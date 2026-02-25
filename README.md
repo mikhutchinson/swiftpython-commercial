@@ -91,4 +91,4 @@ For production builds, set `SWIFTPYTHON_AUTOBUILD_WORKER=0` and ensure the worke
 
 ## License
 
-Binary distribution only. Source and licensing for SwiftPython are governed by the [SwiftPython](https://github.com/mikhutchinson/swiftpython) project (AGPL-3.0 + Commercial).
+Proprietary. See [LICENSE](LICENSE) for terms. You may link against and distribute apps built with this package, but you may not redistribute, reverse engineer, or modify the binaries themselves. SwiftPython source is licensed separately under [AGPL-3.0 + Commercial](https://github.com/mikhutchinson/SwiftPython/blob/main/LICENSE).

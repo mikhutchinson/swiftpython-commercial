@@ -1,0 +1,67 @@
+SwiftPython Commercial Runtime — Proprietary License
+=====================================================
+
+Copyright (c) 2026 SwiftPython Contributors. All rights reserved.
+
+This package ("SwiftPython Commercial Runtime") contains prebuilt binary
+artifacts of the SwiftPython runtime. By downloading, installing, or using
+this package, you agree to the following terms.
+
+--------------------------------------------------------------------------------
+                              GRANT OF USE
+--------------------------------------------------------------------------------
+
+You are granted a non-exclusive, non-transferable, royalty-free license to:
+
+  1. Link your applications against the SwiftPythonRuntime.xcframework
+  2. Bundle and distribute SwiftPythonWorker within your applications
+  3. Distribute applications built against this package to end users
+
+--------------------------------------------------------------------------------
+                              RESTRICTIONS
+--------------------------------------------------------------------------------
+
+You may NOT:
+
+  1. Reverse engineer, decompile, or disassemble any binary in this package
+  2. Redistribute the SwiftPythonRuntime.xcframework or SwiftPythonWorker
+     binary as a standalone package, library, or framework
+  3. Modify the binaries or create derivative works from them
+  4. Remove or alter any proprietary notices, labels, or marks
+  5. Use the binaries to build competing runtime libraries or frameworks
+  6. Sublicense, sell, or transfer the binaries except as embedded within
+     your end-user applications
+
+--------------------------------------------------------------------------------
+                            NO SOURCE CODE
+--------------------------------------------------------------------------------
+
+This package contains compiled binaries only. No source code is provided or
+implied. The SwiftPython source code is licensed separately under AGPL-3.0
+with a commercial license option at:
+
+  https://github.com/mikhutchinson/SwiftPython
+
+--------------------------------------------------------------------------------
+                          WARRANTY DISCLAIMER
+--------------------------------------------------------------------------------
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+                              TERMINATION
+--------------------------------------------------------------------------------
+
+This license is effective until terminated. It will terminate automatically
+if you fail to comply with any term. Upon termination, you must destroy all
+copies of the binaries in your possession.
+
+For commercial licensing inquiries:
+  - Email: licensing@swiftpython.dev
+  - Website: https://swiftpython.dev/commercial
