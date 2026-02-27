@@ -80,7 +80,10 @@ exec "$(dirname "$0")/YourApp.bin"
 
 ## Version History
 
-See [GitHub Releases](https://github.com/mikhutchinson/swiftpython-commercial/releases) for version details and changelogs.
+| Build | Date | Notes |
+|-------|------|-------|
+| 0.1.7+build.20260227 | 2026-02-27 | Memory-pressure-aware worker lifecycle; stream timeout socket drain; unified post-spawn setup (`configureSpawnedWorker`); dispatch_source_memorypressure actor isolation fix; MLX SIGBUS fix; worker `MSG_NOSIGNAL` on Linux; `persistentNamespace` cleanup on shutdown |
+| 0.1.7 | — | See [GitHub Releases](https://github.com/mikhutchinson/swiftpython-commercial/releases) for prior release details |
 
 ## License
 
