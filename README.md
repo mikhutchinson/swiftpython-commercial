@@ -70,6 +70,54 @@ export PATH="$PYTHONHOME/bin:$PATH"
 exec "$(dirname "$0")/YourApp.bin"
 ```
 
+## Entitlements & Code Signing
+
+The `SwiftPythonWorker` and your consumer app both need specific entitlements to work under macOS [Hardened Runtime](https://developer.apple.com/documentation/security/hardened-runtime) (required for notarization) and optionally [App Sandbox](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app).
+
+### Why entitlements are needed
+
+Python loads ad-hoc signed `.so` extension modules (NumPy, Torch, etc.) and uses `mmap(PROT_WRITE|PROT_EXEC)` internally. Under Hardened Runtime, macOS blocks both behaviors unless the executable carries the appropriate code signing exceptions. Since the worker is a separate process (spawned via `posix_spawn`), it needs its own entitlements — it does not inherit from your app.
+
+### Worker (pre-signed)
+
+The `SwiftPythonWorker` ships pre-signed with hardened runtime and 5 entitlements:
+
+| Entitlement | Purpose |
+|-------------|---------|
+| `cs.allow-unsigned-executable-memory` | Python/NumPy/SciPy use `mmap(PROT_EXEC)` without `MAP_JIT` |
+| `cs.disable-library-validation` | Load ad-hoc signed `.so` modules and Homebrew's `libpython` |
+| `cs.allow-dyld-environment-variables` | Safety net for non-Homebrew Python installs using `DYLD_LIBRARY_PATH` |
+| `com.apple.security.app-sandbox` | Sandbox support (no-op when parent is not sandboxed) |
+| `com.apple.security.inherit` | Inherit parent's sandbox profile when App Sandbox is enabled |
+
+**After copying the worker into your `.app` bundle, you must re-sign it** — copying invalidates the signature:
+
+```bash
+codesign --force --sign - --options runtime \
+  --entitlements Entitlements/SwiftPythonWorker.entitlements \
+  "YourApp.app/Contents/MacOS/SwiftPythonWorker"
+```
+
+### Consumer app
+
+Your app binary links `libpython3.13` (via the XCFramework static lib) and needs its own entitlements. Use the `Entitlements/ConsumerApp.entitlements` template:
+
+```bash
+codesign --force --sign - --options runtime \
+  --entitlements Entitlements/ConsumerApp.entitlements \
+  "YourApp.app/Contents/MacOS/YourApp"
+```
+
+For notarization, replace `--sign -` with `--sign "Developer ID Application: Your Name (TEAMID)"`. **Sign innermost first** (worker, then app).
+
+### App Sandbox (Mac App Store)
+
+The worker already carries `app-sandbox` + `inherit`, so it automatically inherits your app's sandbox when you enable App Sandbox on your consumer app. No separate worker entitlements file needed — the same entitlements work for both Developer ID and Mac App Store distribution.
+
+To enable App Sandbox on your consumer app, uncomment the sandbox keys in `Entitlements/ConsumerApp.entitlements`.
+
+> **Caveat**: `com.apple.security.get-task-allow` (injected by Xcode in debug builds) is incompatible with `com.apple.security.inherit`. If the worker crashes on launch during development, ensure "Code Sign On Copy" is checked in your Xcode build phase, or set `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`.
+
 ## Troubleshooting
 
 | Issue | Resolution |

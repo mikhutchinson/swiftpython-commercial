@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- REQUIRED: Your app links libpython via the XCFramework static lib.
+         Homebrew libpython is ad-hoc signed and uses mmap(PROT_EXEC).
+         See: https://developer.apple.com/documentation/security/hardened-runtime -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- OPTIONAL: Uncomment if your Python env needs DYLD_LIBRARY_PATH (non-Homebrew installs) -->
+    <!-- <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/> -->
+
+    <!-- APP SANDBOX (Mac App Store): Enable these for App Sandbox distribution.
+         The worker already carries app-sandbox + inherit, so it inherits your sandbox.
+         See: https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app -->
+    <!-- <key>com.apple.security.app-sandbox</key><true/> -->
+    <!-- <key>com.apple.security.network.client</key><true/> -->
+    <!-- <key>com.apple.security.files.user-selected.read-write</key><true/> -->
+</dict>
+</plist>
