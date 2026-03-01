@@ -106,7 +106,29 @@ codesign --force --sign - --options runtime \
   "YourApp.app/Contents/MacOS/YourApp"
 ```
 
-For notarization, replace `--sign -` with `--sign "Developer ID Application: Your Name (TEAMID)"`. **Sign innermost first** (worker, then app).
+**Sign innermost first** (worker, then app).
+
+### Signing identity: ad-hoc vs Apple Development
+
+| Identity | Command | Hardened runtime CS exceptions | Keychain access |
+|----------|---------|-------------------------------|-----------------|
+| Ad-hoc | `--sign -` | Works | Login keychain works, but macOS prompts on every rebuild (binary hash changes → new ACL entry) |
+| Apple Development | `--sign "Apple Development: Name (ID)"` | Works | Login keychain works with **no prompts** across rebuilds (same identity = stable ACL) |
+| Developer ID | `--sign "Developer ID Application: Name (ID)"` | Works | Required for notarization |
+
+**Ad-hoc signing is sufficient** for the hardened runtime CS exceptions that SwiftPython needs. However, if your app uses the macOS **login keychain** (`SecItemAdd`/`SecItemCopyMatching`), ad-hoc signing causes a password prompt on every rebuild because each build produces a different binary hash, and the legacy keychain's ACL is per-hash.
+
+**Recommended**: Sign with an Apple Development identity during development. Auto-detect it in your build script:
+
+```bash
+IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Development" | head -1 | awk -F'"' '{print $2}')
+SIGN_ID="${IDENTITY:--}"  # falls back to ad-hoc if no identity found
+codesign --force --sign "$SIGN_ID" --options runtime \
+  --entitlements YourApp.entitlements \
+  "YourApp.app/Contents/MacOS/YourApp"
+```
+
+> **Note on data protection keychain**: `kSecUseDataProtectionKeychain: true` requires a provisioning profile embedded in the app bundle — signing with entitlements alone (even `keychain-access-groups`) returns `errSecMissingEntitlement (-34018)`. Use the standard login keychain for SPM-based apps without Xcode projects.
 
 ### App Sandbox (Mac App Store)
 
