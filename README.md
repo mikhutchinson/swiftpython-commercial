@@ -14,7 +14,7 @@ Add this package to your `Package.swift` dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.1.7")
+    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.1.8")
 ]
 ```
 
@@ -22,7 +22,7 @@ Or use environment variables for dynamic resolution:
 
 ```bash
 export SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://github.com/mikhutchinson/swiftpython-commercial.git
-export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.1.7
+export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.1.8
 ```
 
 ## Usage
@@ -82,6 +82,7 @@ exec "$(dirname "$0")/YourApp.bin"
 
 | Build | Date | Notes |
 |-------|------|-------|
+| 0.1.8 | 2026-03-01 | Side channel (`sideEval`): fire-and-forget Python eval via dedicated UDS socket per worker — safe to call during active streams; stream queue (`enqueue`/`dequeue`): ring-buffer data feed from Swift into Python generators with backpressure; proper `SideCommand` codec in `MessageFrame`; daemon thread shutdown hardened (stop flag + semaphore + GIL fence); 412 tests passing |
 | 0.1.7+build.20260228 | 2026-02-28 | Fix: `sendResponse` write race — `sendLock: NSLock` serializes concurrent `send(2)` calls from main stream thread and Python daemon threads; regression test `testConcurrentDaemonThreadCallbackDuringStream`; warning fixes in test files; AGENTS.md macOS/Linux build split; 957 tests passing |
 | 0.1.7+build.20260227 | 2026-02-27 | Memory-pressure-aware worker lifecycle; stream timeout socket drain; unified post-spawn setup (`configureSpawnedWorker`); dispatch_source_memorypressure actor isolation fix; MLX SIGBUS fix; worker `MSG_NOSIGNAL` on Linux; `persistentNamespace` cleanup on shutdown |
 | 0.1.7 | — | See [GitHub Releases](https://github.com/mikhutchinson/swiftpython-commercial/releases) for prior release details |
