@@ -10,10 +10,5 @@
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
-    <!-- App Sandbox inheritance (no-op when parent is not sandboxed) -->
-    <key>com.apple.security.app-sandbox</key>
-    <true/>
-    <key>com.apple.security.inherit</key>
-    <true/>
 </dict>
 </plist>

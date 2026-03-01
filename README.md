@@ -80,15 +80,13 @@ Python loads ad-hoc signed `.so` extension modules (NumPy, Torch, etc.) and uses
 
 ### Worker (pre-signed)
 
-The `SwiftPythonWorker` ships pre-signed with hardened runtime, an embedded `CFBundleIdentifier` (required by App Sandbox), and 5 entitlements:
+The `SwiftPythonWorker` ships pre-signed with hardened runtime, an embedded `CFBundleIdentifier`, and 3 code signing exceptions:
 
 | Entitlement | Purpose |
 |-------------|---------|
 | `cs.allow-unsigned-executable-memory` | Python/NumPy/SciPy use `mmap(PROT_EXEC)` without `MAP_JIT` |
 | `cs.disable-library-validation` | Load ad-hoc signed `.so` modules and Homebrew's `libpython` |
 | `cs.allow-dyld-environment-variables` | Safety net for non-Homebrew Python installs using `DYLD_LIBRARY_PATH` |
-| `com.apple.security.app-sandbox` | Sandbox support (no-op when parent is not sandboxed) |
-| `com.apple.security.inherit` | Inherit parent's sandbox profile when App Sandbox is enabled |
 
 **After copying the worker into your `.app` bundle, you must re-sign it** — copying invalidates the signature:
 
@@ -112,9 +110,14 @@ For notarization, replace `--sign -` with `--sign "Developer ID Application: You
 
 ### App Sandbox (Mac App Store)
 
-The worker already carries `app-sandbox` + `inherit`, so it automatically inherits your app's sandbox when you enable App Sandbox on your consumer app. No separate worker entitlements file needed — the same entitlements work for both Developer ID and Mac App Store distribution.
+A separate `SwiftPythonWorker-sandbox.entitlements` is provided for Mac App Store distribution where the parent app is sandboxed. It adds `app-sandbox` + `inherit` so the worker inherits the parent's sandbox profile.
 
-To enable App Sandbox on your consumer app, uncomment the sandbox keys in `Entitlements/ConsumerApp.entitlements`.
+> **Warning**: Do NOT use the sandbox entitlements if the parent app is not sandboxed. `app-sandbox: true` always activates sandboxing — when the parent isn't sandboxed, the worker gets a default restrictive sandbox that blocks Python file access (`/opt/homebrew/`, site-packages, etc.), causing it to hang on initialization.
+
+To use:
+1. Sign the worker with `SwiftPythonWorker-sandbox.entitlements` instead of `SwiftPythonWorker.entitlements`
+2. Enable App Sandbox on your consumer app (uncomment sandbox keys in `ConsumerApp.entitlements`)
+3. Ensure Python framework + site-packages are accessible within the sandbox (bundled in the app or in a sandbox-readable location)
 
 > **Caveat**: `com.apple.security.get-task-allow` (injected by Xcode in debug builds) is incompatible with `com.apple.security.inherit`. If the worker crashes on launch during development, ensure "Code Sign On Copy" is checked in your Xcode build phase, or set `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`.
 
