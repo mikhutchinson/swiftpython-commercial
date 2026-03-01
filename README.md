@@ -80,7 +80,7 @@ Python loads ad-hoc signed `.so` extension modules (NumPy, Torch, etc.) and uses
 
 ### Worker (pre-signed)
 
-The `SwiftPythonWorker` ships pre-signed with hardened runtime and 5 entitlements:
+The `SwiftPythonWorker` ships pre-signed with hardened runtime, an embedded `CFBundleIdentifier` (required by App Sandbox), and 5 entitlements:
 
 | Entitlement | Purpose |
 |-------------|---------|
