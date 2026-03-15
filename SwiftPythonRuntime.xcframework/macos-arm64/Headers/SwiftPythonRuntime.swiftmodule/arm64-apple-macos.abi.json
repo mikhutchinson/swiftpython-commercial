@@ -33155,14 +33155,10 @@
             "moduleName": "SwiftPythonRuntime",
             "static": true,
             "declAttributes": [
-              "HasInitialValue",
               "Final",
-              "HasStorage",
               "AccessControl",
               "RawDocComment"
             ],
-            "isLet": true,
-            "hasStorage": true,
             "accessors": [
               {
                 "kind": "Accessor",
@@ -33181,7 +33177,6 @@
                 "mangledName": "$s18SwiftPythonRuntime13WorkerProcessC22defaultSocketDirectorySSvgZ",
                 "moduleName": "SwiftPythonRuntime",
                 "static": true,
-                "implicit": true,
                 "declAttributes": [
                   "Final"
                 ],
@@ -58157,141 +58152,134 @@
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
-      "kind": "StringLiteral",
-      "offset": 2728,
-      "length": 6,
-      "value": "\"\/tmp\""
-    },
-    {
-      "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 3379,
+      "offset": 3474,
       "length": 2,
       "value": "-1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "StringLiteral",
-      "offset": 3827,
+      "offset": 3922,
       "length": 2,
       "value": "\"\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 3934,
+      "offset": 4029,
       "length": 2,
       "value": "-1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 4397,
+      "offset": 4492,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "FloatLiteral",
-      "offset": 5092,
+      "offset": 5158,
       "length": 4,
       "value": "10.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "FloatLiteral",
-      "offset": 10930,
+      "offset": 10929,
       "length": 4,
       "value": "10.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 12169,
+      "offset": 12168,
       "length": 2,
       "value": "-1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "FloatLiteral",
-      "offset": 14326,
+      "offset": 14325,
       "length": 4,
       "value": "10.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 24982,
+      "offset": 24981,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 47839,
+      "offset": 47838,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 49049,
+      "offset": 49048,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Array",
-      "offset": 53895,
+      "offset": 53894,
       "length": 2,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 53927,
+      "offset": 53926,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 54166,
+      "offset": 54165,
       "length": 2,
       "value": "16"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "Array",
-      "offset": 56577,
+      "offset": 56576,
       "length": 2,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 57881,
+      "offset": 57880,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 57912,
+      "offset": 57911,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "BooleanLiteral",
-      "offset": 57941,
+      "offset": 57940,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess.swift",
       "kind": "BooleanLiteral",
-      "offset": 58013,
+      "offset": 58012,
       "length": 5,
       "value": "false"
     },

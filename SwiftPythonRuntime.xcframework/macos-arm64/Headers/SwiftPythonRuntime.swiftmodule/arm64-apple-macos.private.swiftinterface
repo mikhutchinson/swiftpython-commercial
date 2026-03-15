@@ -1390,7 +1390,9 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
   final public var pid: _DarwinFoundation2.pid_t {
     get
   }
-  public static let defaultSocketDirectory: Swift.String
+  public static var defaultSocketDirectory: Swift.String {
+    get
+  }
   final public var socketPath: Swift.String {
     get
   }
