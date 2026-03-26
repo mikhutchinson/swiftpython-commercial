@@ -1794,48 +1794,6 @@
             ]
           },
           {
-            "kind": "Var",
-            "name": "unownedExecutor",
-            "printedName": "unownedExecutor",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "UnownedSerialExecutor",
-                "printedName": "_Concurrency.UnownedSerialExecutor",
-                "usr": "s:Sce"
-              }
-            ],
-            "declKind": "Var",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevp",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevp",
-            "moduleName": "SwiftPythonRuntime",
-            "declAttributes": [
-              "Nonisolated",
-              "AccessControl",
-              "RawDocComment"
-            ],
-            "accessors": [
-              {
-                "kind": "Accessor",
-                "name": "Get",
-                "printedName": "Get()",
-                "children": [
-                  {
-                    "kind": "TypeNominal",
-                    "name": "UnownedSerialExecutor",
-                    "printedName": "_Concurrency.UnownedSerialExecutor",
-                    "usr": "s:Sce"
-                  }
-                ],
-                "declKind": "Accessor",
-                "usr": "s:18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevg",
-                "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevg",
-                "moduleName": "SwiftPythonRuntime",
-                "accessorKind": "get"
-              }
-            ]
-          },
-          {
             "kind": "Function",
             "name": "run",
             "printedName": "run(_:)",
@@ -1860,20 +1818,16 @@
                     "name": "Void",
                     "printedName": "()"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC3runyxxyYbKXEYaKs8SendableRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC3runyxxyYbKXEYaKs8SendableRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC3runyxxyYbKcYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC3runyxxyYbKcYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
             "declAttributes": [
-              "Rethrows",
               "AccessControl",
               "RawDocComment"
             ],
@@ -1907,18 +1861,14 @@
                     "name": "Void",
                     "printedName": "()"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC7executeyAA11PyObjectRefCAFyYbKXEYaKF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC7executeyAA11PyObjectRefCAFyYbKXEYaKF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC7executeyAA11PyObjectRefCAFyYbKcYaKF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC7executeyAA11PyObjectRefCAFyYbKcYaKF",
             "moduleName": "SwiftPythonRuntime",
             "declAttributes": [
-              "Rethrows",
               "AccessControl",
               "DiscardableResult",
               "RawDocComment"
@@ -1952,15 +1902,12 @@
                     "name": "Void",
                     "printedName": "()"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC7executeyxAA11PyObjectRefCyYbKXEYaKAA0B11ConvertibleRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC7executeyxAA11PyObjectRefCyYbKXEYaKAA0B11ConvertibleRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC7executeyxAA11PyObjectRefCyYbKcYaKAA0B11ConvertibleRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC7executeyxAA11PyObjectRefCyYbKcYaKAA0B11ConvertibleRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : SwiftPythonRuntime.PythonConvertible>",
             "sugared_genericSig": "<T where T : SwiftPythonRuntime.PythonConvertible>",
@@ -1970,6 +1917,61 @@
             ],
             "throwing": true,
             "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Var",
+            "name": "unownedExecutor",
+            "printedName": "unownedExecutor",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "UnownedSerialExecutor",
+                "printedName": "_Concurrency.UnownedSerialExecutor",
+                "usr": "s:Sce"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevp",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevp",
+            "moduleName": "SwiftPythonRuntime",
+            "implicit": true,
+            "intro_Macosx": "10.15",
+            "intro_iOS": "13.0",
+            "intro_tvOS": "13.0",
+            "intro_watchOS": "6.0",
+            "declAttributes": [
+              "Available",
+              "Available",
+              "Available",
+              "Available",
+              "Final",
+              "Nonisolated",
+              "Semantics"
+            ],
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "UnownedSerialExecutor",
+                    "printedName": "_Concurrency.UnownedSerialExecutor",
+                    "usr": "s:Sce"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevg",
+                "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC07unownedD0Scevg",
+                "moduleName": "SwiftPythonRuntime",
+                "implicit": true,
+                "declAttributes": [
+                  "Final"
+                ],
+                "accessorKind": "get"
+              }
+            ]
           },
           {
             "kind": "Function",
@@ -2064,15 +2066,12 @@
                     "printedName": "SwiftPythonRuntime.PyObjectRef",
                     "usr": "s:18SwiftPythonRuntime11PyObjectRefC"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC10withObjectyxAA8PyHandleV_xAA0gF3RefCYbKXEtYaKs8SendableRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC10withObjectyxAA8PyHandleV_xAA0gF3RefCYbKXEtYaKs8SendableRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC10withObjectyxAA8PyHandleV_xAA0gF3RefCYbKctYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC10withObjectyxAA8PyHandleV_xAA0gF3RefCYbKctYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
@@ -2135,15 +2134,12 @@
                       }
                     ]
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_AFxAA0G9ObjectRefC_AHtYbKXEtYaKs8SendableRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_AFxAA0G9ObjectRefC_AHtYbKXEtYaKs8SendableRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_AFxAA0G9ObjectRefC_AHtYbKctYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_AFxAA0G9ObjectRefC_AHtYbKctYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
@@ -2218,15 +2214,12 @@
                       }
                     ]
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_A2FxAA0G9ObjectRefC_A2HtYbKXEtYaKs8SendableRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_A2FxAA0G9ObjectRefC_A2HtYbKXEtYaKs8SendableRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_A2FxAA0G9ObjectRefC_A2HtYbKctYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxAA8PyHandleV_A2FxAA0G9ObjectRefC_A2HtYbKctYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
@@ -2286,15 +2279,12 @@
                     ],
                     "usr": "s:Sa"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxSayAA8PyHandleVG_xSayAA0G9ObjectRefCGYbKXEtYaKs8SendableRzlF",
-            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxSayAA8PyHandleVG_xSayAA0G9ObjectRefCGYbKXEtYaKs8SendableRzlF",
+            "usr": "s:18SwiftPythonRuntime0B8ExecutorC11withObjectsyxSayAA8PyHandleVG_xSayAA0G9ObjectRefCGYbKctYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B8ExecutorC11withObjectsyxSayAA8PyHandleVG_xSayAA0G9ObjectRefCGYbKctYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
@@ -37407,21 +37397,17 @@
                     "name": "Void",
                     "printedName": "()"
                   }
-                ],
-                "typeAttributes": [
-                  "noescape"
                 ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B0V3runyxxyYbKXEYaKs8SendableRzlFZ",
-            "mangledName": "$s18SwiftPythonRuntime0B0V3runyxxyYbKXEYaKs8SendableRzlFZ",
+            "usr": "s:18SwiftPythonRuntime0B0V3runyxxyYbKcYaKs8SendableRzlFZ",
+            "mangledName": "$s18SwiftPythonRuntime0B0V3runyxxyYbKcYaKs8SendableRzlFZ",
             "moduleName": "SwiftPythonRuntime",
             "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
             "sugared_genericSig": "<T where T : Swift.Sendable>",
             "static": true,
             "declAttributes": [
-              "Rethrows",
               "AccessControl",
               "RawDocComment"
             ],
@@ -49735,8 +49721,7 @@
               "HasInitialValue",
               "Final",
               "HasStorage",
-              "AccessControl",
-              "RawDocComment"
+              "AccessControl"
             ],
             "isLet": true,
             "hasStorage": true,
@@ -49768,53 +49753,87 @@
           },
           {
             "kind": "Function",
-            "name": "enqueue",
-            "printedName": "enqueue(_:)",
+            "name": "runOnThread",
+            "printedName": "runOnThread(_:)",
             "children": [
               {
                 "kind": "TypeNominal",
-                "name": "Void",
-                "printedName": "()"
+                "name": "GenericTypeParam",
+                "printedName": "τ_0_0"
               },
               {
-                "kind": "TypeNominal",
-                "name": "UnownedJob",
-                "printedName": "_Concurrency.UnownedJob",
-                "usr": "s:ScJ"
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "() throws -> τ_0_0",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_0"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  }
+                ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC7enqueueyyScJF",
-            "mangledName": "$s18SwiftPythonRuntime0B14ThreadExecutorC7enqueueyyScJF",
+            "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC05runOnD0yxxyKcKlF",
+            "mangledName": "$s18SwiftPythonRuntime0B14ThreadExecutorC05runOnD0yxxyKcKlF",
             "moduleName": "SwiftPythonRuntime",
+            "genericSig": "<τ_0_0>",
+            "sugared_genericSig": "<T>",
             "declAttributes": [
               "Final",
               "AccessControl",
+              "DiscardableResult",
               "RawDocComment"
             ],
+            "throwing": true,
             "funcSelfKind": "NonMutating"
           },
           {
             "kind": "Function",
-            "name": "asUnownedSerialExecutor",
-            "printedName": "asUnownedSerialExecutor()",
+            "name": "runOnThreadAsync",
+            "printedName": "runOnThreadAsync(_:)",
             "children": [
               {
                 "kind": "TypeNominal",
-                "name": "UnownedSerialExecutor",
-                "printedName": "_Concurrency.UnownedSerialExecutor",
-                "usr": "s:Sce"
+                "name": "GenericTypeParam",
+                "printedName": "τ_0_0"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "() throws -> τ_0_0",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_0"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  }
+                ]
               }
             ],
             "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC015asUnownedSerialE0SceyF",
-            "mangledName": "$s18SwiftPythonRuntime0B14ThreadExecutorC015asUnownedSerialE0SceyF",
+            "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC05runOnD5AsyncyxxyYbKcYaKs8SendableRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B14ThreadExecutorC05runOnD5AsyncyxxyYbKcYaKs8SendableRzlF",
             "moduleName": "SwiftPythonRuntime",
+            "genericSig": "<τ_0_0 where τ_0_0 : Swift.Sendable>",
+            "sugared_genericSig": "<T where T : Swift.Sendable>",
             "declAttributes": [
               "Final",
               "AccessControl",
               "RawDocComment"
             ],
+            "throwing": true,
             "funcSelfKind": "NonMutating"
           },
           {
@@ -49861,36 +49880,6 @@
                 "accessorKind": "get"
               }
             ]
-          },
-          {
-            "kind": "Function",
-            "name": "isSameExclusiveExecutionContext",
-            "printedName": "isSameExclusiveExecutionContext(other:)",
-            "children": [
-              {
-                "kind": "TypeNominal",
-                "name": "Bool",
-                "printedName": "Swift.Bool",
-                "usr": "s:Sb"
-              },
-              {
-                "kind": "TypeNominal",
-                "name": "PythonThreadExecutor",
-                "printedName": "SwiftPythonRuntime.PythonThreadExecutor",
-                "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC"
-              }
-            ],
-            "declKind": "Func",
-            "usr": "s:18SwiftPythonRuntime0B14ThreadExecutorC31isSameExclusiveExecutionContext5otherSbAC_tF",
-            "mangledName": "$s18SwiftPythonRuntime0B14ThreadExecutorC31isSameExclusiveExecutionContext5otherSbAC_tF",
-            "moduleName": "SwiftPythonRuntime",
-            "declAttributes": [
-              "Final",
-              "AccessControl",
-              "RawDocComment"
-            ],
-            "isFromExtension": true,
-            "funcSelfKind": "NonMutating"
           }
         ],
         "declKind": "Class",
@@ -49920,24 +49909,10 @@
           },
           {
             "kind": "Conformance",
-            "name": "SerialExecutor",
-            "printedName": "SerialExecutor",
-            "usr": "s:Scf",
-            "mangledName": "$sScf"
-          },
-          {
-            "kind": "Conformance",
             "name": "Sendable",
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
             "mangledName": "$ss8SendableP"
-          },
-          {
-            "kind": "Conformance",
-            "name": "Executor",
-            "printedName": "Executor",
-            "usr": "s:ScF",
-            "mangledName": "$sScF"
           },
           {
             "kind": "Conformance",
@@ -56389,14 +56364,14 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/GILManager.swift",
       "kind": "IntegerLiteral",
-      "offset": 1259,
+      "offset": 1227,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/GILManager.swift",
       "kind": "Dictionary",
-      "offset": 9720,
+      "offset": 9485,
       "length": 3,
       "value": "[]"
     },
@@ -58489,21 +58464,21 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonThreadExecutor.swift",
       "kind": "Array",
-      "offset": 969,
+      "offset": 2036,
       "length": 2,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonThreadExecutor.swift",
       "kind": "BooleanLiteral",
-      "offset": 2105,
+      "offset": 2141,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonThreadExecutor.swift",
       "kind": "BooleanLiteral",
-      "offset": 2188,
+      "offset": 2224,
       "length": 5,
       "value": "false"
     },

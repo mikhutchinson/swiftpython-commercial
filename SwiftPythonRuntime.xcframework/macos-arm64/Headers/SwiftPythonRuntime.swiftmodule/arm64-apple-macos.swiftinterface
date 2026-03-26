@@ -85,14 +85,15 @@ public struct PythonAttributeProxy : Swift.Sendable {
 }
 @_hasMissingDesignatedInitializers public actor PythonExecutor {
   public static let shared: SwiftPythonRuntime.PythonExecutor
-  nonisolated public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+  public func run<T>(_ operation: @escaping @Sendable () throws -> T) async throws -> T where T : Swift.Sendable
+  @discardableResult
+  public func execute(_ operation: @escaping @Sendable () throws -> SwiftPythonRuntime.PyObjectRef) async throws -> SwiftPythonRuntime.PyObjectRef
+  public func execute<T>(_ operation: @escaping @Sendable () throws -> SwiftPythonRuntime.PyObjectRef) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
     get
   }
-  public func run<T>(_ operation: @Sendable () throws -> T) async rethrows -> T where T : Swift.Sendable
-  @discardableResult
-  public func execute(_ operation: @Sendable () throws -> SwiftPythonRuntime.PyObjectRef) async rethrows -> SwiftPythonRuntime.PyObjectRef
-  public func execute<T>(_ operation: @Sendable () throws -> SwiftPythonRuntime.PyObjectRef) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  @objc deinit
 }
 final public class PythonObjectRef : @unchecked Swift.Sendable {
   public init(pythonObject: SwiftPythonRuntime.PyObjectRef)
@@ -163,10 +164,10 @@ public struct PyHandleSharedMemoryRef : Swift.Sendable, Swift.Hashable {
 extension SwiftPythonRuntime.PythonExecutor {
   public func store(_ obj: SwiftPythonRuntime.PyObjectRef) async throws -> SwiftPythonRuntime.PyHandle
   public static func storeSync(_ obj: SwiftPythonRuntime.PyObjectRef) -> SwiftPythonRuntime.PyHandle
-  public func withObject<T>(_ handle: SwiftPythonRuntime.PyHandle, _ body: @Sendable (SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
-  public func withObjects<T>(_ h1: SwiftPythonRuntime.PyHandle, _ h2: SwiftPythonRuntime.PyHandle, _ body: @Sendable (SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
-  public func withObjects<T>(_ h1: SwiftPythonRuntime.PyHandle, _ h2: SwiftPythonRuntime.PyHandle, _ h3: SwiftPythonRuntime.PyHandle, _ body: @Sendable (SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
-  public func withObjects<T>(_ handles: [SwiftPythonRuntime.PyHandle], _ body: @Sendable ([SwiftPythonRuntime.PyObjectRef]) throws -> T) async throws -> T where T : Swift.Sendable
+  public func withObject<T>(_ handle: SwiftPythonRuntime.PyHandle, _ body: @escaping @Sendable (SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
+  public func withObjects<T>(_ h1: SwiftPythonRuntime.PyHandle, _ h2: SwiftPythonRuntime.PyHandle, _ body: @escaping @Sendable (SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
+  public func withObjects<T>(_ h1: SwiftPythonRuntime.PyHandle, _ h2: SwiftPythonRuntime.PyHandle, _ h3: SwiftPythonRuntime.PyHandle, _ body: @escaping @Sendable (SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef, SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
+  public func withObjects<T>(_ handles: [SwiftPythonRuntime.PyHandle], _ body: @escaping @Sendable ([SwiftPythonRuntime.PyObjectRef]) throws -> T) async throws -> T where T : Swift.Sendable
   nonisolated public static func withObjectUsingGIL<T>(_ handle: SwiftPythonRuntime.PyHandle, _ body: (SwiftPythonRuntime.PyObjectRef) throws -> T) throws -> T
   nonisolated public static func storeSyncUsingGIL(_ obj: SwiftPythonRuntime.PyObjectRef) -> SwiftPythonRuntime.PyHandle
   nonisolated public static func releaseUsingGIL(_ handles: [SwiftPythonRuntime.PyHandle])
@@ -1562,7 +1563,7 @@ public struct Python {
   public static func `import`(_ name: Swift.String) throws -> SwiftPythonRuntime.PyObjectRef
   public static func importModule(_ name: Swift.String) throws -> SwiftPythonRuntime.PyObjectRef
   public static func len(_ object: SwiftPythonRuntime.PyObjectRef) throws -> Swift.Int
-  public static func run<T>(_ operation: @Sendable () throws -> T) async rethrows -> T where T : Swift.Sendable
+  public static func run<T>(_ operation: @escaping @Sendable () throws -> T) async throws -> T where T : Swift.Sendable
   public static var sys: SwiftPythonRuntime.PyObjectRef {
     get throws
   }
@@ -2091,17 +2092,15 @@ public struct MultiIndex : Swift.Sendable {
   public init(_ elements: SwiftPythonRuntime.IndexElement...)
   public func toPyObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
-@_hasMissingDesignatedInitializers final public class PythonThreadExecutor : _Concurrency.SerialExecutor, @unchecked Swift.Sendable {
+@_hasMissingDesignatedInitializers final public class PythonThreadExecutor : @unchecked Swift.Sendable {
   public static let shared: SwiftPythonRuntime.PythonThreadExecutor
-  final public func enqueue(_ job: _Concurrency.UnownedJob)
-  final public func asUnownedSerialExecutor() -> _Concurrency.UnownedSerialExecutor
+  @discardableResult
+  final public func runOnThread<T>(_ body: @escaping () throws -> T) throws -> T
+  final public func runOnThreadAsync<T>(_ body: @escaping @Sendable () throws -> T) async throws -> T where T : Swift.Sendable
   final public var isOnPythonThread: Swift.Bool {
     get
   }
   @objc deinit
-}
-extension SwiftPythonRuntime.PythonThreadExecutor {
-  final public func isSameExclusiveExecutionContext(other: SwiftPythonRuntime.PythonThreadExecutor) -> Swift.Bool
 }
 public protocol PythonConvertible : Swift.Sendable {
   init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
