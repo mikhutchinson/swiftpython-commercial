@@ -1,7 +1,7 @@
 // swift-interface-format-version: 1.0
-// swift-compiler-version: Apple Swift version 6.2.4 (swiftlang-6.2.4.1.4 clang-1700.6.4.2)
+// swift-compiler-version: Apple Swift version 6.3 (swiftlang-6.3.0.123.5 clang-2100.0.123.102)
 // swift-module-flags: -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -O -module-name SwiftPythonRuntime -package-name swiftpython
-// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.2.4
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3
 import Darwin
 import Dispatch
 import Foundation
@@ -13,11 +13,9 @@ import _StringProcessing
 import _SwiftConcurrencyShims
 @_hasMissingDesignatedInitializers public actor PythonAsyncioLoop {
   public static let shared: SwiftPythonRuntime.PythonAsyncioLoop
-  #if compiler(>=5.3) && $NonescapableTypes
   public var eventLoop: SwiftPythonRuntime.PyObjectRef? {
     get
   }
-  #endif
   public func initialize() async throws
   public func run<T>(_ coroutine: SwiftPythonRuntime.PyObjectRef) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
   public func runUntilComplete(_ coroutine: SwiftPythonRuntime.PyObjectRef) async throws -> SwiftPythonRuntime.PyObjectRef
@@ -58,18 +56,14 @@ public struct ContextManagerExceptionSuppressed : Swift.Error {
 public protocol PythonContextManager {
   associatedtype ContextType
   func __enter__() async throws -> Self.ContextType
-  #if compiler(>=5.3) && $NonescapableTypes
   func __exit__(type: SwiftPythonRuntime.PyObjectRef?, value: SwiftPythonRuntime.PyObjectRef?, traceback: SwiftPythonRuntime.PyObjectRef?) async throws -> SwiftPythonRuntime.PyObjectRef
-  #endif
 }
 public func withPythonContext<Manager, T>(_ manager: Manager, _ body: @Sendable (Manager.ContextType) async throws -> T) async throws -> T where Manager : Swift.Sendable, Manager : SwiftPythonRuntime.PythonContextManager, T : Swift.Sendable, Manager.ContextType : Swift.Sendable
 public struct PyContextManager : SwiftPythonRuntime.PythonContextManager, Swift.Sendable {
   public typealias ContextType = SwiftPythonRuntime.PyObjectRef
   public init(_ pythonObject: SwiftPythonRuntime.PyObjectRef)
   public func __enter__() async throws -> SwiftPythonRuntime.PyObjectRef
-  #if compiler(>=5.3) && $NonescapableTypes
   public func __exit__(type: SwiftPythonRuntime.PyObjectRef?, value: SwiftPythonRuntime.PyObjectRef?, traceback: SwiftPythonRuntime.PyObjectRef?) async throws -> SwiftPythonRuntime.PyObjectRef
-  #endif
 }
 public func withPythonContext<T>(_ contextManager: SwiftPythonRuntime.PyObjectRef, _ body: @Sendable (SwiftPythonRuntime.PyObjectRef) async throws -> T) async throws -> T where T : Swift.Sendable
 public func withPythonContextSync<T>(_ contextManager: SwiftPythonRuntime.PyObjectRef, _ body: (SwiftPythonRuntime.PyObjectRef) throws -> T) throws -> T
@@ -112,9 +106,7 @@ public struct PyHandle : Swift.Sendable, Swift.Hashable {
   public let id: Foundation.UUID
   public let processID: SwiftPythonRuntime.PyHandleProcessID?
   public let sharedMemory: SwiftPythonRuntime.PyHandleSharedMemoryRef?
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(id: Foundation.UUID = UUID(), processID: SwiftPythonRuntime.PyHandleProcessID?, sharedMemory: SwiftPythonRuntime.PyHandleSharedMemoryRef? = nil)
-  #endif
   public var isMainProcess: Swift.Bool {
     get
   }
@@ -130,16 +122,12 @@ public struct PyHandle : Swift.Sendable, Swift.Hashable {
 public enum PyHandleProcessID : Swift.Sendable, Swift.Hashable, Swift.Codable {
   case main
   case worker(index: Swift.Int, generation: Swift.UInt64)
-  #if compiler(>=5.3) && $NonescapableTypes
   public var workerIndex: Swift.Int? {
     get
   }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public var workerGeneration: Swift.UInt64? {
     get
   }
-  #endif
   public static func == (a: SwiftPythonRuntime.PyHandleProcessID, b: SwiftPythonRuntime.PyHandleProcessID) -> Swift.Bool
   public func encode(to encoder: any Swift.Encoder) throws
   public func hash(into hasher: inout Swift.Hasher)
@@ -183,9 +171,7 @@ public struct CancellableStream<Element> : _Concurrency.AsyncSequence, Swift.Sen
   public init(_ base: _Concurrency.AsyncThrowingStream<Element, any Swift.Error>, onCancel: @escaping @Sendable () -> Swift.Void)
   public func makeAsyncIterator() -> SwiftPythonRuntime.CancellableStream<Element>.Iterator
   public struct Iterator : _Concurrency.AsyncIteratorProtocol {
-    #if compiler(>=5.3) && $NonescapableTypes
     public mutating func next() async throws -> Element?
-    #endif
     @available(iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
     @_implements(_Concurrency.AsyncIteratorProtocol, Failure) public typealias __AsyncIteratorProtocol_Failure = any Swift.Error
   }
@@ -208,16 +194,12 @@ public struct IPCConfiguration : Swift.Sendable, Swift.Codable, Swift.Equatable 
 public enum ProcessID : Swift.Sendable, Swift.Hashable, Swift.Codable {
   case main
   case worker(index: Swift.Int, generation: Swift.UInt64)
-  #if compiler(>=5.3) && $NonescapableTypes
   public var workerIndex: Swift.Int? {
     get
   }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public var workerGeneration: Swift.UInt64? {
     get
   }
-  #endif
   public static func == (a: SwiftPythonRuntime.ProcessID, b: SwiftPythonRuntime.ProcessID) -> Swift.Bool
   public func encode(to encoder: any Swift.Encoder) throws
   public func hash(into hasher: inout Swift.Hasher)
@@ -235,9 +217,7 @@ public struct HandleDescriptor : Swift.Sendable, Swift.Hashable, Swift.Codable {
   public let size: Swift.Int?
   public let shape: [Swift.Int]?
   public let dtype: Swift.String?
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(id: Foundation.UUID, processID: SwiftPythonRuntime.ProcessID, isShared: Swift.Bool = false, shmName: Swift.String? = nil, offset: Swift.Int? = nil, size: Swift.Int? = nil, shape: [Swift.Int]? = nil, dtype: Swift.String? = nil)
-  #endif
   public static func local(id: Foundation.UUID, processID: SwiftPythonRuntime.ProcessID) -> SwiftPythonRuntime.HandleDescriptor
   public static func shared(id: Foundation.UUID, processID: SwiftPythonRuntime.ProcessID, shmName: Swift.String, offset: Swift.Int, size: Swift.Int, shape: [Swift.Int], dtype: Swift.String) -> SwiftPythonRuntime.HandleDescriptor
   public static func == (a: SwiftPythonRuntime.HandleDescriptor, b: SwiftPythonRuntime.HandleDescriptor) -> Swift.Bool
@@ -289,9 +269,7 @@ public enum WorkerErrorCode : Swift.String, Swift.Sendable, Swift.Codable {
   case sharedMemoryError
   case internalError
   case unknown
-  #if compiler(>=5.3) && $NonescapableTypes
   public init?(rawValue: Swift.String)
-  #endif
   public typealias RawValue = Swift.String
   public var rawValue: Swift.String {
     get
@@ -327,9 +305,7 @@ public struct MessageFrame {
     case command
     case response
     case side
-    #if compiler(>=5.3) && $NonescapableTypes
     public init?(rawValue: Swift.UInt8)
-    #endif
     public typealias RawValue = Swift.UInt8
     public var rawValue: Swift.UInt8 {
       get
@@ -349,9 +325,7 @@ public struct MessageFrame {
   public static func encode(response: SwiftPythonRuntime.WorkerResponse) throws -> Foundation.Data
   public static func encodeComponents(sideCommand: SwiftPythonRuntime.SideCommand) throws -> SwiftPythonRuntime.MessageFrame.FrameComponents
   public static func encode(sideCommand: SwiftPythonRuntime.SideCommand) throws -> Foundation.Data
-  #if compiler(>=5.3) && $NonescapableTypes
   public static func readHeader(from data: Foundation.Data, maxPayloadBytes: Swift.Int? = nil) throws -> (SwiftPythonRuntime.MessageFrame.MessageType, Swift.Int, Swift.Int)?
-  #endif
   public static func decodeSideCommand(from jsonPayload: Foundation.Data) throws -> SwiftPythonRuntime.SideCommand
   public static func decodeCommand(from jsonPayload: Foundation.Data, binary: Foundation.Data = Data()) throws -> SwiftPythonRuntime.WorkerCommand
   public static func decodeResponse(from jsonPayload: Foundation.Data, binary: Foundation.Data = Data()) throws -> SwiftPythonRuntime.WorkerResponse
@@ -386,11 +360,9 @@ public enum PythonWorkerError : Swift.Error, Swift.Sendable {
   case ipcError(Swift.String)
 }
 extension SwiftPythonRuntime.PythonWorkerError : Foundation.LocalizedError {
-  #if compiler(>=5.3) && $NonescapableTypes
   public var errorDescription: Swift.String? {
     get
   }
-  #endif
 }
 extension SwiftPythonRuntime.PythonWorkerError : Swift.CustomStringConvertible {
   public var description: Swift.String {
@@ -412,9 +384,7 @@ public enum WorkloadType : Swift.Sendable {
 }
 public struct WorkerResourceLimits : Swift.Sendable, Swift.Codable, Swift.Equatable {
   public var maxMemoryBytes: Swift.Int?
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(maxMemoryBytes: Swift.Int? = nil)
-  #endif
   public static let `default`: SwiftPythonRuntime.WorkerResourceLimits
   public static func == (a: SwiftPythonRuntime.WorkerResourceLimits, b: SwiftPythonRuntime.WorkerResourceLimits) -> Swift.Bool
   public func encode(to encoder: any Swift.Encoder) throws
@@ -431,9 +401,7 @@ public enum ThermalLevel : Swift.Int, Swift.Sendable, Swift.Comparable {
   case serious
   case critical
   public static func < (lhs: SwiftPythonRuntime.ThermalLevel, rhs: SwiftPythonRuntime.ThermalLevel) -> Swift.Bool
-  #if compiler(>=5.3) && $NonescapableTypes
   public init?(rawValue: Swift.Int)
-  #endif
   public typealias RawValue = Swift.Int
   public var rawValue: Swift.Int {
     get
@@ -463,9 +431,7 @@ public struct ResourceMonitorConfig : Swift.Sendable {
   public var idleShutdownTimeout: Foundation.TimeInterval
   public var spawnPressureTimeout: Foundation.TimeInterval
   public var enabled: Swift.Bool
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(sampleInterval: Foundation.TimeInterval = 2.0, memoryPressureThrottle: Swift.Double = 0.85, memoryPressureReject: Swift.Double = 0.95, thermalThrottleLevel: SwiftPythonRuntime.ThermalLevel = .fair, workerCPUThrottlePercent: Swift.Double = 90.0, idleShutdownTimeout: Foundation.TimeInterval = 60.0, spawnPressureTimeout: Foundation.TimeInterval = 30.0, enabled: Swift.Bool? = nil)
-  #endif
   public static let `default`: SwiftPythonRuntime.ResourceMonitorConfig
   public static let disabled: SwiftPythonRuntime.ResourceMonitorConfig
 }
@@ -473,9 +439,7 @@ public struct SharedMemoryConfig : Swift.Sendable {
   public var initialSize: Swift.Int
   public var maxSize: Swift.Int
   public var growthFactor: Swift.Double
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(initialSize: Swift.Int = 256 * 1024 * 1024, maxSize: Swift.Int? = nil, growthFactor: Swift.Double = 2.0)
-  #endif
   public static let `default`: SwiftPythonRuntime.SharedMemoryConfig
 }
 public enum BufferDType : Swift.String, Swift.Sendable, Swift.Codable, Swift.CaseIterable {
@@ -497,9 +461,7 @@ public enum BufferDType : Swift.String, Swift.Sendable, Swift.Codable, Swift.Cas
   public var numpyDtype: Swift.String {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public init?(rawValue: Swift.String)
-  #endif
   public typealias AllCases = [SwiftPythonRuntime.BufferDType]
   public typealias RawValue = Swift.String
   nonisolated public static var allCases: [SwiftPythonRuntime.BufferDType] {
@@ -517,11 +479,9 @@ public enum ProcessPoolDAGError : Swift.Error, Foundation.LocalizedError, Swift.
   case invalidWorkerIndex(index: Swift.Int, validRange: Swift.Range<Swift.Int>)
   case missingDependencyResult(Swift.String)
   case internalInvariantViolation(Swift.String)
-  #if compiler(>=5.3) && $NonescapableTypes
   public var errorDescription: Swift.String? {
     get
   }
-  #endif
 }
 public enum DAGFailurePolicy : Swift.Sendable {
   case failFast
@@ -558,23 +518,15 @@ public struct ProcessPoolDAG<NodeID, Output> : Swift.Sendable where NodeID : Swi
     public let dependencies: [NodeID]
     public let preferredWorker: Swift.Int?
     public let operation: SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node.Operation
-    #if compiler(>=5.3) && $NonescapableTypes
     public init(id: NodeID, dependencies: [NodeID] = [], preferredWorker: Swift.Int? = nil, operation: @escaping SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node.Operation)
-    #endif
   }
   public let nodes: [SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node]
   public init(nodes: [SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node])
 }
 extension SwiftPythonRuntime.PythonProcessPool {
-  #if compiler(>=5.3) && $NonescapableTypes
   public func run<NodeID, Output>(_ dag: SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>, maxParallelism: Swift.Int? = nil) async throws -> [NodeID : Output] where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func run<NodeID, Output>(_ dag: SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>, maxParallelism: Swift.Int? = nil, failurePolicy: SwiftPythonRuntime.DAGFailurePolicy) async throws -> SwiftPythonRuntime.DAGResult<NodeID, Output> where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func run<NodeID, Output>(nodes: [SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node], maxParallelism: Swift.Int? = nil) async throws -> [NodeID : Output] where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
-  #endif
 }
 public actor PythonProcessPool {
   public enum State : Swift.Sendable {
@@ -616,15 +568,9 @@ public actor PythonProcessPool {
     get
   }
   final public let maxRespawns: Swift.Int
-  #if compiler(>=5.3) && $NonescapableTypes
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3) async throws
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
-  #endif
   public static func recommended(for workload: SwiftPythonRuntime.WorkloadType) -> Swift.Int
   @discardableResult
   public func registerRawCallback(name: Swift.String, handler: @escaping @Sendable (Foundation.Data) throws -> Foundation.Data) async throws -> SwiftPythonRuntime.CallbackRegistration
@@ -651,96 +597,36 @@ public actor PythonProcessPool {
   @discardableResult
   public func registerStreamingCallback(name: Swift.String, callback: @escaping @Sendable () throws -> SwiftPythonRuntime.StreamingCallbackIterator) async throws -> SwiftPythonRuntime.CallbackRegistration
   public func unregisterCallback(name: Swift.String) async throws
-  #if compiler(>=5.3) && $NonescapableTypes
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invoke(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invoke(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStreamRaw(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStreamRaw(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStreamRaw(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStreamRaw(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStreamRaw(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStreamRaw(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data>
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible
-  #endif
   public func release(_ handle: SwiftPythonRuntime.PyHandle) async throws
   nonisolated public func enqueue(_ data: Foundation.Data, worker workerIndex: Swift.Int)
   nonisolated public func enqueue(_ data: [Foundation.Data], worker workerIndex: Swift.Int)
@@ -751,12 +637,8 @@ public actor PythonProcessPool {
   public var workerCount: Swift.Int {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public func workerGeneration(for workerIndex: Swift.Int) -> Swift.UInt64?
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func workerPID(for workerIndex: Swift.Int) -> _DarwinFoundation2.pid_t?
-  #endif
   public func respawnCount(for workerIndex: Swift.Int) -> Swift.Int
   public func isWorkerDead(_ workerIndex: Swift.Int) -> Swift.Bool
   public func healthCheck() async throws -> [Swift.Bool]
@@ -771,9 +653,7 @@ public actor PythonProcessPool {
   public func withSharedBuffer<T, R>(_ handle: SwiftPythonRuntime.PyHandle, as type: T.Type, _ body: @Sendable (Swift.UnsafeMutableBufferPointer<T>) throws -> R) async throws -> R where R : Swift.Sendable
   public func writeToShared<T>(_ data: [T], to handle: SwiftPythonRuntime.PyHandle) async throws
   public func readFromShared<T>(_ handle: SwiftPythonRuntime.PyHandle, as type: T.Type) async throws -> [T] where T : Swift.Sendable
-  #if compiler(>=5.3) && $NonescapableTypes
   public func resourceSnapshot() async -> SwiftPythonRuntime.ResourceSnapshot?
-  #endif
   @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
@@ -781,7 +661,6 @@ public actor PythonProcessPool {
   }
 }
 extension SwiftPythonRuntime.PythonProcessPool {
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func invoke(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
         try await invoke(
             module: module,
@@ -791,8 +670,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func invoke(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
         try await invoke(
             module: module,
@@ -803,8 +680,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
         try await invokeResult(
             module: module,
@@ -814,8 +689,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
         try await invokeResult(
             module: module,
@@ -826,8 +699,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
         try await method(
             handle: target,
@@ -837,8 +708,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
         try await method(
             handle: target,
@@ -849,8 +718,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
         try await methodResult(
             handle: target,
@@ -860,8 +727,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
         try await methodResult(
             handle: target,
@@ -872,7 +737,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
             timeout: timeout
         )
     }
-  #endif
 }
 extension SwiftPythonRuntime.WorkerResponse : Swift.Equatable {
   public static func == (lhs: SwiftPythonRuntime.WorkerResponse, rhs: SwiftPythonRuntime.WorkerResponse) -> Swift.Bool
@@ -885,17 +749,12 @@ extension SwiftPythonRuntime.PythonProcessPool {
             self.pool = pool
             self.index = index
         }
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
             try await pool.eval(code, bindings: bindings, worker: index, timeout: timeout)
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.evalResult(code, bindings: bindings, worker: index, timeout: timeout)
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invoke(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
             try await pool.invoke(
                 module: module,
@@ -906,11 +765,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func invoke(module: Swift.String, function: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }) async throws -> SwiftPythonRuntime.PyHandle
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.invokeResult(
                 module: module,
@@ -921,11 +776,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func invokeResult<T>(module: Swift.String, function: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
             try await pool.method(
                 handle: target,
@@ -936,11 +787,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }) async throws -> SwiftPythonRuntime.PyHandle
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.methodResult(
                 handle: target,
@@ -951,11 +798,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func methodStreamRaw(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data> {
             try await pool.methodStreamRaw(
                 handle: target, name: name,
@@ -963,8 +806,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 worker: index, timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable {
             try await pool.methodStream(
                 handle: target, name: name,
@@ -973,8 +814,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 decode: decode
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func methodStream<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.methodStream(
                 handle: target, name: name,
@@ -982,8 +821,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 worker: index, timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invokeStreamRaw(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data> {
             try await pool.invokeStreamRaw(
                 module: module, function: function,
@@ -991,8 +828,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 worker: index, timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable {
             try await pool.invokeStream(
                 module: module, function: function,
@@ -1001,8 +836,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 decode: decode
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invokeStream<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.invokeStream(
                 module: module, function: function,
@@ -1010,16 +843,12 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 worker: index, timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func evalStreamRaw(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<Foundation.Data> {
             try await pool.evalStreamRaw(
                 code, bindings: bindings,
                 worker: index, timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil, decode: @escaping @Sendable (Foundation.Data) async throws -> T) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : Swift.Sendable {
             try await pool.evalStream(
                 code, bindings: bindings,
@@ -1027,15 +856,12 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 decode: decode
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func evalStream<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.CancellableStream<T> where T : SwiftPythonRuntime.PythonConvertible {
             try await pool.evalStream(
                 code, bindings: bindings,
                 worker: index, timeout: timeout
             )
         }
-    #endif
     @inlinable public func enqueue(_ data: Foundation.Data) {
             pool.enqueue(data, worker: index)
         }
@@ -1048,15 +874,12 @@ extension SwiftPythonRuntime.PythonProcessPool {
     @inlinable public func sideEval(_ code: Swift.String) async throws {
             try await pool.sideEval(code, worker: index)
         }
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func withEvalHandle<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable {
             try await pool.withTemporaryHandle(
                 createdBy: { try await self.eval(code, bindings: bindings, timeout: timeout) },
                 body
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func withInvokeHandle<T>(module: Swift.String, function: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable {
             try await pool.withTemporaryHandle(
                 createdBy: {
@@ -1071,8 +894,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 body
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func withInvokeHandle<T>(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable {
             try await withInvokeHandle(
                 module: module,
@@ -1083,11 +904,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 body
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func withInvokeHandle<T>(module: Swift.String, function: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func withMethodHandle<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [SwiftPythonRuntime.RemotePythonValue] = [], kwargs: [Swift.String : SwiftPythonRuntime.RemotePythonValue] = [:], timeout: Foundation.TimeInterval? = nil, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable {
             try await pool.withTemporaryHandle(
                 createdBy: {
@@ -1102,8 +919,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 body
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func withMethodHandle<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable {
             try await withMethodHandle(
                 handle: target,
@@ -1114,11 +929,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 body
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     public func withMethodHandle<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, timeout: Foundation.TimeInterval? = nil, @SwiftPythonRuntime.RemoteArgsBuilder _ args: () -> [SwiftPythonRuntime.RemotePythonValue], @SwiftPythonRuntime.RemoteKwargsBuilder kwargs: () -> [SwiftPythonRuntime.RemoteKwarg] = { [] }, _ body: @Sendable (SwiftPythonRuntime.PyHandle) async throws -> T) async throws -> T where T : Swift.Sendable
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invoke(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
             try await invoke(
                 module: module,
@@ -1128,8 +939,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func invokeResult<T>(module: Swift.String, function: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
             try await invokeResult(
                 module: module,
@@ -1139,8 +948,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func method(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle {
             try await method(
                 handle: target,
@@ -1150,8 +957,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
-    #if compiler(>=5.3) && $NonescapableTypes
     @inlinable public func methodResult<T>(handle target: SwiftPythonRuntime.PyHandle, name: Swift.String, args: [any SwiftPythonRuntime.PythonConvertible], kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible {
             try await methodResult(
                 handle: target,
@@ -1161,7 +966,6 @@ extension SwiftPythonRuntime.PythonProcessPool {
                 timeout: timeout
             )
         }
-    #endif
   }
   @inlinable nonisolated public func worker(_ workerIndex: Swift.Int) -> SwiftPythonRuntime.PythonProcessPool.WorkerContext {
         WorkerContext(pool: self, index: workerIndex)
@@ -1181,9 +985,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
         return try await withTemporaryHandle(handle, body)
     }
 }
-#if compiler(>=5.3) && $NonescapableTypes
 public func withProcessPool<T>(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, _ body: @Sendable (SwiftPythonRuntime.PythonProcessPool) async throws -> T) async throws -> T where T : Swift.Sendable
-#endif
 @frozen public enum RemotePythonValue : Swift.Sendable {
   case python(any SwiftPythonRuntime.PythonConvertible)
   case handle(SwiftPythonRuntime.PyHandle)
@@ -1215,11 +1017,9 @@ public func withProcessPool<T>(workers workerCount: Swift.Int, sharedMemory: Swi
   @inlinable public static func buildBlock(_ components: [SwiftPythonRuntime.RemotePythonValue]...) -> [SwiftPythonRuntime.RemotePythonValue] {
         components.flatMap { $0 }
     }
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public static func buildOptional(_ component: [SwiftPythonRuntime.RemotePythonValue]?) -> [SwiftPythonRuntime.RemotePythonValue] {
         component ?? []
     }
-  #endif
   @inlinable public static func buildEither(first component: [SwiftPythonRuntime.RemotePythonValue]) -> [SwiftPythonRuntime.RemotePythonValue] {
         component
     }
@@ -1246,11 +1046,9 @@ public func withProcessPool<T>(workers workerCount: Swift.Int, sharedMemory: Swi
   @inlinable public static func buildBlock(_ components: [SwiftPythonRuntime.RemoteKwarg]...) -> [SwiftPythonRuntime.RemoteKwarg] {
         components.flatMap { $0 }
     }
-  #if compiler(>=5.3) && $NonescapableTypes
   @inlinable public static func buildOptional(_ component: [SwiftPythonRuntime.RemoteKwarg]?) -> [SwiftPythonRuntime.RemoteKwarg] {
         component ?? []
     }
-  #endif
   @inlinable public static func buildEither(first component: [SwiftPythonRuntime.RemoteKwarg]) -> [SwiftPythonRuntime.RemoteKwarg] {
         component
     }
@@ -1270,16 +1068,10 @@ internal func remoteKwargsDictionary(from pairs: [SwiftPythonRuntime.RemoteKwarg
     values.mapValues { .python($0) }
 }
 @_hasMissingDesignatedInitializers public actor ResourceMonitor {
-  #if compiler(>=5.3) && $NonescapableTypes
   public func start(config: SwiftPythonRuntime.ResourceMonitorConfig, workerPIDs: @escaping @Sendable () async -> [Swift.Int : _DarwinFoundation2.pid_t], onPressureDrop: (@Sendable () -> Swift.Void)? = nil)
-  #endif
   public func stop()
-  #if compiler(>=5.3) && $NonescapableTypes
   public func snapshot() -> SwiftPythonRuntime.ResourceSnapshot?
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public func injectForTesting(_ snapshot: SwiftPythonRuntime.ResourceSnapshot, config: SwiftPythonRuntime.ResourceMonitorConfig? = nil) async
-  #endif
   @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
@@ -1297,11 +1089,9 @@ public enum SharedMemoryError : Swift.Error, Swift.Sendable, Swift.CustomStringC
   public var description: Swift.String {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public var errorDescription: Swift.String? {
     get
   }
-  #endif
 }
 public struct SharedMemoryRegion : Swift.Sendable, Swift.Hashable {
   public let shmName: Swift.String
@@ -1321,19 +1111,13 @@ public struct SharedMemoryRegion : Swift.Sendable, Swift.Hashable {
 }
 final public class SharedMemoryArena : @unchecked Swift.Sendable {
   final public let name: Swift.String
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(name: Swift.String? = nil, config: SwiftPythonRuntime.SharedMemoryConfig = .default) throws
-  #endif
   @objc deinit
   final public func allocate(shape: [Swift.Int], dtype: SwiftPythonRuntime.BufferDType) throws -> SwiftPythonRuntime.SharedMemoryRegion
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func pointer(for region: SwiftPythonRuntime.SharedMemoryRegion) -> Swift.UnsafeMutableRawPointer?
-  #endif
   final public func withBuffer<T, R>(for region: SwiftPythonRuntime.SharedMemoryRegion, as type: T.Type, _ body: (Swift.UnsafeMutableBufferPointer<T>) throws -> R) throws -> R
   final public func write(_ data: Foundation.Data, to region: SwiftPythonRuntime.SharedMemoryRegion) throws
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func read(from region: SwiftPythonRuntime.SharedMemoryRegion) -> Foundation.Data?
-  #endif
   final public func unlink()
   final public var allocatedBytes: Swift.Int {
     get
@@ -1356,9 +1140,7 @@ final public class SharedMemoryClient : @unchecked Swift.Sendable {
   public init(name: Swift.String) throws
   @objc deinit
   final public func attachSegment(_ segmentName: Swift.String) throws
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func pointer(for region: SwiftPythonRuntime.SharedMemoryRegion) -> Swift.UnsafeMutableRawPointer?
-  #endif
   final public func withBuffer<T, R>(for region: SwiftPythonRuntime.SharedMemoryRegion, as type: T.Type, _ body: (Swift.UnsafeMutableBufferPointer<T>) throws -> R) throws -> R
   @available(*, deprecated, message: "No longer needed with segment-based architecture")
   final public func remap(newSize: Swift.Int) throws
@@ -1407,14 +1189,10 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
   @objc deinit
   final public func spawn(workerExecutablePath: Swift.String, acceptTimeout: Foundation.TimeInterval = 10.0) throws
   final public func sideEval(_ code: Swift.String) throws
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func sendStreamCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil, onChunk: (Foundation.Data) -> Swift.Void) throws
-  #endif
   final public var callbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data)?
   final public var streamingCallbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> SwiftPythonRuntime.StreamingCallbackIterator)?
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func sendCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil) throws -> SwiftPythonRuntime.WorkerResponse
-  #endif
   final public func requestShutdown()
   final public func waitForExit(timeout: Foundation.TimeInterval) -> Swift.Bool
   final public func signalAbort()
@@ -1425,9 +1203,7 @@ public struct WorkerCallbackContext : @unchecked Swift.Sendable {
   public var workerID: Swift.Int {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public func sendNestedCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil) throws -> SwiftPythonRuntime.WorkerResponse
-  #endif
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.HandleDescriptor] = [:]) throws -> SwiftPythonRuntime.HandleDescriptor
   public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.HandleDescriptor] = [:]) throws -> T where T : SwiftPythonRuntime.PythonConvertible
   public func release(id: Foundation.UUID) throws
@@ -1491,18 +1267,14 @@ extension SwiftPythonRuntime.PythonObjectWrapper {
   convenience public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
   final public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
   public init(borrowed pointer: SwiftPythonRuntime.PyObjectPointer)
-  #if compiler(>=5.3) && $NonescapableTypes
   public init?(consuming pointer: SwiftPythonRuntime.PyObjectPointer?)
-  #endif
   @objc deinit
   final public func getAttribute(_ name: Swift.String) throws -> SwiftPythonRuntime.PyObjectRef
   final public func setAttribute(_ name: Swift.String, value: SwiftPythonRuntime.PyObjectRef) throws
   final public func call(args: [SwiftPythonRuntime.PyObjectRef] = [], kwargs: [Swift.String : SwiftPythonRuntime.PyObjectRef] = [:]) throws -> SwiftPythonRuntime.PyObjectRef
-  #if compiler(>=5.3) && $NonescapableTypes
   final public subscript(index: SwiftPythonRuntime.PyObjectRef) -> SwiftPythonRuntime.PyObjectRef? {
     get
   }
-  #endif
   final public func setItem(index: SwiftPythonRuntime.PyObjectRef, value: SwiftPythonRuntime.PyObjectRef) throws
 }
 extension SwiftPythonRuntime.PyObjectRef {
@@ -1608,18 +1380,14 @@ public enum PythonBufferError : Swift.Error, Swift.Sendable, Swift.CustomStringC
   public var description: Swift.String {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public var errorDescription: Swift.String? {
     get
   }
-  #endif
 }
 final public class PythonBuffer : @unchecked Swift.Sendable {
-  #if compiler(>=5.3) && $NonescapableTypes
   final public var pointer: Swift.UnsafeMutableRawPointer? {
     get
   }
-  #endif
   final public var length: Swift.Int {
     get
   }
@@ -1632,11 +1400,9 @@ final public class PythonBuffer : @unchecked Swift.Sendable {
   final public var isReadOnly: Swift.Bool {
     get
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   final public var format: Swift.String? {
     get
   }
-  #endif
   final public var shape: [Swift.Int] {
     get
   }
@@ -1646,9 +1412,7 @@ final public class PythonBuffer : @unchecked Swift.Sendable {
   public init(object: SwiftPythonRuntime.PyObjectRef, flags: Swift.Int32 = PyBUF_FULL_RO) throws
   @objc deinit
   final public func release()
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func typedPointer<T>() -> Swift.UnsafeMutablePointer<T>?
-  #endif
   final public func asBufferPointer<T>() -> Swift.UnsafeBufferPointer<T>
   final public func asMutableBufferPointer<T>() throws -> Swift.UnsafeMutableBufferPointer<T>
   final public func withUnsafeBufferPointer<T, R>(_ body: (Swift.UnsafeBufferPointer<T>) throws -> R) rethrows -> R
@@ -1679,32 +1443,20 @@ public func Py_Initialize()
 public func Py_IsInitialized() -> Swift.Int32
 @_silgen_name("Py_Finalize")
 public func Py_Finalize()
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("Py_IncRef")
 public func Py_IncRef(_: SwiftPythonRuntime.PyObjectPointer?)
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("Py_DecRef")
 public func Py_DecRef(_: SwiftPythonRuntime.PyObjectPointer?)
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyErr_Occurred")
 public func PyErr_Occurred() -> SwiftPythonRuntime.PyObjectPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyErr_Fetch")
 public func PyErr_Fetch(_: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?)
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyErr_NormalizeException")
 public func PyErr_NormalizeException(_: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?)
-#endif
 @_silgen_name("PyErr_Clear")
 public func PyErr_Clear()
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyErr_SetString")
 public func PyErr_SetString(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafePointer<Swift.CChar>)
-#endif
 @_silgen_name("PyExc_RuntimeError")
 nonisolated(unsafe) public var PyExc_RuntimeError: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyExc_TypeError")
@@ -1713,38 +1465,22 @@ nonisolated(unsafe) public var PyExc_TypeError: SwiftPythonRuntime.PyObjectPoint
 nonisolated(unsafe) public var PyExc_KeyError: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyExc_ValueError")
 nonisolated(unsafe) public var PyExc_ValueError: SwiftPythonRuntime.PyObjectPointer
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyImport_ImportModule")
 public func PyImport_ImportModule(_: Swift.UnsafePointer<Swift.CChar>) -> SwiftPythonRuntime.PyObjectPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyDict_New")
 public func PyDict_New() -> SwiftPythonRuntime.PyObjectPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyDict_SetItemString")
 public func PyDict_SetItemString(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafePointer<Swift.CChar>, _: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyDict_GetItemString")
 public func PyDict_GetItemString(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafePointer<Swift.CChar>) -> SwiftPythonRuntime.PyObjectPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyDict_DelItemString")
 public func PyDict_DelItemString(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafePointer<Swift.CChar>) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyDict_Next")
 public func PyDict_Next(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafeMutablePointer<Swift.Int>, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>, _: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyObject_IsTrue")
 public func PyObject_IsTrue(_ o: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyObject_Type")
 public func PyObject_Type(_ o: SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyObjectPointer?
-#endif
 @_silgen_name("PyGILState_Ensure")
 public func PyGILState_Ensure() -> Swift.Int32
 @_silgen_name("PyGILState_Release")
@@ -1754,18 +1490,12 @@ public func PyGILState_Check() -> Swift.Int32
 public let PYGEN_NEXT: Swift.Int32
 public let PYGEN_RETURN: Swift.Int32
 public let PYGEN_ERROR: Swift.Int32
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyIter_Send")
 public func PyIter_Send(_ iter: SwiftPythonRuntime.PyObjectPointer?, _ arg: SwiftPythonRuntime.PyObjectPointer?, _ presult: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyObjectPointer?>?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyIter_Check")
 public func PyIter_Check(_ o: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyAIter_Check")
 public func PyAIter_Check(_ o: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-#endif
 public struct Py_buffer {
   public var buf: Swift.UnsafeMutableRawPointer?
   public var obj: SwiftPythonRuntime.PyObjectPointer?
@@ -1797,70 +1527,44 @@ public let PyBUF_RECORDS: Swift.Int32
 public let PyBUF_RECORDS_RO: Swift.Int32
 public let PyBUF_FULL: Swift.Int32
 public let PyBUF_FULL_RO: Swift.Int32
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyObject_GetBuffer")
 public func PyObject_GetBuffer(_ obj: SwiftPythonRuntime.PyObjectPointer?, _ view: Swift.UnsafeMutablePointer<SwiftPythonRuntime.Py_buffer>, _ flags: Swift.Int32) -> Swift.Int32
-#endif
 @_silgen_name("PyBuffer_Release")
 public func PyBuffer_Release(_ view: Swift.UnsafeMutablePointer<SwiftPythonRuntime.Py_buffer>)
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyObject_CheckBuffer")
 public func PyObject_CheckBuffer(_ obj: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-#endif
 public struct PyMethodDef {
   public let ml_name: Swift.UnsafePointer<Swift.CChar>
   public let ml_meth: SwiftPythonRuntime.PyCFunction
   public let ml_flags: Swift.Int32
   public let ml_doc: Swift.UnsafePointer<Swift.CChar>?
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(ml_name: Swift.UnsafePointer<Swift.CChar>, ml_meth: SwiftPythonRuntime.PyCFunction, ml_flags: Swift.Int32, ml_doc: Swift.UnsafePointer<Swift.CChar>? = nil)
-  #endif
 }
 public typealias PyCFunction = @convention(c) (SwiftPythonRuntime.PyObjectPointer?, SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyObjectPointer?
 public let METH_VARARGS: Swift.Int32
 public let METH_KEYWORDS: Swift.Int32
 public let METH_NOARGS: Swift.Int32
 public typealias PyCFunctionWithKeywords = @convention(c) (SwiftPythonRuntime.PyObjectPointer?, SwiftPythonRuntime.PyObjectPointer?, SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyObjectPointer?
-#if compiler(>=5.3) && $NonescapableTypes
 public func PyCFunction_New(method: Swift.UnsafeMutablePointer<SwiftPythonRuntime.PyMethodDef>, self: SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyObjectPointer?
-#endif
 public typealias PyCapsule_Destructor = @convention(c) (SwiftPythonRuntime.PyObjectPointer?) -> Swift.Void
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_New")
 public func PyCapsule_New(_ pointer: Swift.UnsafeMutableRawPointer?, _ name: Swift.UnsafePointer<Swift.CChar>?, _ destructor: SwiftPythonRuntime.PyCapsule_Destructor?) -> SwiftPythonRuntime.PyObjectPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_GetPointer")
 public func PyCapsule_GetPointer(_ capsule: SwiftPythonRuntime.PyObjectPointer?, _ name: Swift.UnsafePointer<Swift.CChar>?) -> Swift.UnsafeMutableRawPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_GetName")
 public func PyCapsule_GetName(_ capsule: SwiftPythonRuntime.PyObjectPointer?) -> Swift.UnsafePointer<Swift.CChar>?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_IsValid")
 public func PyCapsule_IsValid(_ capsule: SwiftPythonRuntime.PyObjectPointer?, _ name: Swift.UnsafePointer<Swift.CChar>?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_SetPointer")
 public func PyCapsule_SetPointer(_ capsule: SwiftPythonRuntime.PyObjectPointer?, _ pointer: Swift.UnsafeMutableRawPointer?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_SetDestructor")
 public func PyCapsule_SetDestructor(_ capsule: SwiftPythonRuntime.PyObjectPointer?, _ destructor: SwiftPythonRuntime.PyCapsule_Destructor?) -> Swift.Int32
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_GetDestructor")
 public func PyCapsule_GetDestructor(_ capsule: SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyCapsule_Destructor?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_GetContext")
 public func PyCapsule_GetContext(_ capsule: SwiftPythonRuntime.PyObjectPointer?) -> Swift.UnsafeMutableRawPointer?
-#endif
-#if compiler(>=5.3) && $NonescapableTypes
 @_silgen_name("PyCapsule_SetContext")
 public func PyCapsule_SetContext(_ capsule: SwiftPythonRuntime.PyObjectPointer?, _ context: Swift.UnsafeMutableRawPointer?) -> Swift.Int32
-#endif
 @_hasMissingDesignatedInitializers public actor PythonRuntimeActor {
   public static let shared: SwiftPythonRuntime.PythonRuntimeActor
   public var builtins: SwiftPythonRuntime.PyObjectRef {
@@ -1953,9 +1657,7 @@ final public class PoolRawCallbackStore : @unchecked Swift.Sendable {
   public typealias RawHandler = @Sendable (Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data
   public init()
   final public func set(name: Swift.String, handler: @escaping SwiftPythonRuntime.PoolRawCallbackStore.RawHandler)
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func get(name: Swift.String) -> SwiftPythonRuntime.PoolRawCallbackStore.RawHandler?
-  #endif
   final public func remove(name: Swift.String)
   @objc deinit
 }
@@ -1963,9 +1665,7 @@ final public class PoolStreamingCallbackStore : @unchecked Swift.Sendable {
   public typealias StreamHandler = @Sendable (Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> SwiftPythonRuntime.StreamingCallbackIterator
   public init()
   final public func set(name: Swift.String, handler: @escaping SwiftPythonRuntime.PoolStreamingCallbackStore.StreamHandler)
-  #if compiler(>=5.3) && $NonescapableTypes
   final public func get(name: Swift.String) -> SwiftPythonRuntime.PoolStreamingCallbackStore.StreamHandler?
-  #endif
   final public func remove(name: Swift.String)
   @objc deinit
 }
@@ -1985,22 +1685,14 @@ public enum PythonError : Swift.Error, Swift.Sendable, Swift.CustomStringConvert
     public let type: Swift.String
     public let message: Swift.String
     public let traceback: Swift.String?
-    #if compiler(>=5.3) && $NonescapableTypes
     public init(error: SwiftPythonRuntime.PythonError, type: Swift.String, message: Swift.String, traceback: Swift.String?)
-    #endif
   }
-  #if compiler(>=5.3) && $NonescapableTypes
   public static func fetch() -> SwiftPythonRuntime.PythonError?
-  #endif
-  #if compiler(>=5.3) && $NonescapableTypes
   public static func fetchDetailed() -> SwiftPythonRuntime.PythonError.Diagnostics?
-  #endif
   public static func clear()
-  #if compiler(>=5.3) && $NonescapableTypes
   public var errorDescription: Swift.String? {
     get
   }
-  #endif
 }
 extension SwiftPythonRuntime.PythonError {
   public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
@@ -2013,9 +1705,7 @@ public struct PythonSlice : Swift.Sendable {
   public let start: Swift.Int?
   public let stop: Swift.Int?
   public let step: Swift.Int?
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(start: Swift.Int? = nil, stop: Swift.Int? = nil, step: Swift.Int? = nil)
-  #endif
   public func toPyObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
 public enum SliceMarker {
@@ -2053,9 +1743,7 @@ extension Swift.PartialRangeThrough where Bound == Swift.Int {
   }
 }
 public struct StridedSlice : Swift.Sendable {
-  #if compiler(>=5.3) && $NonescapableTypes
   public init(start: Swift.Int? = nil, stop: Swift.Int? = nil, step: Swift.Int)
-  #endif
   public func toPyObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
 public protocol PythonSliceable {
@@ -2138,16 +1826,12 @@ extension Swift.Dictionary : SwiftPythonRuntime.PythonConvertible where Key : Sw
   public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
   public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
-#if compiler(>=5.3) && $NonescapableTypes
 extension Swift.Optional : SwiftPythonRuntime.PythonConvertible where Wrapped : SwiftPythonRuntime.PythonConvertible {
   public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
   public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
-#endif
 public func pyArg(_ value: any SwiftPythonRuntime.PythonConvertible) throws -> SwiftPythonRuntime.PyObjectRef
-#if compiler(>=5.3) && $NonescapableTypes
 public func pyArgOptionalExistential(_ value: (any SwiftPythonRuntime.PythonConvertible)?) throws -> SwiftPythonRuntime.PyObjectRef
-#endif
 public func pyArgs(_ args: [any SwiftPythonRuntime.PythonConvertible]) throws -> [SwiftPythonRuntime.PyObjectRef]
 public func pyKwargs(_ kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible]) throws -> [Swift.String : SwiftPythonRuntime.PyObjectRef]
 public func pyList(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
