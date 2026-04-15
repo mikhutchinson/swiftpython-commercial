@@ -8,6 +8,7 @@ import Foundation
 import OSLog
 import Swift
 import Synchronization
+@preconcurrency import Virtualization
 import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
@@ -296,6 +297,7 @@ public enum WorkerResponse : Swift.Sendable, Swift.Codable {
 }
 public enum SideCommand : Swift.Sendable, Swift.Codable {
   case eval(code: Swift.String)
+  case startOOBStream(generatorCode: Swift.String, socketPath: Swift.String?, vsockPort: Swift.Int?, vsockCID: Swift.Int?)
   public func encode(to encoder: any Swift.Encoder) throws
   public init(from decoder: any Swift.Decoder) throws
 }
@@ -528,7 +530,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func run<NodeID, Output>(_ dag: SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>, maxParallelism: Swift.Int? = nil, failurePolicy: SwiftPythonRuntime.DAGFailurePolicy) async throws -> SwiftPythonRuntime.DAGResult<NodeID, Output> where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
   public func run<NodeID, Output>(nodes: [SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node], maxParallelism: Swift.Int? = nil) async throws -> [NodeID : Output] where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
 }
-public actor PythonProcessPool {
+@_hasMissingDesignatedInitializers public actor PythonProcessPool {
   public enum State : Swift.Sendable {
     case initializing
     case running
@@ -564,13 +566,21 @@ public actor PythonProcessPool {
       get
     }
   }
+  public enum WorkerBackend : Swift.Sendable {
+    case process
+    case vm(imagePath: Swift.String, config: SwiftPythonRuntime.VMManager.VMConfiguration = .default)
+  }
   public var state: SwiftPythonRuntime.PythonProcessPool.State {
     get
   }
   final public let maxRespawns: Swift.Int
+  public var vmDisplayRef: SwiftPythonRuntime.VMDisplayRef? {
+    get async
+  }
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3) async throws
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
   public init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
+  public convenience init(workers workerCount: Swift.Int, backend: SwiftPythonRuntime.PythonProcessPool.WorkerBackend, fallbackToProcess: Swift.Bool = false, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
   public static func recommended(for workload: SwiftPythonRuntime.WorkloadType) -> Swift.Int
   @discardableResult
   public func registerRawCallback(name: Swift.String, handler: @escaping @Sendable (Foundation.Data) throws -> Foundation.Data) async throws -> SwiftPythonRuntime.CallbackRegistration
@@ -633,6 +643,7 @@ public actor PythonProcessPool {
   nonisolated public func streamQueueDropCount(worker workerIndex: Swift.Int) -> Swift.Int
   public func sideEval(_ code: Swift.String, worker workerIndex: Swift.Int) throws
   public func startOutOfBandStream(generatorCode: Swift.String, worker workerIndex: Swift.Int, buffer: SwiftPythonRuntime.SharedRingBuffer) throws
+  public func startOutOfBandSocketStream(generatorCode: Swift.String, worker workerIndex: Swift.Int, capacity: Swift.Int = 65_536) async throws -> SwiftPythonRuntime.SocketOOBStreamBuffer
   public func map(_ handles: [SwiftPythonRuntime.PyHandle], code: Swift.String, bindingName: Swift.String = "item") async throws -> [SwiftPythonRuntime.PyHandle]
   public var workerCount: Swift.Int {
     get
@@ -1165,6 +1176,155 @@ final public class SharedRingBuffer : @unchecked Swift.Sendable {
     get
   }
 }
+final public class SocketOOBStreamBuffer : @unchecked Swift.Sendable {
+  final public let dataCapacity: Swift.Int
+  public init(fd: Swift.Int32, capacity: Swift.Int = 65_536)
+  @objc deinit
+  final public func readAvailable() -> Foundation.Data
+  final public func signalAbort()
+  final public var isWriterDone: Swift.Bool {
+    get
+  }
+  final public var isAborted: Swift.Bool {
+    get
+  }
+}
+final public class LinuxImageBuilder : @unchecked Swift.Sendable {
+  final public var onProgress: ((Swift.Double, Swift.String) -> Swift.Void)?
+  public init(outputDir: Swift.String? = nil, cpuCount: Swift.Int = 2, memoryMB: Swift.Int = 2048)
+  public static var defaultOutputDir: Swift.String {
+    get
+  }
+  public static var isoCacheDir: Swift.String {
+    get
+  }
+  final public func build(force: Swift.Bool = false) async throws -> Swift.String
+  @objc deinit
+}
+final public class VMHealthMonitor : @unchecked Swift.Sendable {
+  public struct Configuration : Swift.Sendable {
+    public var pingInterval: Foundation.TimeInterval
+    public var maxConsecutiveFailures: Swift.Int
+    public var pingTimeout: Foundation.TimeInterval
+    public init(pingInterval: Foundation.TimeInterval = 5.0, maxConsecutiveFailures: Swift.Int = 3, pingTimeout: Foundation.TimeInterval = 3.0)
+    public static let `default`: SwiftPythonRuntime.VMHealthMonitor.Configuration
+  }
+  final public var isHealthy: Swift.Bool {
+    get
+  }
+  final public var consecutiveFailureCount: Swift.Int {
+    get
+  }
+  public init(config: SwiftPythonRuntime.VMHealthMonitor.Configuration = .default, ping: @escaping @Sendable () throws -> Swift.Bool, onUnhealthy: @escaping @Sendable () async -> Swift.Void)
+  final public func start()
+  final public func stop()
+  @objc deinit
+}
+public actor VMManager {
+  public enum State : Swift.Sendable {
+    case idle
+    case booting
+    case running
+    case saving
+    case error(Swift.String)
+    case shutdown
+  }
+  public enum BootMode : Swift.Sendable {
+    case cold
+    case warm
+    public static func == (a: SwiftPythonRuntime.VMManager.BootMode, b: SwiftPythonRuntime.VMManager.BootMode) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public var state: SwiftPythonRuntime.VMManager.State {
+    get
+  }
+  public var bootMode: SwiftPythonRuntime.VMManager.BootMode? {
+    get
+  }
+  public var stateFileURL: Foundation.URL {
+    get
+  }
+  public var hasWarmBootState: Swift.Bool {
+    get
+  }
+  public enum GuestOS : Swift.Sendable {
+    case macOS
+    case linux
+    public static func == (a: SwiftPythonRuntime.VMManager.GuestOS, b: SwiftPythonRuntime.VMManager.GuestOS) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public struct VMConfiguration : Swift.Sendable {
+    public var guestOS: SwiftPythonRuntime.VMManager.GuestOS
+    public var cpuCount: Swift.Int
+    public var memorySize: Swift.UInt64
+    public var diskSizeGB: Swift.Int
+    public init(guestOS: SwiftPythonRuntime.VMManager.GuestOS = .linux, cpuCount: Swift.Int = 2, memorySize: Swift.UInt64 = 2 * 1024 * 1024 * 1024, diskSizeGB: Swift.Int = 4)
+    public static let `default`: SwiftPythonRuntime.VMManager.VMConfiguration
+    public static let macOSDefault: SwiftPythonRuntime.VMManager.VMConfiguration
+  }
+  public init(bundlePath: Swift.String, config: SwiftPythonRuntime.VMManager.VMConfiguration = .default)
+  public func boot() async throws
+  public func acceptConnection(on port: Swift.UInt32, timeout: Foundation.TimeInterval = 30.0) async throws -> Swift.Int32
+  public func preRegisterListener(port: Swift.UInt32)
+  @available(macOS 14.0, *)
+  public func saveState() async throws
+  public func shutdown(saveState shouldSave: Swift.Bool = true) async throws
+  public func connectToGuest(port: Swift.UInt32, timeout: Foundation.TimeInterval = 30.0) async throws -> Swift.Int32
+  public func releaseConnection(on port: Swift.UInt32)
+  public var virtualMachineForDisplay: SwiftPythonRuntime.VMDisplayRef? {
+    get
+  }
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+    get
+  }
+}
+extension SwiftPythonRuntime.VMManager {
+  public static func createVM(at bundlePath: Swift.String, diskSizeGB: Swift.Int = 32, onProgress: ((Swift.Double, Swift.String) -> Swift.Void)? = nil) async throws
+}
+public struct VMDisplayRef : @unchecked Swift.Sendable {
+  public let vm: Virtualization.VZVirtualMachine
+}
+public enum VMError : Swift.Error, Swift.Sendable, Swift.CustomStringConvertible {
+  case missingFile(Swift.String)
+  case invalidConfiguration(Swift.String)
+  case invalidState(Swift.String)
+  case vsockConnectionFailed(port: Swift.UInt32)
+  case shutdown
+  public var description: Swift.String {
+    get
+  }
+}
+final public class VMPoolBootstrapper : @unchecked Swift.Sendable {
+  final public let vmManager: SwiftPythonRuntime.VMManager
+  final public var onUnhealthy: (@Sendable () async -> Swift.Void)?
+  public init(vmManager: SwiftPythonRuntime.VMManager, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, healthConfig: SwiftPythonRuntime.VMHealthMonitor.Configuration = .default)
+  final public func boot() async throws
+  final public func spawnWorkers(count: Swift.Int) async throws -> [SwiftPythonRuntime.WorkerProcess]
+  final public func respawnWorker(id: Swift.Int) async throws -> (mainFD: Swift.Int32, sideFD: Swift.Int32, pid: _DarwinFoundation2.pid_t)
+  final public func allocateOOBPort() -> Swift.UInt32
+  final public func acceptOOBConnection(on port: Swift.UInt32, timeout: Foundation.TimeInterval = 10.0) async throws -> Swift.Int32
+  final public func pingSupervisor() -> Swift.Bool
+  final public func shutdown(saveState: Swift.Bool = true) async throws
+  @objc deinit
+}
+extension SwiftPythonRuntime.VMPoolBootstrapper : SwiftPythonRuntime.WorkerLifecycleDelegate {
+  final public func workerSignalAbort(id: Swift.Int)
+  final public func workerKill(id: Swift.Int)
+  final public func workerCleanup(id: Swift.Int)
+}
+public protocol WorkerLifecycleDelegate : AnyObject, Swift.Sendable {
+  func workerSignalAbort(id: Swift.Int)
+  func workerKill(id: Swift.Int)
+  func workerCleanup(id: Swift.Int)
+}
 final public class WorkerProcess : @unchecked Swift.Sendable {
   final public let id: Swift.Int
   final public var generation: Swift.UInt64 {
@@ -1185,10 +1345,16 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
   final public var sideSocketPath: Swift.String {
     get
   }
+  final public var lifecycleDelegate: (any SwiftPythonRuntime.WorkerLifecycleDelegate)?
+  final public var isExternallyManaged: Swift.Bool {
+    get
+  }
   public init(id: Swift.Int, socketDirectory: Swift.String = WorkerProcess.defaultSocketDirectory, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, environmentOverrides: [Swift.String : Swift.String] = [:])
   @objc deinit
+  final public func attachExternalFD(mainFD: Swift.Int32, sideFD: Swift.Int32 = -1, pid: _DarwinFoundation2.pid_t = 0)
   final public func spawn(workerExecutablePath: Swift.String, acceptTimeout: Foundation.TimeInterval = 10.0) throws
   final public func sideEval(_ code: Swift.String) throws
+  final public func sendSideCommand(_ command: SwiftPythonRuntime.SideCommand) throws
   final public func sendStreamCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil, onChunk: (Foundation.Data) -> Swift.Void) throws
   final public var callbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data)?
   final public var streamingCallbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> SwiftPythonRuntime.StreamingCallbackIterator)?
@@ -1275,10 +1441,28 @@ extension SwiftPythonRuntime.PythonObjectWrapper {
   final public subscript(index: SwiftPythonRuntime.PyObjectRef) -> SwiftPythonRuntime.PyObjectRef? {
     get
   }
+  final public func getItem(_ key: SwiftPythonRuntime.PyObjectRef) throws -> SwiftPythonRuntime.PyObjectRef
   final public func setItem(index: SwiftPythonRuntime.PyObjectRef, value: SwiftPythonRuntime.PyObjectRef) throws
+  final public subscript(pyKey key: Swift.String) -> SwiftPythonRuntime.PyObjectRef {
+    get throws
+  }
+  final public subscript(pyKey key: any SwiftPythonRuntime.PythonConvertible) -> SwiftPythonRuntime.PyObjectRef {
+    get throws
+  }
+  final public func setItem(pyKey key: Swift.String, value: SwiftPythonRuntime.PyObjectRef) throws
+  final public func setItem(pyKey key: any SwiftPythonRuntime.PythonConvertible, value: SwiftPythonRuntime.PyObjectRef) throws
+  final public var count: Swift.Int {
+    get throws
+  }
 }
 extension SwiftPythonRuntime.PyObjectRef {
   public static var none: SwiftPythonRuntime.PyObjectRef {
+    get
+  }
+  final public var isNone: Swift.Bool {
+    get
+  }
+  final public var typeName: Swift.String? {
     get
   }
 }
@@ -1286,6 +1470,19 @@ extension SwiftPythonRuntime.PyObjectRef {
   public static func capsule<T>(_ object: T, name: Swift.String) throws -> SwiftPythonRuntime.PyObjectRef where T : AnyObject
   final public func extractCapsule<T>(as type: T.Type, name: Swift.String) throws -> T where T : AnyObject
   final public func isCapsule(name: Swift.String) -> Swift.Bool
+}
+extension SwiftPythonRuntime.PyObjectRef : Swift.CustomStringConvertible {
+  final public var description: Swift.String {
+    get
+  }
+}
+extension SwiftPythonRuntime.PyObjectRef : Swift.CustomDebugStringConvertible {
+  final public var debugDescription: Swift.String {
+    get
+  }
+}
+extension SwiftPythonRuntime.PyObjectRef {
+  final public func pyEquals(_ other: SwiftPythonRuntime.PyObjectRef) -> Swift.Bool
 }
 extension SwiftPythonRuntime.PyObjectRef : Swift.Equatable, Swift.Hashable {
   public static func == (lhs: SwiftPythonRuntime.PyObjectRef, rhs: SwiftPythonRuntime.PyObjectRef) -> Swift.Bool
@@ -1369,6 +1566,9 @@ public struct Python {
   public static var collections: SwiftPythonRuntime.PyObjectRef {
     get throws
   }
+  public static func str(_ object: SwiftPythonRuntime.PyObjectRef) throws -> Swift.String
+  public static func repr(_ object: SwiftPythonRuntime.PyObjectRef) throws -> Swift.String
+  public static func type(_ object: SwiftPythonRuntime.PyObjectRef) throws -> Swift.String
 }
 public enum PythonBufferError : Swift.Error, Swift.Sendable, Swift.CustomStringConvertible, Foundation.LocalizedError {
   case bufferNotSupported
@@ -1481,6 +1681,18 @@ public func PyDict_Next(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafeM
 public func PyObject_IsTrue(_ o: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
 @_silgen_name("PyObject_Type")
 public func PyObject_Type(_ o: SwiftPythonRuntime.PyObjectPointer?) -> SwiftPythonRuntime.PyObjectPointer?
+@_silgen_name("PyObject_Length")
+public func PyObject_Length(_ o: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int
+@_silgen_name("SwiftPython_Py_IsNone")
+public func SwiftPython_Py_IsNone(_ obj: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
+@_silgen_name("SwiftPython_PyObject_RichCompareBool")
+public func PyObject_RichCompareBool(_ o1: SwiftPythonRuntime.PyObjectPointer?, _ o2: SwiftPythonRuntime.PyObjectPointer?, _ opid: Swift.Int32) -> Swift.Int32
+public let Py_LT: Swift.Int32
+public let Py_LE: Swift.Int32
+public let Py_EQ: Swift.Int32
+public let Py_NE: Swift.Int32
+public let Py_GT: Swift.Int32
+public let Py_GE: Swift.Int32
 @_silgen_name("PyGILState_Ensure")
 public func PyGILState_Ensure() -> Swift.Int32
 @_silgen_name("PyGILState_Release")
@@ -1646,6 +1858,8 @@ public typealias SwiftAsyncCallback = @Sendable ([SwiftPythonRuntime.PyHandle], 
   final public func register<T, U, R>(name: Swift.String, callback: @escaping (T, U) throws -> R) -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
   final public func register<T, U, V, R>(name: Swift.String, callback: @escaping (T, U, V) throws -> R) -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  final public func register<T, U, V, W, R>(name: Swift.String, callback: @escaping (T, U, V, W) throws -> R) -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, W : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @objc deinit
 }
 @_hasMissingDesignatedInitializers final public class SwiftBridgeModule : @unchecked Swift.Sendable {
@@ -1834,14 +2048,53 @@ public func pyArg(_ value: any SwiftPythonRuntime.PythonConvertible) throws -> S
 public func pyArgOptionalExistential(_ value: (any SwiftPythonRuntime.PythonConvertible)?) throws -> SwiftPythonRuntime.PyObjectRef
 public func pyArgs(_ args: [any SwiftPythonRuntime.PythonConvertible]) throws -> [SwiftPythonRuntime.PyObjectRef]
 public func pyKwargs(_ kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible]) throws -> [Swift.String : SwiftPythonRuntime.PyObjectRef]
-public func pyList(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
-public func pyList(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
-public func pyTuple(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
-public func pyTuple(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
-public func pySet(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
-public func pySet(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
+@_disfavoredOverload public func pyList(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
+public func pyList<T>(_ items: [T]) throws -> SwiftPythonRuntime.PyObjectRef where T : SwiftPythonRuntime.PythonConvertible
+@_disfavoredOverload public func pyList(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
+@_disfavoredOverload public func pyTuple(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
+public func pyTuple<T>(_ items: [T]) throws -> SwiftPythonRuntime.PyObjectRef where T : SwiftPythonRuntime.PythonConvertible
+@_disfavoredOverload public func pyTuple(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
+@_disfavoredOverload public func pySet(_ items: any SwiftPythonRuntime.PythonConvertible...) throws -> SwiftPythonRuntime.PyObjectRef
+public func pySet<T>(_ items: [T]) throws -> SwiftPythonRuntime.PyObjectRef where T : SwiftPythonRuntime.PythonConvertible
+@_disfavoredOverload public func pySet(_ items: [any SwiftPythonRuntime.PythonConvertible]) throws -> SwiftPythonRuntime.PyObjectRef
 public func pyDict(_ pairs: (any SwiftPythonRuntime.PythonConvertible, any SwiftPythonRuntime.PythonConvertible)...) throws -> SwiftPythonRuntime.PyObjectRef
 public func pyDict(_ pairs: [(any SwiftPythonRuntime.PythonConvertible, any SwiftPythonRuntime.PythonConvertible)]) throws -> SwiftPythonRuntime.PyObjectRef
+extension Swift.Float : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.Int64 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.Int32 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.Int16 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.Int8 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.UInt64 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.UInt32 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.UInt16 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
+extension Swift.UInt8 : SwiftPythonRuntime.PythonConvertible {
+  public init(pythonObject: SwiftPythonRuntime.PyObjectRef) throws
+  public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
+}
 extension SwiftPythonRuntime.WorkerErrorCode : Swift.Equatable {}
 extension SwiftPythonRuntime.WorkerErrorCode : Swift.Hashable {}
 extension SwiftPythonRuntime.WorkerErrorCode : Swift.RawRepresentable {}
@@ -1859,5 +2112,9 @@ extension SwiftPythonRuntime.DAGFailurePolicy : Swift.Equatable {}
 extension SwiftPythonRuntime.DAGFailurePolicy : Swift.Hashable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Equatable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Hashable {}
+extension SwiftPythonRuntime.VMManager.BootMode : Swift.Equatable {}
+extension SwiftPythonRuntime.VMManager.BootMode : Swift.Hashable {}
+extension SwiftPythonRuntime.VMManager.GuestOS : Swift.Equatable {}
+extension SwiftPythonRuntime.VMManager.GuestOS : Swift.Hashable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Equatable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Hashable {}
