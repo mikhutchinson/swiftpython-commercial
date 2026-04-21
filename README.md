@@ -2,6 +2,8 @@
 
 Binary distribution of the SwiftPython runtime for macOS. This package provides a pre-built XCFramework and worker binary for consuming SwiftPython functionality via Swift Package Manager.
 
+**Latest release: `v0.2.0` — streaming overhaul.** See [What's new in v0.2.0](#whats-new-in-v020) below and the [Migration v0.1 → v0.2 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md) for upgrade recipes.
+
 ## Requirements
 
 - macOS 15.0+
@@ -14,7 +16,7 @@ Add this package to your `Package.swift` dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.1.23")
+    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.2.0")
 ]
 ```
 
@@ -22,8 +24,56 @@ Or use environment variables for dynamic resolution:
 
 ```bash
 export SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://github.com/mikhutchinson/swiftpython-commercial.git
-export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.1.23
+export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.2.0
 ```
+
+## What's new in v0.2.0
+
+The v0.2.0 release closes seven structural gaps the v0.1.x streaming primitive had — across nine independently-gated phases organised in three parallel tracks plus a convergence step.
+
+**v0.2.0 is wire-compatible** with v0.1.x consumers when `IPCConfiguration.requiredProtocolVersion = 1` is set (emergency rollback), and **source-compatible** with v0.1.x consumers using the legacy 18 stream overloads (which stay shimmed unchanged in v0.2.0 and are deprecated-and-removed in a single v0.3.0 release).
+
+| Track | What landed | New consumer-facing API |
+|-------|-------------|--------------------------|
+| **Wire/Protocol** | Versioned wire handshake (`requiredProtocolVersion`), per-stream channel IDs, worker-emitted `streamKeepalive` (default 5s), user-emitted `streamProgress` (`swift_bridge.progress(...)`), per-stream `streamCancel`, cooperative `swift_bridge.check_cancel()`, opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn on `respawnOnTimeout`. | `IPCConfiguration.streamKeepaliveInterval`, `.allowInterruptInjection`, `.requiredProtocolVersion` |
+| **Ergonomics** | `StreamOptions` collapses 18 stream overloads → 9 modern entry points; `OwnedPyHandle` eliminates `defer { Task { try? await pool.release(h) } }` boilerplate via ARC-driven release. | `StreamOptions(timeout:workerAffinity:surfaceProgressEvents:)`, `pool.evalOwned()` / `invokeOwned()` / `methodOwned()` returning `OwnedPyHandle` |
+| **Observability** | `pool.events()` multi-subscriber lifecycle stream; `StreamEvent<T>` typed value+progress streams (wire-order preserved); `PoolEvent.callbackOrphaned` for in-flight callbacks lost to worker death. | `pool.events()` → `AsyncStream<PoolEvent>`, `*EventStream<T>` returning `CancellableStream<StreamEvent<T>>` |
+| **Hardening** | Worker `sendLock` write-mutex; `executeStream` releases the GIL between iterations (enables side-channel daemon + keepalive timer thread); cross-track integration tests + chaos scenario verifying all phases compose under simultaneous failure. | (transparent to consumers — fewer wedges, cleaner cleanup on failure) |
+
+### What's deletable in your v0.1.x consumer code
+
+If your code includes any of the following workarounds, v0.2.0 lets you delete them. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md) for before/after recipes.
+
+| v0.1.x scaffolding | v0.2.0 primitive that replaces it |
+|--------------------|------------------------------------|
+| Per-chunk timeout watchdogs (`Task.sleep` then check stream progress) | `IPCConfiguration.streamKeepaliveInterval` (worker emits liveness on a clock) |
+| Manual ticker plumbing emitting "still alive" frames from Python | `IPCConfiguration.streamKeepaliveInterval` (same job, no user code) |
+| Disambiguating progress markers from real values in pickled data | `StreamEvent<T>` with `.value(T)` / `.progress(elapsedMs:hint:)` cases |
+| `defer { Task { try? await pool.release(handle) } }` everywhere | `pool.evalOwned(...)` + `OwnedPyHandle` — release on scope exit |
+| Polling `pool.respawnCount(for:)` to detect crashes | Subscribe to `pool.events()` for `.workerRespawned` / `.workerDied` |
+| Custom orphan-callback bookkeeping when workers crash mid-callback | `PoolEvent.callbackOrphaned(workerID:callID:callbackName:kind:)` |
+
+### Wire protocol compatibility
+
+| Pool config | Worker version | Outcome |
+|-------------|----------------|---------|
+| Default v0.2.0 | v2 worker (this release) | Full v0.2.0 surface, all features active |
+| `requiredProtocolVersion: 1` | v2 worker (this release) | Degraded mode — v0.2.0 features emit on the wire but consumers see legacy semantics |
+| Default v0.2.0 | v1 worker (legacy v0.1.x binary) | **Spawn fails fast** with `PythonWorkerError.protocolError` |
+| `requiredProtocolVersion: 1` | v1 worker (legacy v0.1.x binary) | Legacy v1 wire only |
+
+For an emergency rollback to a v0.1.x worker binary while still using a v0.2.0 framework:
+
+```swift
+let ipc = IPCConfiguration(requiredProtocolVersion: 1)
+let pool = try await PythonProcessPool(workers: 4, ipc: ipc)
+```
+
+This disables every v0.2.0 feature (channel IDs, keepalive, progress, multiplex cancel) for that pool but keeps the spawn loop alive. New code should never need this; it exists to catch misconfiguration silently rather than wedging.
+
+### Wire-protocol reference
+
+For the full v0.2.0 wire format, see the [Streaming Protocol v2 reference](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Streaming-Protocol-V2.md) in the SwiftPython wiki.
 
 ## Usage
 
@@ -150,12 +200,18 @@ To use:
 | `Library not loaded: libpython3.13.dylib` | Ensure `PYTHONHOME` and `DYLD_LIBRARY_PATH` are set correctly |
 | `compiled module was created by a different version of the compiler` | Rebuild your project with the same Swift version used to build this XCFramework |
 | SPM fingerprint mismatch | Delete `~/Library/org.swift.swiftpm/security/fingerprints`, `.build/`, and `Package.resolved`, then re-resolve |
+| `PythonWorkerError.protocolError("Worker N speaks protocol v1; pool requires v2 or higher")` (v0.2.0+) | Your sidecar `SwiftPythonWorker` binary is from v0.1.x but the framework is v0.2.0. Update the worker binary to the v0.2.0 release (re-resolve SPM, copy the new worker into your `.app` bundle, re-sign). For an emergency rollback to keep using a v0.1.x worker binary, set `IPCConfiguration(requiredProtocolVersion: 1)` — this disables every v0.2.0 feature for that pool. See [What's new in v0.2.0 § Wire protocol compatibility](#whats-new-in-v020) above. |
+| `from swift_bridge import progress` raises `ImportError` (v0.2.0+) | The `progress()` Python helper is installed lazily on first stream invocation. Defer the `import` to runtime inside the generator function: `def gen(): from swift_bridge import progress; ...`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
 
 ## Version History
 
 | Build | Date | Notes |
 |-------|------|-------|
-| 0.1.23 | 2026-03-28 | **Current.** Semver tag for SPM pinning; same binaries as v0.1.22. |
+| 0.2.0 | 2026-04-20 | **Current. Streaming overhaul** — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
+| 0.1.26 | 2026-04-17 | Fix XCFramework layout for xcodebuild consumers — `EmitSwiftModule` previously failed with `cannot find type 'PyObjectRef'` because Xcode 15+ explicit-modules only registers the slice via `Info.plist`'s `HeadersPath` and does not probe `Headers/` for nested `.swiftmodule` directories. The xcframework now ships the Swift module in both `<slice>/SwiftPythonRuntime.swiftmodule/` (Apple-canonical, xcodebuild) and `<slice>/Headers/SwiftPythonRuntime.swiftmodule/` (SPM back-compat). Bump consumer's `SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION` to `0.1.26` and re-resolve. Also includes Linux CI fixes: `SHUT_RDWR` Int32 cast and `PythonVMWorkerTests` `canImport(Darwin)` gate. |
+| 0.1.25 | 2026-04-15 | Semver tag for SPM pinning; same binaries as v0.1.24. Restored fingerprint-safe versioning after a force-push incident on v0.1.24. |
+| 0.1.24 | 2026-04-15 | API gap fixes (16 items) — `PyObjectRef.isNone` (C-level Py_IsNone check, zero overhead), `PyObjectRef.typeName`, `PyObjectRef: CustomStringConvertible/CustomDebugStringConvertible`, `PyObjectRef.pyEquals(_:)` (Python-level `==`), `PyObjectRef.count` + `getItem(_:)` throwing variants, dict `subscript(pyKey:)` + `setItem(pyKey:value:)`, `Python.str/repr/type` static convenience, `Float: PythonConvertible` round-trip, all 8 fixed-width integer types as `PythonConvertible`, `Bool` round-trip, 4-arg typed callback overload. 163 new `APIGapTests`. Also: pyList double-wrap fix; build is now warning-free workspace-wide. |
+| 0.1.23 | 2026-03-28 | Semver tag for SPM pinning; same binaries as v0.1.22. |
 | 0.1.22 | 2026-03-28 | macOS 26: fix `EXC_BAD_ACCESS` in Swift concurrency (`swift_task_isMainExecutorImpl`) — remove `SerialExecutor` conformance from `PythonThreadExecutor`. |
 | 0.1.21 | 2026-03-26 | Rebuild SwiftPythonWorker (stderr/EPIPE hardening) and XCFramework. |
 | 0.1.20 | 2026-03-26 | Worker IPC recv serialization and nested stream routing. |
