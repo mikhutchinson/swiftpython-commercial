@@ -2,7 +2,7 @@
 
 Binary distribution of the SwiftPython runtime for macOS. This package provides a pre-built XCFramework and worker binary for consuming SwiftPython functionality via Swift Package Manager.
 
-**Latest release: `v0.2.0` — streaming overhaul.** See [What's new in v0.2.0](#whats-new-in-v020) below and the [Migration v0.1 → v0.2 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md) for upgrade recipes.
+**Latest release: `v0.2.1` — public respawn surface + force-kill fast-path.** Wire-compatible with v0.2.0 in either direction (no protocol change). See [What's new in v0.2.1](#whats-new-in-v021) below and the [Migration v0.2.0 → v0.2.1 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md) for the host-integration recipe (cooperative-cancel → 2s deadline → force-respawn escalation).
 
 ## Requirements
 
@@ -16,7 +16,7 @@ Add this package to your `Package.swift` dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.2.0")
+    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.2.1")
 ]
 ```
 
@@ -24,8 +24,46 @@ Or use environment variables for dynamic resolution:
 
 ```bash
 export SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://github.com/mikhutchinson/swiftpython-commercial.git
-export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.2.0
+export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.2.1
 ```
+
+## What's new in v0.2.1
+
+A focused additive release that ships the public manual-respawn verb the v0.2.0 surface was missing, together with a fast-kill mode for the "agent stuck mid-bash, just kill it" case that cooperative cancel (SIGUSR1 + `swift_bridge.check_cancel()`) cannot solve.
+
+**Wire-protocol compatibility**: v0.2.1 ships the same wire format as v0.2.0; the protocol-version handshake floor stays at `2`. A v0.2.0 framework spawning a v0.2.1 worker (or vice versa) handshakes successfully — no migration is forced on consumers staying on v0.2.0.
+
+### New surface
+
+- **`public func respawnWorker(_:reason:force:)`** on `PythonProcessPool` (was `internal` in v0.2.0). Default reason is `.userInitiated`; `force: false` preserves the v0.2.0 graceful path (SIGTERM → 500ms grace → SIGKILL).
+- **`force: true`** parameter that skips the SIGTERM grace and SIGKILLs the existing process immediately (~50ms vs the graceful path's ~1s). Use when the worker is wedged inside a syscall (`subprocess.run`, `time.sleep`) where polite shutdown is pointless waiting.
+- **`PoolEvent.RespawnReason.userInitiated`** — the default reason on the public verb. Distinct from `.explicit` (which is reserved for internal/test programmatic respawns) so subscribers can filter end-user actions from telemetry-driven recycles.
+- **`PythonWorkerError.workerForciblyRespawned(workerID:)`** — surfaced to any in-flight caller whose worker was killed by a concurrent `respawnWorker(_:force: true)`. Categorically distinct from `.workerCrashed` so hosts can surface a "stopped" banner instead of a "crashed" banner and skip crash-report / blacklisting paths. **Excluded from the pool's transparent-retry path** so the runtime does not silently re-execute work the user just told us to abandon.
+
+### Adoption
+
+```swift
+// User-facing menu command:
+try? await pool.respawnWorker(workerIndex)  // graceful, default reason: .userInitiated
+
+// Emergency stop button (escalate from cooperative cancel):
+try? await pool.respawnWorker(workerIndex, force: true)
+```
+
+```swift
+// Distinguish user-driven cancellation from real crashes:
+catch let error as PythonWorkerError {
+    switch error {
+    case .workerForciblyRespawned(let id):
+        showStoppedBanner(workerID: id)   // not a crash — user requested it
+    case .workerCrashed(let id, _):
+        showCrashedBanner(workerID: id)   // real crash — escalate
+    default: throw error
+    }
+}
+```
+
+See the [Migration v0.2.0 → v0.2.1 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md) for the recommended host pattern (cooperative-cancel → 2s deadline → force-respawn escalation) and the honest scope of what `force: true` does NOT solve (worker child processes survive SIGKILL; respawn budget still applies).
 
 ## What's new in v0.2.0
 
@@ -207,7 +245,8 @@ To use:
 
 | Build | Date | Notes |
 |-------|------|-------|
-| 0.2.0 | 2026-04-20 | **Current. Streaming overhaul** — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
+| 0.2.1 | 2026-04-23 | **Current. Public respawn surface + force-kill fast-path** — promotes `PythonProcessPool.respawnWorker(_:reason:force:)` from internal to public; adds `force: true` SIGKILL fast-path (~50ms vs graceful ~1s) for the "agent stuck mid-bash" case where cooperative cancel cannot break a worker out of a blocking syscall; adds `PoolEvent.RespawnReason.userInitiated` (default reason on the public verb) and `PythonWorkerError.workerForciblyRespawned(workerID:)` so hosts can distinguish user-driven kills from real crashes. **Wire-compatible with v0.2.0 in either direction** — no protocol-level changes; the handshake floor stays at `2`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md). |
+| 0.2.0 | 2026-04-20 | Streaming overhaul — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
 | 0.1.26 | 2026-04-17 | Fix XCFramework layout for xcodebuild consumers — `EmitSwiftModule` previously failed with `cannot find type 'PyObjectRef'` because Xcode 15+ explicit-modules only registers the slice via `Info.plist`'s `HeadersPath` and does not probe `Headers/` for nested `.swiftmodule` directories. The xcframework now ships the Swift module in both `<slice>/SwiftPythonRuntime.swiftmodule/` (Apple-canonical, xcodebuild) and `<slice>/Headers/SwiftPythonRuntime.swiftmodule/` (SPM back-compat). Bump consumer's `SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION` to `0.1.26` and re-resolve. Also includes Linux CI fixes: `SHUT_RDWR` Int32 cast and `PythonVMWorkerTests` `canImport(Darwin)` gate. |
 | 0.1.25 | 2026-04-15 | Semver tag for SPM pinning; same binaries as v0.1.24. Restored fingerprint-safe versioning after a force-push incident on v0.1.24. |
 | 0.1.24 | 2026-04-15 | API gap fixes (16 items) — `PyObjectRef.isNone` (C-level Py_IsNone check, zero overhead), `PyObjectRef.typeName`, `PyObjectRef: CustomStringConvertible/CustomDebugStringConvertible`, `PyObjectRef.pyEquals(_:)` (Python-level `==`), `PyObjectRef.count` + `getItem(_:)` throwing variants, dict `subscript(pyKey:)` + `setItem(pyKey:value:)`, `Python.str/repr/type` static convenience, `Float: PythonConvertible` round-trip, all 8 fixed-width integer types as `PythonConvertible`, `Bool` round-trip, 4-arg typed callback overload. 163 new `APIGapTests`. Also: pyList double-wrap fix; build is now warning-free workspace-wide. |
