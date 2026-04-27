@@ -1,8 +1,8 @@
 # SwiftPython Commercial Runtime
 
-Binary distribution of the SwiftPython runtime for macOS. This package provides a pre-built XCFramework and worker binary for consuming SwiftPython functionality via Swift Package Manager.
+Binary distribution of the SwiftPython runtime for macOS. This package provides a pre-built XCFramework, worker binary, and VM guest scripts for consuming SwiftPython functionality via Swift Package Manager.
 
-**Latest release: `v0.2.1` — public respawn surface + force-kill fast-path.** Wire-compatible with v0.2.0 in either direction (no protocol change). See [What's new in v0.2.1](#whats-new-in-v021) below and the [Migration v0.2.0 → v0.2.1 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md) for the host-integration recipe (cooperative-cancel → 2s deadline → force-respawn escalation).
+**Latest release: `v0.4.0` — SandboxPool + protocol v4 VM supervisor runtime.** Ships the matched `SwiftPythonRuntime.xcframework`, `SwiftPythonWorker`, and `VMWorker/` Python guest scripts required by Ubuntu/Alpine VM provisioning. See [What's new in v0.4.0](#whats-new-in-v040) below and the [Sirius migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-from-sirius-vm.md).
 
 ## Requirements
 
@@ -16,7 +16,7 @@ Add this package to your `Package.swift` dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.2.1")
+    .package(url: "https://github.com/mikhutchinson/swiftpython-commercial.git", from: "0.4.0")
 ]
 ```
 
@@ -24,8 +24,26 @@ Or use environment variables for dynamic resolution:
 
 ```bash
 export SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://github.com/mikhutchinson/swiftpython-commercial.git
-export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.2.1
+export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.4.0
 ```
+
+## What's new in v0.4.0
+
+v0.4.0 is the Sirius-replacement sandbox release. It moves the VM backend from a candidate surface to a release artifact with the runtime, sidecar, and guest Python scripts built from the same SwiftPython commit.
+
+**Wire-protocol compatibility**: v0.4.0 uses worker/supervisor protocol v4. Ship the v0.4.0 `SwiftPythonRuntime.xcframework`, `SwiftPythonWorker`, and `VMWorker/` directory together. Older sidecars should be treated as stale and replaced, not mixed with this runtime.
+
+### New surface
+
+- **`SandboxPool`** — actor-owned tenant pool with per-tenant secrets, lock files, drain-and-replace, crash diagnostics, quotas, and event reporting.
+- **Ubuntu 24.04 ARM64 image builder** — two-phase build path: QEMU cloud-init first boot, then Virtualization.framework serial provisioning with Python/scientific packages, `uv`, supervisor, worker, and systemd service installation.
+- **VM supervisor exec protocol** — `execShell`, `execShellStream`, and `execShellPTY` with separate stdout/stderr, stdin frames, resize frames, signal frames, output caps, and typed error mapping.
+- **Supervisor policy enforcement** — defaults to sudo disabled, worker/exec children run as `user`, open-file limits use `RLIMIT_NOFILE`, CPU quota uses Linux cgroup v2 when constrained, and policy is configured after authenticated supervisor handshake.
+- **Commercial VM script payload** — `VMWorker/swiftpython_supervisor.py` and `VMWorker/swiftpython_worker.py` are now shipped beside the XCFramework so binary consumers can provision VM images without SwiftPython source checkouts.
+
+### Adoption
+
+For Sirius-style sandbox migration, pin `swiftpython-commercial` to `0.4.0`, re-resolve the package, copy the new `SwiftPythonWorker` into the app bundle, and leave the `VMWorker/` directory available in the package checkout or set `SWIFTPYTHON_VM_WORKER_DIR` to an explicit deployed copy.
 
 ## What's new in v0.2.1
 
@@ -115,12 +133,13 @@ For the full v0.2.0 wire format, see the [Streaming Protocol v2 reference](https
 
 ## Usage
 
-The package provides two binary artifacts:
+The package provides three runtime artifacts:
 
 - `SwiftPythonRuntime.xcframework` — The runtime library (link against this target)
 - `SwiftPythonWorker` — Sidecar process for Python execution
+- `VMWorker/` — Python supervisor/worker scripts installed into Linux VM images
 
-Your app bundle should include the `SwiftPythonWorker` binary alongside your main executable.
+Your app bundle should include the `SwiftPythonWorker` binary alongside your main executable. Consumers that build VM images outside an SPM checkout should also deploy `VMWorker/` and set `SWIFTPYTHON_VM_WORKER_DIR` to that directory.
 
 ## Linker Configuration
 
@@ -238,6 +257,8 @@ To use:
 | `Library not loaded: libpython3.13.dylib` | Ensure `PYTHONHOME` and `DYLD_LIBRARY_PATH` are set correctly |
 | `compiled module was created by a different version of the compiler` | Rebuild your project with the same Swift version used to build this XCFramework |
 | SPM fingerprint mismatch | Delete `~/Library/org.swift.swiftpm/security/fingerprints`, `.build/`, and `Package.resolved`, then re-resolve |
+| `VMWorker scripts not found` from an image builder | Use the v0.4.0 commercial package checkout with `VMWorker/` present, copy `VMWorker/` beside the consuming tool, or set `SWIFTPYTHON_VM_WORKER_DIR=/path/to/VMWorker` |
+| `PythonWorkerError.protocolError(...)` mentioning protocol v4 | Runtime and sidecar are not the matched v0.4.0 pair. Re-resolve `swiftpython-commercial`, copy the v0.4.0 `SwiftPythonWorker`, and re-sign it in the app bundle. |
 | `PythonWorkerError.protocolError("Worker N speaks protocol v1; pool requires v2 or higher")` (v0.2.0+) | Your sidecar `SwiftPythonWorker` binary is from v0.1.x but the framework is v0.2.0. Update the worker binary to the v0.2.0 release (re-resolve SPM, copy the new worker into your `.app` bundle, re-sign). For an emergency rollback to keep using a v0.1.x worker binary, set `IPCConfiguration(requiredProtocolVersion: 1)` — this disables every v0.2.0 feature for that pool. See [What's new in v0.2.0 § Wire protocol compatibility](#whats-new-in-v020) above. |
 | `from swift_bridge import progress` raises `ImportError` (v0.2.0+) | The `progress()` Python helper is installed lazily on first stream invocation. Defer the `import` to runtime inside the generator function: `def gen(): from swift_bridge import progress; ...`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
 
@@ -245,7 +266,9 @@ To use:
 
 | Build | Date | Notes |
 |-------|------|-------|
-| 0.2.1 | 2026-04-23 | **Current. Public respawn surface + force-kill fast-path** — promotes `PythonProcessPool.respawnWorker(_:reason:force:)` from internal to public; adds `force: true` SIGKILL fast-path (~50ms vs graceful ~1s) for the "agent stuck mid-bash" case where cooperative cancel cannot break a worker out of a blocking syscall; adds `PoolEvent.RespawnReason.userInitiated` (default reason on the public verb) and `PythonWorkerError.workerForciblyRespawned(workerID:)` so hosts can distinguish user-driven kills from real crashes. **Wire-compatible with v0.2.0 in either direction** — no protocol-level changes; the handshake floor stays at `2`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md). |
+| 0.4.0 | 2026-04-27 | **Current. SandboxPool + protocol v4 VM supervisor runtime** — real Ubuntu 24.04 image builder, VM-backed tenant pool, authenticated supervisor configure command, exec capture/stream/PTY, stdin/resize/signal frames, sudo/RLIMIT/cgroup policy enforcement, crash diagnostics, and packaged `VMWorker/` scripts for commercial binary consumers. See the [Sirius migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-from-sirius-vm.md). |
+| 0.3.0 | 2026-04-23 | Multi-stream worker protocol v3 — same-worker stream multiplexing, protocol v3 handshake, public surface pruning, and matched sidecar rebuild. |
+| 0.2.1 | 2026-04-23 | Public respawn surface + force-kill fast-path — promotes `PythonProcessPool.respawnWorker(_:reason:force:)` from internal to public; adds `force: true` SIGKILL fast-path (~50ms vs graceful ~1s) for the "agent stuck mid-bash" case where cooperative cancel cannot break a worker out of a blocking syscall; adds `PoolEvent.RespawnReason.userInitiated` (default reason on the public verb) and `PythonWorkerError.workerForciblyRespawned(workerID:)` so hosts can distinguish user-driven kills from real crashes. **Wire-compatible with v0.2.0 in either direction** — no protocol-level changes; the handshake floor stays at `2`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md). |
 | 0.2.0 | 2026-04-20 | Streaming overhaul — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
 | 0.1.26 | 2026-04-17 | Fix XCFramework layout for xcodebuild consumers — `EmitSwiftModule` previously failed with `cannot find type 'PyObjectRef'` because Xcode 15+ explicit-modules only registers the slice via `Info.plist`'s `HeadersPath` and does not probe `Headers/` for nested `.swiftmodule` directories. The xcframework now ships the Swift module in both `<slice>/SwiftPythonRuntime.swiftmodule/` (Apple-canonical, xcodebuild) and `<slice>/Headers/SwiftPythonRuntime.swiftmodule/` (SPM back-compat). Bump consumer's `SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION` to `0.1.26` and re-resolve. Also includes Linux CI fixes: `SHUT_RDWR` Int32 cast and `PythonVMWorkerTests` `canImport(Darwin)` gate. |
 | 0.1.25 | 2026-04-15 | Semver tag for SPM pinning; same binaries as v0.1.24. Restored fingerprint-safe versioning after a force-push incident on v0.1.24. |

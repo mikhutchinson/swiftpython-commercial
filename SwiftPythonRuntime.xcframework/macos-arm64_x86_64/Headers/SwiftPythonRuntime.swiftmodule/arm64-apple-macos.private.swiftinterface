@@ -2,6 +2,8 @@
 // swift-compiler-version: Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)
 // swift-module-flags: -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -O -module-name SwiftPythonRuntime -package-name swiftpython
 // swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.1
+import CommonCrypto
+import CryptoKit
 import Darwin
 import Dispatch
 import Foundation
@@ -204,9 +206,10 @@ public struct IPCConfiguration : Swift.Sendable, Swift.Codable, Swift.Equatable 
   public var respawnOnTimeout: Swift.Bool
   public var requiredProtocolVersion: Swift.UInt32
   public var streamKeepaliveInterval: Foundation.TimeInterval
-  public var allowInterruptInjection: Swift.Bool
   public var broadcastResourceSamples: Swift.Bool
-  public init(sendTimeout: Foundation.TimeInterval = 30, receiveTimeout: Foundation.TimeInterval = 30, healthCheckTimeout: Foundation.TimeInterval = 5, maxPayloadBytes: Swift.Int = 16 * 1024 * 1024, maxPickleBytes: Swift.Int = 8 * 1024 * 1024, respawnOnTimeout: Swift.Bool = false, requiredProtocolVersion: Swift.UInt32 = IPCConfiguration.currentProtocolVersion, streamKeepaliveInterval: Foundation.TimeInterval = 5.0, allowInterruptInjection: Swift.Bool = false, broadcastResourceSamples: Swift.Bool = false)
+  public var maxExecChunkBytes: Swift.Int
+  public var supervisorParentDisconnectTimeout: Foundation.TimeInterval
+  public init(sendTimeout: Foundation.TimeInterval = 30, receiveTimeout: Foundation.TimeInterval = 30, healthCheckTimeout: Foundation.TimeInterval = 5, maxPayloadBytes: Swift.Int = 16 * 1024 * 1024, maxPickleBytes: Swift.Int = 8 * 1024 * 1024, respawnOnTimeout: Swift.Bool = false, requiredProtocolVersion: Swift.UInt32 = IPCConfiguration.currentProtocolVersion, streamKeepaliveInterval: Foundation.TimeInterval = 5.0, broadcastResourceSamples: Swift.Bool = false, maxExecChunkBytes: Swift.Int = 256 * 1024, supervisorParentDisconnectTimeout: Foundation.TimeInterval = 5.0)
   public static let currentProtocolVersion: Swift.UInt32
   public init(from decoder: any Swift.Decoder) throws
   public static let `default`: SwiftPythonRuntime.IPCConfiguration
@@ -282,6 +285,12 @@ public enum WorkerCommand : Swift.Sendable, Swift.Codable {
   case callbackStreamChunk(callId: Swift.UInt64, pickle: Foundation.Data, channelID: Swift.UInt32 = 0)
   case callbackStreamEnd(callId: Swift.UInt64, channelID: Swift.UInt32 = 0)
   case callbackStreamError(callId: Swift.UInt64, type: Swift.String, message: Swift.String, channelID: Swift.UInt32 = 0)
+  case execShell(command: Swift.String, stdin: Foundation.Data?, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32 = 0)
+  case execShellStream(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32 = 0)
+  case execShellPTY(command: Swift.String, initialSize: SwiftPythonRuntime.TerminalSize, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32 = 0)
+  case execStdinChunk(channelID: Swift.UInt32, bytes: Foundation.Data, eof: Swift.Bool)
+  case execSignal(channelID: Swift.UInt32, signal: SwiftPythonRuntime.PosixSignal, terminalSize: SwiftPythonRuntime.TerminalSize?)
+  case execAuthResponse(channelID: Swift.UInt32 = 0, hmac: Foundation.Data, clientVersion: Swift.UInt32)
   public func encode(to encoder: any Swift.Encoder) throws
   public init(from decoder: any Swift.Decoder) throws
 }
@@ -316,6 +325,13 @@ public enum WorkerResponse : Swift.Sendable, Swift.Codable {
   case callbackStreamNext(callId: Swift.UInt64, channelID: Swift.UInt32 = 0)
   case streamKeepalive(streamChannelID: Swift.UInt32, elapsedMs: Swift.UInt64)
   case streamProgress(streamChannelID: Swift.UInt32, elapsedMs: Swift.UInt64, hint: Swift.String?)
+  case execStdoutChunk(channelID: Swift.UInt32, bytes: Foundation.Data)
+  case execStderrChunk(channelID: Swift.UInt32, bytes: Foundation.Data)
+  case execResult(channelID: Swift.UInt32, exitCode: Swift.Int32, elapsedMs: Swift.UInt64, truncated: Swift.Bool)
+  case execTimedOut(channelID: Swift.UInt32, elapsedMs: Swift.UInt64)
+  case execAuthChallenge(channelID: Swift.UInt32 = 0, nonce: Foundation.Data)
+  case execAuthOK(channelID: Swift.UInt32 = 0, supervisorVersion: Swift.UInt32, protocolVersion: Swift.UInt32)
+  case execAuthFailed(channelID: Swift.UInt32 = 0, reason: Swift.String)
   public init(from decoder: any Swift.Decoder) throws
   public func encode(to encoder: any Swift.Encoder) throws
 }
@@ -752,6 +768,12 @@ extension SwiftPythonRuntime.PythonProcessPool {
   }
 }
 extension SwiftPythonRuntime.PythonProcessPool {
+  public func execShell(on tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, stdin: Foundation.Data? = nil, timeout: Foundation.TimeInterval = 120, maxOutputBytes: Swift.Int = 64 * 1024 * 1024, traceID: Foundation.UUID? = nil) async throws -> SwiftPythonRuntime.ShellResult
+  public func execShell(on tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, stdin: Foundation.Data? = nil, options: SwiftPythonRuntime.ExecStreamOptions) async throws -> SwiftPythonRuntime.SandboxShellResult
+  public func execShellStream(on tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, options: SwiftPythonRuntime.ExecStreamOptions = ExecStreamOptions()) async throws -> SwiftPythonRuntime.SandboxExecSession
+  public func execShellPTY(on tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, options: SwiftPythonRuntime.ExecPTYOptions = ExecPTYOptions()) async throws -> SwiftPythonRuntime.SandboxExecSession
+}
+extension SwiftPythonRuntime.PythonProcessPool {
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], worker workerIndex: Swift.Int, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.PyHandle
   public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:], timeout: Foundation.TimeInterval? = nil) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
@@ -832,6 +854,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3) async throws
   public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
   public init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
+  public init(workers workerCount: Swift.Int, transport: any SwiftPythonRuntime.WorkerTransport, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
   public convenience init(workers workerCount: Swift.Int, backend: SwiftPythonRuntime.PythonProcessPool.WorkerBackend, fallbackToProcess: Swift.Bool = false, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
   public static func recommended(for workload: SwiftPythonRuntime.WorkloadType) -> Swift.Int
   @objc deinit
@@ -851,6 +874,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
 extension SwiftPythonRuntime.PythonProcessPool {
   public func sideEval(_ code: Swift.String, worker workerIndex: Swift.Int) throws
   public func startOutOfBandStream(generatorCode: Swift.String, worker workerIndex: Swift.Int, buffer: SwiftPythonRuntime.SharedRingBuffer) throws
+  @available(*, deprecated, message: "Use transport-capability-selected out-of-band streaming; this explicit socket entry point will be removed in v0.5.0.")
   public func startOutOfBandSocketStream(generatorCode: Swift.String, worker workerIndex: Swift.Int, capacity: Swift.Int = 65_536) async throws -> SwiftPythonRuntime.SocketOOBStreamBuffer
 }
 extension SwiftPythonRuntime.PythonProcessPool {
@@ -879,7 +903,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func respawnWorker(_ workerIndex: Swift.Int, reason: SwiftPythonRuntime.PoolEvent.RespawnReason = .userInitiated, force: Swift.Bool = false) async throws
   public func healthCheck() async throws -> [Swift.Bool]
   public func warmup(_ code: Swift.String) async throws
-  public func drain(timeout: Swift.Duration = .seconds(30)) async throws
+  public func drain(timeout: Swift.Duration? = .seconds(30)) async throws
   public func shedIdleWorkers(force: Swift.Bool = false)
   public func resume()
   public func shutdown(timeout: Swift.Duration = .seconds(5)) async
@@ -1201,6 +1225,384 @@ internal func remoteKwargsDictionary(from pairs: [SwiftPythonRuntime.RemoteKwarg
     get
   }
 }
+public enum SandboxExecStream : Swift.String, Swift.Sendable, Swift.Codable, Swift.Hashable {
+  case stdout
+  case stderr
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct SandboxShellChunk : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public let stream: SwiftPythonRuntime.SandboxExecStream
+  public let bytes: Foundation.Data
+  public let sequence: Swift.UInt64
+  public init(stream: SwiftPythonRuntime.SandboxExecStream, bytes: Foundation.Data, sequence: Swift.UInt64)
+  public static func == (a: SwiftPythonRuntime.SandboxShellChunk, b: SwiftPythonRuntime.SandboxShellChunk) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct SandboxShellResult : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public let stdout: Foundation.Data
+  public let stderr: Foundation.Data
+  public let exitCode: Swift.Int32
+  public let elapsedMs: Swift.UInt64
+  public let truncated: Swift.Bool
+  public init(stdout: Foundation.Data, stderr: Foundation.Data, exitCode: Swift.Int32, elapsedMs: Swift.UInt64, truncated: Swift.Bool = false)
+  public static func == (a: SwiftPythonRuntime.SandboxShellResult, b: SwiftPythonRuntime.SandboxShellResult) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public typealias ShellResult = SwiftPythonRuntime.SandboxShellResult
+public typealias ShellChunk = SwiftPythonRuntime.SandboxShellChunk
+@_hasMissingDesignatedInitializers final public class SandboxExecSession : @unchecked Swift.Sendable {
+  final public let channelID: Swift.UInt32
+  final public let chunks: _Concurrency.AsyncThrowingStream<SwiftPythonRuntime.SandboxShellChunk, any Swift.Error>
+  final public let result: _Concurrency.Task<SwiftPythonRuntime.SandboxShellResult, any Swift.Error>
+  final public func sendStdin(_ data: Foundation.Data) async throws
+  final public func finishStdin() async throws
+  final public func signal(_ signal: SwiftPythonRuntime.PosixSignal) async throws
+  final public func resize(to size: SwiftPythonRuntime.TerminalSize) async throws
+  final public func cancel() async
+  @objc deinit
+}
+public struct TerminalSize : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public let columns: Swift.UInt16
+  public let rows: Swift.UInt16
+  public let xPixels: Swift.UInt16
+  public let yPixels: Swift.UInt16
+  public init(columns: Swift.UInt16 = 80, rows: Swift.UInt16 = 24, xPixels: Swift.UInt16 = 0, yPixels: Swift.UInt16 = 0)
+  public static let `default`: SwiftPythonRuntime.TerminalSize
+  public var cols: Swift.UInt16 {
+    get
+  }
+  public static func == (a: SwiftPythonRuntime.TerminalSize, b: SwiftPythonRuntime.TerminalSize) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum PosixSignal : Swift.Int32, Swift.Sendable, Swift.Codable, Swift.Hashable {
+  case interrupt
+  case hangup
+  case terminate
+  case kill
+  case windowChanged
+  public static let sigint: SwiftPythonRuntime.PosixSignal
+  public static let sighup: SwiftPythonRuntime.PosixSignal
+  public static let sigterm: SwiftPythonRuntime.PosixSignal
+  public static let sigkill: SwiftPythonRuntime.PosixSignal
+  public static let sigwinch: SwiftPythonRuntime.PosixSignal
+  public init?(rawValue: Swift.Int32)
+  public typealias RawValue = Swift.Int32
+  public var rawValue: Swift.Int32 {
+    get
+  }
+}
+public struct ExecStreamOptions : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public let timeout: Foundation.TimeInterval
+  public let maxOutputBytes: Swift.Int
+  public let traceID: Foundation.UUID?
+  public init(timeout: Foundation.TimeInterval = 120, maxOutputBytes: Swift.Int = 64 * 1024 * 1024, traceID: Foundation.UUID? = nil)
+  public static func == (a: SwiftPythonRuntime.ExecStreamOptions, b: SwiftPythonRuntime.ExecStreamOptions) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct ExecPTYOptions : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public let timeout: Foundation.TimeInterval
+  public let maxOutputBytes: Swift.Int
+  public let initialSize: SwiftPythonRuntime.TerminalSize
+  public let traceID: Foundation.UUID?
+  public init(timeout: Foundation.TimeInterval = 120, maxOutputBytes: Swift.Int = 64 * 1024 * 1024, initialSize: SwiftPythonRuntime.TerminalSize = .default, traceID: Foundation.UUID? = nil)
+  public static func == (a: SwiftPythonRuntime.ExecPTYOptions, b: SwiftPythonRuntime.ExecPTYOptions) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct SandboxImageManifest : Swift.Codable, Swift.Equatable, Swift.Sendable {
+  public let imageVersion: Swift.Int
+  public let sha256: Swift.String
+  public let swiftpythonVersion: Swift.String
+  public let builtAt: Swift.String
+  public let distro: Swift.String
+  public let supervisorVersion: Swift.String
+  public init(imageVersion: Swift.Int, sha256: Swift.String, swiftpythonVersion: Swift.String, builtAt: Swift.String, distro: Swift.String, supervisorVersion: Swift.String)
+  public static func == (a: SwiftPythonRuntime.SandboxImageManifest, b: SwiftPythonRuntime.SandboxImageManifest) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum SandboxImageVerifier {
+  public static func manifestPath(forDiskPath diskPath: Swift.String) -> Swift.String
+  public static func writeManifest(forDiskPath diskPath: Swift.String, imageVersion: Swift.Int = 1, swiftpythonVersion: Swift.String, distro: Swift.String, supervisorVersion: Swift.String) throws -> SwiftPythonRuntime.SandboxImageManifest
+  @discardableResult
+  public static func verify(diskPath: Swift.String, manifestPath: Swift.String? = nil, minimumSwiftPythonVersion: Swift.String? = nil) throws -> SwiftPythonRuntime.SandboxImageManifest
+}
+public enum SandboxImageHasher {
+  public static func sha256Hex(fileAtPath path: Swift.String) throws -> Swift.String
+}
+public enum SandboxCrashDiagnostics {
+  @discardableResult
+  public static func writeReport(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String, vmConfig: SwiftPythonRuntime.VMConfiguration, recentEvents: [SwiftPythonRuntime.SandboxEvent], crashReportsDirectory: Swift.String) throws -> Swift.String
+}
+public struct SandboxTenantID : Swift.Sendable, Swift.Hashable, Swift.Codable, Swift.CustomStringConvertible {
+  public let rawValue: Swift.String
+  public init(rawValue: Swift.String)
+  public var description: Swift.String {
+    get
+  }
+  public static func == (a: SwiftPythonRuntime.SandboxTenantID, b: SwiftPythonRuntime.SandboxTenantID) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum QuotaResource : Swift.Sendable, Swift.Hashable, Swift.Codable {
+  case memory
+  case cpu
+  case disk
+  case openFiles
+  case outputBytes
+  public static func == (a: SwiftPythonRuntime.QuotaResource, b: SwiftPythonRuntime.QuotaResource) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum SnapshotRestoreReason : Swift.Sendable, Swift.Hashable, Swift.Codable {
+  case unsupportedInThisRelease
+  case snapshotNotFound(Swift.String)
+  case incompatibleHostMacOSVersion(required: Swift.String, observed: Swift.String)
+  case checksumMismatch
+  public static func == (a: SwiftPythonRuntime.SnapshotRestoreReason, b: SwiftPythonRuntime.SnapshotRestoreReason) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum SandboxError : Swift.Error, Swift.Sendable {
+  case imageNotFound(path: Swift.String)
+  case imageHashMismatch(expected: Swift.String, observed: Swift.String, imagePath: Swift.String)
+  case baseImageVersionTooOld(imageVersion: Swift.Int, frameworkVersion: Swift.String)
+  case cloudInitTimeout(elapsedMs: Swift.UInt64)
+  case vmBootFailed(reason: Swift.String, imagePath: Swift.String)
+  case vsockConnectionRefused(tenantID: SwiftPythonRuntime.SandboxTenantID)
+  case supervisorAuthFailed(tenantID: SwiftPythonRuntime.SandboxTenantID, reason: Swift.String)
+  case snapshotRestoreFailed(SwiftPythonRuntime.SnapshotRestoreReason)
+  case execTimedOut(channelID: Swift.UInt32, elapsedMs: Swift.UInt64)
+  case execOutputLimitExceeded(observed: Swift.Int, limit: Swift.Int, partialOutput: Foundation.Data)
+  case sudoDisabled(Swift.String)
+  case tenantQuotaExceeded(SwiftPythonRuntime.QuotaResource, limit: Swift.UInt64, observed: Swift.UInt64)
+  case networkEgressDenied
+  case guestPanicked(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String)
+  case guestUnreachable(tenantID: SwiftPythonRuntime.SandboxTenantID, lastSeenMsAgo: Swift.UInt64)
+  case serialChannelCRCMismatch(seq: Swift.UInt32, expected: Swift.UInt32, observed: Swift.UInt32)
+  case serialChannelAckTimeout(seq: Swift.UInt32, waitedMs: Swift.UInt64)
+}
+public enum TenantEvictionReason : Swift.Sendable, Swift.Equatable, Swift.Codable {
+  case released
+  case forceStopped
+  case idleTimeout
+  case drainAndReplace
+  case shutdown
+  public static func == (a: SwiftPythonRuntime.TenantEvictionReason, b: SwiftPythonRuntime.TenantEvictionReason) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum SandboxEvent : Swift.Sendable, Swift.Equatable {
+  case tenantSpawned(tenantID: SwiftPythonRuntime.SandboxTenantID, bootMs: Swift.UInt64, imageHash: Swift.String)
+  case tenantEvicted(tenantID: SwiftPythonRuntime.SandboxTenantID, reason: SwiftPythonRuntime.TenantEvictionReason)
+  indirect case tenantCrashed(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String, lastEvent: SwiftPythonRuntime.SandboxEvent?)
+  case execStarted(channelID: Swift.UInt32, tenantID: SwiftPythonRuntime.SandboxTenantID, command: Swift.String, traceID: Foundation.UUID?)
+  case execCompleted(channelID: Swift.UInt32, tenantID: SwiftPythonRuntime.SandboxTenantID, exitCode: Swift.Int32, elapsedMs: Swift.UInt64, stdoutBytes: Swift.UInt64, stderrBytes: Swift.UInt64, traceID: Foundation.UUID?)
+  case execTimedOut(channelID: Swift.UInt32, tenantID: SwiftPythonRuntime.SandboxTenantID, elapsedMs: Swift.UInt64, traceID: Foundation.UUID?)
+  case guestKernelPanic(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String)
+  case quotaExceeded(tenantID: SwiftPythonRuntime.SandboxTenantID, resource: SwiftPythonRuntime.QuotaResource, limit: Swift.UInt64, observed: Swift.UInt64)
+  case eventsDropped(count: Swift.Int)
+  public static func == (a: SwiftPythonRuntime.SandboxEvent, b: SwiftPythonRuntime.SandboxEvent) -> Swift.Bool
+}
+public struct SandboxPoolConfig : Swift.Sendable {
+  public var minimumSwiftPythonVersion: Swift.String
+  public var idleEvictionTimeout: Foundation.TimeInterval
+  public var lockDirectory: Swift.String
+  public var crashReportsDirectory: Swift.String
+  public var supervisorParentDisconnectTimeout: Foundation.TimeInterval
+  public var verifyImageManifest: Swift.Bool
+  public var workersPerTenant: Swift.Int
+  public var ipc: SwiftPythonRuntime.IPCConfiguration
+  public var processPoolFactory: (@Sendable (SwiftPythonRuntime.SandboxTenantID, SwiftPythonRuntime.VMConfiguration) async throws -> SwiftPythonRuntime.PythonProcessPool)?
+  public init(minimumSwiftPythonVersion: Swift.String = "0.4.0", idleEvictionTimeout: Foundation.TimeInterval = 300, lockDirectory: Swift.String = SandboxPoolConfig.defaultLockDirectory, crashReportsDirectory: Swift.String = "~/.swiftpython/crash-reports", supervisorParentDisconnectTimeout: Foundation.TimeInterval = 5, verifyImageManifest: Swift.Bool = true, workersPerTenant: Swift.Int = 1, ipc: SwiftPythonRuntime.IPCConfiguration = .default, processPoolFactory: (@Sendable (SwiftPythonRuntime.SandboxTenantID, SwiftPythonRuntime.VMConfiguration) async throws -> SwiftPythonRuntime.PythonProcessPool)? = nil)
+  public static var defaultLockDirectory: Swift.String {
+    get
+  }
+}
+public struct SandboxTenant : Swift.Sendable {
+  public let id: SwiftPythonRuntime.SandboxTenantID
+  public let processPool: SwiftPythonRuntime.PythonProcessPool
+  public let mounts: [SwiftPythonRuntime.VMFileSystemMount]
+  public let bootMillis: Swift.UInt64
+  public let supervisorAuthSecret: Foundation.Data
+  public let clonePath: Swift.String
+  public let lockFilePath: Swift.String
+  public let vmConfig: SwiftPythonRuntime.VMConfiguration
+}
+public actor SandboxPool {
+  public init(baseImagePath: Swift.String, cloneDir: Swift.String, config: SwiftPythonRuntime.SandboxPoolConfig = SandboxPoolConfig()) async throws
+  public func events(bufferSize: Swift.Int = 256) -> _Concurrency.AsyncStream<SwiftPythonRuntime.SandboxEvent>
+  public func activeTenantIDs() -> [SwiftPythonRuntime.SandboxTenantID]
+  public func execShell(tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, stdin: Foundation.Data? = nil, options: SwiftPythonRuntime.ExecStreamOptions = ExecStreamOptions()) async throws -> SwiftPythonRuntime.SandboxShellResult
+  public func execShellStream(tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, options: SwiftPythonRuntime.ExecStreamOptions = ExecStreamOptions()) async throws -> SwiftPythonRuntime.SandboxExecSession
+  public func execShellPTY(tenantID: SwiftPythonRuntime.SandboxTenantID, _ command: Swift.String, options: SwiftPythonRuntime.ExecPTYOptions = ExecPTYOptions()) async throws -> SwiftPythonRuntime.SandboxExecSession
+  public func acquire(tenantID: SwiftPythonRuntime.SandboxTenantID, vmConfig override: SwiftPythonRuntime.VMConfiguration? = nil) async throws -> SwiftPythonRuntime.SandboxTenant
+  public func release(_ tenant: SwiftPythonRuntime.SandboxTenant, force: Swift.Bool = false) async throws
+  public func forceStop(tenantID: SwiftPythonRuntime.SandboxTenantID) async throws
+  public func evictIdle(maxAge: Foundation.TimeInterval? = nil) async
+  public func drainAndReplace(newConfig: SwiftPythonRuntime.SandboxPoolConfig) async throws
+  public func shutdown() async
+  public func recordGuestKernelPanic(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String) async throws
+  public static func cleanupStaleLockFiles(in lockDirectory: Swift.String) throws
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+    get
+  }
+}
+public struct SerialCRCEnvelope : Swift.Equatable, Swift.Sendable {
+  public let seq: Swift.UInt32
+  public let payload: Foundation.Data
+  public let crc32: Swift.UInt32
+  public init(seq: Swift.UInt32, payload: Foundation.Data)
+  public init(seq: Swift.UInt32, payload: Foundation.Data, crc32: Swift.UInt32) throws
+  public func encodedLine() -> Swift.String
+  public static func decodeLine(_ line: Swift.String) throws -> SwiftPythonRuntime.SerialCRCEnvelope
+  public static func == (a: SwiftPythonRuntime.SerialCRCEnvelope, b: SwiftPythonRuntime.SerialCRCEnvelope) -> Swift.Bool
+}
+public enum CRC32 {
+  public static func checksum(_ data: Foundation.Data) -> Swift.UInt32
+}
+public struct VMFileSystemMount : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public var hostPath: Swift.String
+  public var guestTag: Swift.String
+  public var readOnly: Swift.Bool
+  public init(hostPath: Swift.String, guestTag: Swift.String, readOnly: Swift.Bool = true)
+  public static func == (a: SwiftPythonRuntime.VMFileSystemMount, b: SwiftPythonRuntime.VMFileSystemMount) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct KernelBoot : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public var kernelPath: Swift.String
+  public var initrdPath: Swift.String?
+  public var commandLine: Swift.String
+  public init(kernelPath: Swift.String, initrdPath: Swift.String? = nil, commandLine: Swift.String = "")
+  public static func == (a: SwiftPythonRuntime.KernelBoot, b: SwiftPythonRuntime.KernelBoot) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct NATNetworkConfig : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public var macAddress: Swift.String?
+  public init(macAddress: Swift.String? = nil)
+  public static func == (a: SwiftPythonRuntime.NATNetworkConfig, b: SwiftPythonRuntime.NATNetworkConfig) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public enum GuestSudoMode : Swift.String, Swift.Sendable, Swift.Codable, Swift.Hashable {
+  case none
+  case interactive
+  case nopasswd
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum SandboxBootStrategy : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  case coldBoot
+  case snapshotRestore(snapshotPath: Swift.String)
+  public static func == (a: SwiftPythonRuntime.SandboxBootStrategy, b: SwiftPythonRuntime.SandboxBootStrategy) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+  public init(from decoder: any Swift.Decoder) throws
+}
+public struct VMConfiguration : Swift.Sendable, Swift.Codable, Swift.Hashable {
+  public enum GuestOS : Swift.String, Swift.Sendable, Swift.Codable, Swift.Hashable {
+    case ubuntu24
+    case alpine
+    case macOS
+    public init?(rawValue: Swift.String)
+    public typealias RawValue = Swift.String
+    public var rawValue: Swift.String {
+      get
+    }
+  }
+  public var guestOS: SwiftPythonRuntime.VMConfiguration.GuestOS
+  public var bootStrategy: SwiftPythonRuntime.SandboxBootStrategy
+  public var cpuCount: Swift.Int
+  public var cpuQuotaPercent: Swift.Int
+  public var memoryMB: Swift.Int
+  public var diskMB: Swift.Int
+  public var maxOpenFilesPerProcess: Swift.Int
+  public var diskImagePath: Swift.String
+  public var inheritedDiskFD: Swift.Int32?
+  public var isoPath: Swift.String?
+  public var customKernel: SwiftPythonRuntime.KernelBoot?
+  public var nvramPath: Swift.String?
+  public var attachSerialConsole: Swift.Bool
+  public var fileSystemMounts: [SwiftPythonRuntime.VMFileSystemMount]
+  public var allowNetworkEgress: Swift.Bool
+  public var natNetworkConfig: SwiftPythonRuntime.NATNetworkConfig?
+  public var supervisorAuthSecret: Foundation.Data?
+  public var guestSudoMode: SwiftPythonRuntime.GuestSudoMode
+  public init(guestOS: SwiftPythonRuntime.VMConfiguration.GuestOS = .ubuntu24, bootStrategy: SwiftPythonRuntime.SandboxBootStrategy = .coldBoot, cpuCount: Swift.Int = 2, cpuQuotaPercent: Swift.Int = 100, memoryMB: Swift.Int = 2048, diskMB: Swift.Int = 4096, maxOpenFilesPerProcess: Swift.Int = 1024, diskImagePath: Swift.String = "", inheritedDiskFD: Swift.Int32? = nil, isoPath: Swift.String? = nil, customKernel: SwiftPythonRuntime.KernelBoot? = nil, nvramPath: Swift.String? = nil, attachSerialConsole: Swift.Bool = false, fileSystemMounts: [SwiftPythonRuntime.VMFileSystemMount] = [], allowNetworkEgress: Swift.Bool = false, natNetworkConfig: SwiftPythonRuntime.NATNetworkConfig? = nil, supervisorAuthSecret: Foundation.Data? = nil, guestSudoMode: SwiftPythonRuntime.GuestSudoMode = .none)
+  public init(from decoder: any Swift.Decoder) throws
+  public static func == (a: SwiftPythonRuntime.VMConfiguration, b: SwiftPythonRuntime.VMConfiguration) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
 public enum SharedMemoryError : Swift.Error, Swift.Sendable, Swift.CustomStringConvertible, Foundation.LocalizedError {
   case createFailed(Swift.String)
   case openFailed(Swift.String)
@@ -1331,6 +1733,25 @@ final public class LinuxImageBuilder : @unchecked Swift.Sendable {
   final public func build(force: Swift.Bool = false) async throws -> Swift.String
   @objc deinit
 }
+final public class UbuntuImageBuilder : @unchecked Swift.Sendable {
+  public static let defaultImageURL: Foundation.URL
+  public static let supervisorVersion: Swift.String
+  public enum Event : Swift.Sendable {
+    case phase(Swift.String)
+    case step(Swift.String)
+    case tick(elapsedSeconds: Swift.Int, latestSerialLine: Swift.String?)
+    case log(Swift.String)
+    case done(phase: Swift.String, elapsedSeconds: Swift.Int)
+  }
+  final public let outputDir: Swift.String
+  final public let cacheDir: Swift.String
+  final public let swiftpythonVersion: Swift.String
+  final public var onProgress: (@Sendable (Swift.Double, Swift.String) -> Swift.Void)?
+  final public var onEvent: (@Sendable (SwiftPythonRuntime.UbuntuImageBuilder.Event) -> Swift.Void)?
+  public init(outputDir: Swift.String, cacheDir: Swift.String? = nil, swiftpythonVersion: Swift.String = "0.4.0", cpuCount: Swift.Int = 2, memoryMB: Swift.Int = 2048, diskSizeMB: Swift.Int = 8192)
+  final public func build(force: Swift.Bool = false) async throws -> Swift.String
+  @objc deinit
+}
 final public class VMHealthMonitor : @unchecked Swift.Sendable {
   public struct Configuration : Swift.Sendable {
     public var pingInterval: Foundation.TimeInterval
@@ -1394,7 +1815,10 @@ public actor VMManager {
     public var cpuCount: Swift.Int
     public var memorySize: Swift.UInt64
     public var diskSizeGB: Swift.Int
-    public init(guestOS: SwiftPythonRuntime.VMManager.GuestOS = .linux, cpuCount: Swift.Int = 2, memorySize: Swift.UInt64 = 2 * 1024 * 1024 * 1024, diskSizeGB: Swift.Int = 4)
+    public var allowNetworkEgress: Swift.Bool
+    public var attachSerialConsole: Swift.Bool
+    public var fileSystemMounts: [SwiftPythonRuntime.VMFileSystemMount]
+    public init(guestOS: SwiftPythonRuntime.VMManager.GuestOS = .linux, cpuCount: Swift.Int = 2, memorySize: Swift.UInt64 = 2 * 1024 * 1024 * 1024, diskSizeGB: Swift.Int = 4, allowNetworkEgress: Swift.Bool = false, attachSerialConsole: Swift.Bool = false, fileSystemMounts: [SwiftPythonRuntime.VMFileSystemMount] = [])
     public static let `default`: SwiftPythonRuntime.VMManager.VMConfiguration
     public static let macOSDefault: SwiftPythonRuntime.VMManager.VMConfiguration
   }
@@ -1435,7 +1859,7 @@ public enum VMError : Swift.Error, Swift.Sendable, Swift.CustomStringConvertible
 final public class VMPoolBootstrapper : @unchecked Swift.Sendable {
   final public let vmManager: SwiftPythonRuntime.VMManager
   final public var onUnhealthy: (@Sendable () async -> Swift.Void)?
-  public init(vmManager: SwiftPythonRuntime.VMManager, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, healthConfig: SwiftPythonRuntime.VMHealthMonitor.Configuration = .default)
+  public init(vmManager: SwiftPythonRuntime.VMManager, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, healthConfig: SwiftPythonRuntime.VMHealthMonitor.Configuration = .default, supervisorAuthSecret: Foundation.Data? = nil, guestSudoMode: SwiftPythonRuntime.GuestSudoMode = .none, cpuQuotaPercent: Swift.Int = 100, maxOpenFilesPerProcess: Swift.Int = 1024, supervisorParentDisconnectTimeout: Foundation.TimeInterval = 5.0, execUser: Swift.String = "user", execHome: Swift.String = "/home/user")
   final public func boot() async throws
   final public func spawnWorkers(count: Swift.Int) async throws -> [SwiftPythonRuntime.WorkerProcess]
   final public func respawnWorker(id: Swift.Int) async throws -> (mainFD: Swift.Int32, sideFD: Swift.Int32, pid: _DarwinFoundation2.pid_t)
@@ -1443,6 +1867,9 @@ final public class VMPoolBootstrapper : @unchecked Swift.Sendable {
   final public func acceptOOBConnection(on port: Swift.UInt32, timeout: Foundation.TimeInterval = 10.0) async throws -> Swift.Int32
   final public func pingSupervisor() -> Swift.Bool
   final public func shutdown(saveState: Swift.Bool = true) async throws
+  final public func execShellCapture(command: Swift.String, stdin: Foundation.Data?, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32? = nil) async throws -> SwiftPythonRuntime.SandboxShellResult
+  final public func execShellStream(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32? = nil) async throws -> SwiftPythonRuntime.SandboxExecSession
+  final public func execShellPTY(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, initialSize: SwiftPythonRuntime.TerminalSize, traceID: Foundation.UUID?, channelID: Swift.UInt32? = nil) async throws -> SwiftPythonRuntime.SandboxExecSession
   @objc deinit
 }
 extension SwiftPythonRuntime.VMPoolBootstrapper : SwiftPythonRuntime.WorkerLifecycleDelegate {
@@ -1471,7 +1898,11 @@ extension SwiftPythonRuntime.WorkerProcess {
   @usableFromInline
   @inline(__always) final internal func recordCallbackStart(callID: Swift.UInt64, wireName: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32) -> SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind
   @usableFromInline
-  @inline(__always) final internal func recordCallbackEnd(callID: Swift.UInt64, kind: SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind)
+  @inline(__always) final internal func recordCallbackReplySent(callID: Swift.UInt64, kind: SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind, channelID: Swift.UInt32)
+  @usableFromInline
+  @inline(__always) final internal func acknowledgeCallbackReplies(on channelID: Swift.UInt32)
+  @usableFromInline
+  @inline(__always) final internal func clearCallbackTracking(callID: Swift.UInt64)
   @usableFromInline
   @inline(__always) final internal func clearStreamingCallback(callID: Swift.UInt64)
   final public func allocateStreamChannelID() -> Swift.UInt32
@@ -1502,6 +1933,79 @@ final public class StreamingCallbackIterator : @unchecked Swift.Sendable {
   public init(bufferCapacity: Swift.Int, produce: @escaping @Sendable (_ yield: @escaping @Sendable (Foundation.Data) throws -> Swift.Void) throws -> Swift.Void)
   @objc deinit
 }
+public enum WorkerTransportKind : Swift.Sendable, Swift.Equatable {
+  case localProcess
+  case external
+  public static func == (a: SwiftPythonRuntime.WorkerTransportKind, b: SwiftPythonRuntime.WorkerTransportKind) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct WorkerEndpoint : Swift.Sendable {
+  public let mainFD: Swift.Int32
+  public let sideFD: Swift.Int32
+  public let pid: _DarwinFoundation2.pid_t
+  public let kind: SwiftPythonRuntime.WorkerTransportKind
+  public init(mainFD: Swift.Int32, sideFD: Swift.Int32 = -1, pid: _DarwinFoundation2.pid_t = 0, kind: SwiftPythonRuntime.WorkerTransportKind = .external)
+}
+public struct TransportCapabilities : Swift.Sendable, Swift.Equatable {
+  public let supportsPOSIXShm: Swift.Bool
+  public let supportsLocalSignals: Swift.Bool
+  public let prefersSocketOOB: Swift.Bool
+  public let supportsExecRPC: Swift.Bool
+  public let supportsFileSystemMounts: Swift.Bool
+  public let supportsPTY: Swift.Bool
+  public let supportsTenantQuotas: Swift.Bool
+  public init(supportsPOSIXShm: Swift.Bool, supportsLocalSignals: Swift.Bool, prefersSocketOOB: Swift.Bool, supportsExecRPC: Swift.Bool, supportsFileSystemMounts: Swift.Bool, supportsPTY: Swift.Bool, supportsTenantQuotas: Swift.Bool)
+  public static let localProcess: SwiftPythonRuntime.TransportCapabilities
+  public static let vm: SwiftPythonRuntime.TransportCapabilities
+  public static let test: SwiftPythonRuntime.TransportCapabilities
+  public static func == (a: SwiftPythonRuntime.TransportCapabilities, b: SwiftPythonRuntime.TransportCapabilities) -> Swift.Bool
+}
+public protocol WorkerTransport : Swift.Sendable {
+  var capabilities: SwiftPythonRuntime.TransportCapabilities { get }
+  func acquireWorker(id: Swift.Int, ipc: SwiftPythonRuntime.IPCConfiguration) async throws -> SwiftPythonRuntime.WorkerEndpoint
+  func releaseWorker(_ endpoint: SwiftPythonRuntime.WorkerEndpoint, force: Swift.Bool) async throws
+}
+public protocol ManagedWorkerTransport : SwiftPythonRuntime.WorkerTransport {
+  func shutdown() async throws
+}
+public protocol SupervisorExecTransport : SwiftPythonRuntime.WorkerTransport {
+  func execShellCapture(command: Swift.String, stdin: Foundation.Data?, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxShellResult
+  func execShellStream(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxExecSession
+  func execShellPTY(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, initialSize: SwiftPythonRuntime.TerminalSize, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxExecSession
+}
+public struct LocalProcessTransport : SwiftPythonRuntime.WorkerTransport {
+  public let workerExecutablePath: Swift.String?
+  public let socketDirectory: Swift.String
+  public let environmentOverrides: [Swift.String : Swift.String]
+  public let capabilities: SwiftPythonRuntime.TransportCapabilities
+  public init(workerExecutablePath: Swift.String? = nil, socketDirectory: Swift.String = WorkerProcess.defaultSocketDirectory, environmentOverrides: [Swift.String : Swift.String] = [:])
+  public func acquireWorker(id: Swift.Int, ipc: SwiftPythonRuntime.IPCConfiguration) async throws -> SwiftPythonRuntime.WorkerEndpoint
+  public func releaseWorker(_ endpoint: SwiftPythonRuntime.WorkerEndpoint, force: Swift.Bool) async throws
+}
+final public class TestTransport : SwiftPythonRuntime.WorkerTransport, @unchecked Swift.Sendable {
+  final public let capabilities: SwiftPythonRuntime.TransportCapabilities
+  public init(capabilities: SwiftPythonRuntime.TransportCapabilities = .test, acquire: @escaping @Sendable (Swift.Int, SwiftPythonRuntime.IPCConfiguration) async throws -> SwiftPythonRuntime.WorkerEndpoint, release: @escaping @Sendable (SwiftPythonRuntime.WorkerEndpoint, Swift.Bool) async throws -> Swift.Void = { endpoint, _ in
+            if endpoint.mainFD >= 0 { close(endpoint.mainFD) }
+            if endpoint.sideFD >= 0 { close(endpoint.sideFD) }
+        })
+  final public func acquireWorker(id: Swift.Int, ipc: SwiftPythonRuntime.IPCConfiguration) async throws -> SwiftPythonRuntime.WorkerEndpoint
+  final public func releaseWorker(_ endpoint: SwiftPythonRuntime.WorkerEndpoint, force: Swift.Bool) async throws
+  @objc deinit
+}
+final public class VMTransport : SwiftPythonRuntime.SupervisorExecTransport, SwiftPythonRuntime.ManagedWorkerTransport, @unchecked Swift.Sendable {
+  final public let capabilities: SwiftPythonRuntime.TransportCapabilities
+  public init(bootstrapper: SwiftPythonRuntime.VMPoolBootstrapper)
+  final public func acquireWorker(id: Swift.Int, ipc: SwiftPythonRuntime.IPCConfiguration) async throws -> SwiftPythonRuntime.WorkerEndpoint
+  final public func releaseWorker(_ endpoint: SwiftPythonRuntime.WorkerEndpoint, force: Swift.Bool) async throws
+  final public func shutdown() async throws
+  final public func execShellCapture(command: Swift.String, stdin: Foundation.Data?, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxShellResult
+  final public func execShellStream(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxExecSession
+  final public func execShellPTY(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, initialSize: SwiftPythonRuntime.TerminalSize, traceID: Foundation.UUID?, channelID: Swift.UInt32?) async throws -> SwiftPythonRuntime.SandboxExecSession
+  @objc deinit
+}
 public struct WorkerCallbackContext : @unchecked Swift.Sendable {
   public var workerID: Swift.Int {
     get
@@ -1528,6 +2032,12 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
   final public var pid: _DarwinFoundation2.pid_t {
     get
   }
+  final public var transportKind: SwiftPythonRuntime.WorkerTransportKind {
+    get
+  }
+  final public var transportCapabilities: SwiftPythonRuntime.TransportCapabilities {
+    get
+  }
   public static var defaultSocketDirectory: Swift.String {
     get
   }
@@ -1541,15 +2051,13 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
     get
   }
   final public var lifecycleDelegate: (any SwiftPythonRuntime.WorkerLifecycleDelegate)?
-  final public var isExternallyManaged: Swift.Bool {
-    get
-  }
   final public var callbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data)?
   final public var streamingCallbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> SwiftPythonRuntime.StreamingCallbackIterator)?
   final public var onCallbackOrphaned: (@Sendable (_ callID: Swift.UInt64, _ name: Swift.String, _ kind: SwiftPythonRuntime.PoolEvent.CallbackKind, _ streamChannelID: Swift.UInt32?) -> Swift.Void)?
   public init(id: Swift.Int, socketDirectory: Swift.String = WorkerProcess.defaultSocketDirectory, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, environmentOverrides: [Swift.String : Swift.String] = [:])
   @objc deinit
   final public func attachExternalFD(mainFD: Swift.Int32, sideFD: Swift.Int32 = -1, pid: _DarwinFoundation2.pid_t = 0)
+  final public func attachEndpoint(_ endpoint: SwiftPythonRuntime.WorkerEndpoint, capabilities: SwiftPythonRuntime.TransportCapabilities)
 }
 final public class PyCapsuleRef<T> : @unchecked Swift.Sendable where T : AnyObject {
   final public let pyObject: SwiftPythonRuntime.PyObjectRef
@@ -1833,8 +2341,6 @@ nonisolated(unsafe) public var PyExc_TypeError: SwiftPythonRuntime.PyObjectPoint
 nonisolated(unsafe) public var PyExc_KeyError: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyExc_ValueError")
 nonisolated(unsafe) public var PyExc_ValueError: SwiftPythonRuntime.PyObjectPointer
-@_silgen_name("PyExc_KeyboardInterrupt")
-nonisolated(unsafe) public var PyExc_KeyboardInterrupt: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyImport_ImportModule")
 public func PyImport_ImportModule(_: Swift.UnsafePointer<Swift.CChar>) -> SwiftPythonRuntime.PyObjectPointer?
 @_silgen_name("PyDict_New")
@@ -1884,10 +2390,6 @@ public func PyEval_SaveThread() -> SwiftPythonRuntime.PyThreadStatePointer?
 public func PyEval_RestoreThread(_: SwiftPythonRuntime.PyThreadStatePointer?)
 @_silgen_name("PyThread_get_thread_ident")
 public func PyThread_get_thread_ident() -> Swift.UInt
-@_silgen_name("PyThreadState_SetAsyncExc")
-public func PyThreadState_SetAsyncExc(_: Swift.UInt, _: SwiftPythonRuntime.PyObjectPointer?) -> Swift.Int32
-@_silgen_name("PyErr_SetInterrupt")
-public func PyErr_SetInterrupt()
 public struct Py_buffer {
   public var buf: Swift.UnsafeMutableRawPointer?
   public var obj: SwiftPythonRuntime.PyObjectPointer?
@@ -2295,11 +2797,17 @@ extension SwiftPythonRuntime.DAGFailurePolicy : Swift.Equatable {}
 extension SwiftPythonRuntime.DAGFailurePolicy : Swift.Hashable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Equatable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Hashable {}
+extension SwiftPythonRuntime.SandboxExecStream : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.PosixSignal : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.TenantEvictionReason : Swift.Hashable {}
+extension SwiftPythonRuntime.GuestSudoMode : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.VMConfiguration.GuestOS : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.VMManager.BootMode : Swift.Equatable {}
 extension SwiftPythonRuntime.VMManager.BootMode : Swift.Hashable {}
 extension SwiftPythonRuntime.VMManager.GuestOS : Swift.Equatable {}
 extension SwiftPythonRuntime.VMManager.GuestOS : Swift.Hashable {}
 extension SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind : Swift.Equatable {}
 extension SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind : Swift.Hashable {}
+extension SwiftPythonRuntime.WorkerTransportKind : Swift.Hashable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Equatable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Hashable {}
