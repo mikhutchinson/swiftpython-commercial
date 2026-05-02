@@ -2,7 +2,9 @@
 
 Binary distribution of the SwiftPython runtime for macOS. This package provides a pre-built XCFramework, worker binary, and VM guest scripts for consuming SwiftPython functionality via Swift Package Manager.
 
-**Latest release: `v0.4.0` — SandboxPool + protocol v4 VM supervisor runtime.** Ships the matched `SwiftPythonRuntime.xcframework`, `SwiftPythonWorker`, and `VMWorker/` Python guest scripts required by Ubuntu/Alpine VM provisioning. See [What's new in v0.4.0](#whats-new-in-v040) below and the [Sirius migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-from-sirius-vm.md).
+**Latest release: `v0.4.0` — SandboxPool + protocol v4 VM supervisor runtime.** Ships the matched `SwiftPythonRuntime.xcframework`, `SwiftPythonWorker`, and `VMWorker/` Python guest scripts required by Ubuntu/Alpine VM provisioning. See [What's new in v0.4.0](#whats-new-in-v040) below.
+
+**[API Guide →](docs/api-guide/)** — comprehensive reference covering the core runtime, type conversion, concurrency, ProcessPool, streaming, DAG orchestration, callbacks, and generated modules.
 
 ## Requirements
 
@@ -29,7 +31,7 @@ export SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.4.0
 
 ## What's new in v0.4.0
 
-v0.4.0 is the Sirius-replacement sandbox release. It moves the VM backend from a candidate surface to a release artifact with the runtime, sidecar, and guest Python scripts built from the same SwiftPython commit.
+v0.4.0 is the VM sandbox release. It moves the VM backend from a candidate surface to a release artifact with the runtime, sidecar, and guest Python scripts built from the same SwiftPython commit.
 
 **Wire-protocol compatibility**: v0.4.0 uses worker/supervisor protocol v4. Ship the v0.4.0 `SwiftPythonRuntime.xcframework`, `SwiftPythonWorker`, and `VMWorker/` directory together. Older sidecars should be treated as stale and replaced, not mixed with this runtime.
 
@@ -43,7 +45,7 @@ v0.4.0 is the Sirius-replacement sandbox release. It moves the VM backend from a
 
 ### Adoption
 
-For Sirius-style sandbox migration, pin `swiftpython-commercial` to `0.4.0`, re-resolve the package, copy the new `SwiftPythonWorker` into the app bundle, and leave the `VMWorker/` directory available in the package checkout or set `SWIFTPYTHON_VM_WORKER_DIR` to an explicit deployed copy.
+To adopt v0.4.0, pin `swiftpython-commercial` to `0.4.0`, re-resolve the package, copy the new `SwiftPythonWorker` into the app bundle, and leave the `VMWorker/` directory available in the package checkout or set `SWIFTPYTHON_VM_WORKER_DIR` to an explicit deployed copy.
 
 ## What's new in v0.2.1
 
@@ -81,7 +83,7 @@ catch let error as PythonWorkerError {
 }
 ```
 
-See the [Migration v0.2.0 → v0.2.1 guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md) for the recommended host pattern (cooperative-cancel → 2s deadline → force-respawn escalation) and the honest scope of what `force: true` does NOT solve (worker child processes survive SIGKILL; respawn budget still applies).
+See the Migration v0.2.0 → v0.2.1 section above for the recommended host pattern (cooperative-cancel → 2s deadline → force-respawn escalation) and the honest scope of what `force: true` does NOT solve (worker child processes survive SIGKILL; respawn budget still applies).
 
 ## What's new in v0.2.0
 
@@ -98,7 +100,7 @@ The v0.2.0 release closes seven structural gaps the v0.1.x streaming primitive h
 
 ### What's deletable in your v0.1.x consumer code
 
-If your code includes any of the following workarounds, v0.2.0 lets you delete them. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md) for before/after recipes.
+If your code includes any of the following workarounds, v0.2.0 lets you delete them. See the sections above for before/after recipes.
 
 | v0.1.x scaffolding | v0.2.0 primitive that replaces it |
 |--------------------|------------------------------------|
@@ -129,7 +131,7 @@ This disables every v0.2.0 feature (channel IDs, keepalive, progress, multiplex 
 
 ### Wire-protocol reference
 
-For the full v0.2.0 wire format, see the [Streaming Protocol v2 reference](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Streaming-Protocol-V2.md) in the SwiftPython wiki.
+For the full v0.2.0 wire format, see the [API Guide](docs/api-guide/) shipped with this package.
 
 ## Usage
 
@@ -260,16 +262,16 @@ To use:
 | `VMWorker scripts not found` from an image builder | Use the v0.4.0 commercial package checkout with `VMWorker/` present, copy `VMWorker/` beside the consuming tool, or set `SWIFTPYTHON_VM_WORKER_DIR=/path/to/VMWorker` |
 | `PythonWorkerError.protocolError(...)` mentioning protocol v4 | Runtime and sidecar are not the matched v0.4.0 pair. Re-resolve `swiftpython-commercial`, copy the v0.4.0 `SwiftPythonWorker`, and re-sign it in the app bundle. |
 | `PythonWorkerError.protocolError("Worker N speaks protocol v1; pool requires v2 or higher")` (v0.2.0+) | Your sidecar `SwiftPythonWorker` binary is from v0.1.x but the framework is v0.2.0. Update the worker binary to the v0.2.0 release (re-resolve SPM, copy the new worker into your `.app` bundle, re-sign). For an emergency rollback to keep using a v0.1.x worker binary, set `IPCConfiguration(requiredProtocolVersion: 1)` — this disables every v0.2.0 feature for that pool. See [What's new in v0.2.0 § Wire protocol compatibility](#whats-new-in-v020) above. |
-| `from swift_bridge import progress` raises `ImportError` (v0.2.0+) | The `progress()` Python helper is installed lazily on first stream invocation. Defer the `import` to runtime inside the generator function: `def gen(): from swift_bridge import progress; ...`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
+| `from swift_bridge import progress` raises `ImportError` (v0.2.0+) | The `progress()` Python helper is installed lazily on first stream invocation. Defer the `import` to runtime inside the generator function: `def gen(): from swift_bridge import progress; ...`. See the v0.2.0 section above. |
 
 ## Version History
 
 | Build | Date | Notes |
 |-------|------|-------|
-| 0.4.0 | 2026-04-27 | **Current. SandboxPool + protocol v4 VM supervisor runtime** — real Ubuntu 24.04 image builder, VM-backed tenant pool, authenticated supervisor configure command, exec capture/stream/PTY, stdin/resize/signal frames, sudo/RLIMIT/cgroup policy enforcement, crash diagnostics, and packaged `VMWorker/` scripts for commercial binary consumers. See the [Sirius migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-from-sirius-vm.md). |
+| 0.4.0 | 2026-04-27 | **Current. SandboxPool + protocol v4 VM supervisor runtime** — real Ubuntu 24.04 image builder, VM-backed tenant pool, authenticated supervisor configure command, exec capture/stream/PTY, stdin/resize/signal frames, sudo/RLIMIT/cgroup policy enforcement, crash diagnostics, and packaged `VMWorker/` scripts for commercial binary consumers. |
 | 0.3.0 | 2026-04-23 | Multi-stream worker protocol v3 — same-worker stream multiplexing, protocol v3 handshake, public surface pruning, and matched sidecar rebuild. |
-| 0.2.1 | 2026-04-23 | Public respawn surface + force-kill fast-path — promotes `PythonProcessPool.respawnWorker(_:reason:force:)` from internal to public; adds `force: true` SIGKILL fast-path (~50ms vs graceful ~1s) for the "agent stuck mid-bash" case where cooperative cancel cannot break a worker out of a blocking syscall; adds `PoolEvent.RespawnReason.userInitiated` (default reason on the public verb) and `PythonWorkerError.workerForciblyRespawned(workerID:)` so hosts can distinguish user-driven kills from real crashes. **Wire-compatible with v0.2.0 in either direction** — no protocol-level changes; the handshake floor stays at `2`. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.2.0-to-v0.2.1.md). |
-| 0.2.0 | 2026-04-20 | Streaming overhaul — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the [migration guide](https://github.com/mikhutchinson/SwiftPython/blob/main/docs/wiki/Migration-v0.1-to-v0.2.md). |
+| 0.2.1 | 2026-04-23 | Public respawn surface + force-kill fast-path — promotes `PythonProcessPool.respawnWorker(_:reason:force:)` from internal to public; adds `force: true` SIGKILL fast-path (~50ms vs graceful ~1s) for the "agent stuck mid-bash" case where cooperative cancel cannot break a worker out of a blocking syscall; adds `PoolEvent.RespawnReason.userInitiated` (default reason on the public verb) and `PythonWorkerError.workerForciblyRespawned(workerID:)` so hosts can distinguish user-driven kills from real crashes. **Wire-compatible with v0.2.0 in either direction** — no protocol-level changes; the handshake floor stays at `2`.  |
+| 0.2.0 | 2026-04-20 | Streaming overhaul — versioned wire protocol (handshake floor v2), per-stream channel IDs, `streamKeepalive` + `streamProgress` frames, `StreamOptions` (collapses 18 stream overloads → 9 modern entry points), `OwnedPyHandle` (ARC-driven release), `pool.events()` lifecycle observability, `StreamEvent<T>` typed value+progress streams, `PoolEvent.callbackOrphaned` for in-flight callbacks, cooperative `swift_bridge.check_cancel()` + opt-in `PyErr_SetInterrupt` injection, stream-scoped respawn. Wire-compatible with v0.1.x consumers via `requiredProtocolVersion: 1`. Legacy 18 stream overloads stay shimmed; deprecated-and-removed in a single v0.3.0 release. See the v0.2.0 section above. |
 | 0.1.26 | 2026-04-17 | Fix XCFramework layout for xcodebuild consumers — `EmitSwiftModule` previously failed with `cannot find type 'PyObjectRef'` because Xcode 15+ explicit-modules only registers the slice via `Info.plist`'s `HeadersPath` and does not probe `Headers/` for nested `.swiftmodule` directories. The xcframework now ships the Swift module in both `<slice>/SwiftPythonRuntime.swiftmodule/` (Apple-canonical, xcodebuild) and `<slice>/Headers/SwiftPythonRuntime.swiftmodule/` (SPM back-compat). Bump consumer's `SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION` to `0.1.26` and re-resolve. Also includes Linux CI fixes: `SHUT_RDWR` Int32 cast and `PythonVMWorkerTests` `canImport(Darwin)` gate. |
 | 0.1.25 | 2026-04-15 | Semver tag for SPM pinning; same binaries as v0.1.24. Restored fingerprint-safe versioning after a force-push incident on v0.1.24. |
 | 0.1.24 | 2026-04-15 | API gap fixes (16 items) — `PyObjectRef.isNone` (C-level Py_IsNone check, zero overhead), `PyObjectRef.typeName`, `PyObjectRef: CustomStringConvertible/CustomDebugStringConvertible`, `PyObjectRef.pyEquals(_:)` (Python-level `==`), `PyObjectRef.count` + `getItem(_:)` throwing variants, dict `subscript(pyKey:)` + `setItem(pyKey:value:)`, `Python.str/repr/type` static convenience, `Float: PythonConvertible` round-trip, all 8 fixed-width integer types as `PythonConvertible`, `Bool` round-trip, 4-arg typed callback overload. 163 new `APIGapTests`. Also: pyList double-wrap fix; build is now warning-free workspace-wide. |
@@ -289,7 +291,7 @@ To use:
 | 0.1.10 | 2026-03-02 | Semver tag; same revision as the v0.1.9.20260302 OOB streaming drop. |
 | 0.1.9 / 0.1.9.20260302 | 2026-03-02 | Broadcast hardening; ggml-metal atexit SIGABRT fix; `SharedRingBuffer` OOB streaming. |
 | 0.1.8 | 2026-03-01 | Side channel (`sideEval`): fire-and-forget Python eval via dedicated UDS socket per worker — safe to call during active streams; stream queue (`enqueue`/`dequeue`): ring-buffer data feed from Swift into Python generators with backpressure; proper `SideCommand` codec in `MessageFrame`; daemon thread shutdown hardened (stop flag + semaphore + GIL fence); 412 tests passing |
-| 0.1.7+build.20260228 | 2026-02-28 | Fix: `sendResponse` write race — `sendLock: NSLock` serializes concurrent `send(2)` calls from main stream thread and Python daemon threads; regression test `testConcurrentDaemonThreadCallbackDuringStream`; warning fixes in test files; AGENTS.md macOS/Linux build split; 957 tests passing |
+| 0.1.7+build.20260228 | 2026-02-28 | Fix: `sendResponse` write race — `sendLock: NSLock` serializes concurrent `send(2)` calls from main stream thread and Python daemon threads; regression test `testConcurrentDaemonThreadCallbackDuringStream`; warning fixes in test files; macOS/Linux build configuration split; 957 tests passing |
 | 0.1.7+build.20260227 | 2026-02-27 | Memory-pressure-aware worker lifecycle; stream timeout socket drain; unified post-spawn setup (`configureSpawnedWorker`); dispatch_source_memorypressure actor isolation fix; MLX SIGBUS fix; worker `MSG_NOSIGNAL` on Linux; `persistentNamespace` cleanup on shutdown |
 | 0.1.7 | — | See [GitHub Releases](https://github.com/mikhutchinson/swiftpython-commercial/releases) for prior release details |
 

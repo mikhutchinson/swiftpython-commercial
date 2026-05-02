@@ -815,7 +815,7 @@ def main():
     else:
         # Listen on vsock for host connection.
         # The host uses VZVirtioSocketDevice.connect(toPort:) to reach us.
-        # This is the proven pattern from sirius-agent.
+        # Host-connects-to-guest pattern via VZVirtioSocketDevice.connect(toPort:).
         port = int(sys.argv[1]) if len(sys.argv) >= 2 else CONTROL_PORT
         server = socket.socket(AF_VSOCK, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
