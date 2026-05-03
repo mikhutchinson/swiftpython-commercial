@@ -1,30 +1,52 @@
-# SwiftPython API Guide
+# SwiftPython Public API Guide
 
-This guide is split into chapters. Read the chapter(s) relevant to your task.
+This guide documents the public binary API shipped by `swiftpython-commercial`.
+It is written for application authors who need to embed Python execution in a
+macOS app, worker service, or sandboxed tool without access to the private
+SwiftPython source tree.
 
-| Chapter | File | When to read |
-|---------|------|-------------|
-| 1 — Core Runtime | [ch1-core-runtime.md](ch1-core-runtime.md) | `Python.run`, `PyObjectRef`, `PythonError`, context managers |
-| 2 — Type Conversion & Buffers | [ch2-data-interop.md](ch2-data-interop.md) | Swift↔Python value conversion, slicing, NumPy buffers, Accelerate, callables |
-| 3 — Concurrency & Handles | [ch3-concurrency-handles.md](ch3-concurrency-handles.md) | `PythonExecutor`, `PyHandle`, `withGIL` |
-| 4 — ProcessPool | [ch4-process-pool.md](ch4-process-pool.md) | Multi-worker execution, `eval`, `invoke`, `method`, backpressure, lifecycle |
-| 5 — Streaming | [ch5-streaming.md](ch5-streaming.md) | `CancellableStream`, generator iteration over IPC |
-| 6 — DAG Orchestration | [ch6-dag.md](ch6-dag.md) | `ProcessPoolDAG`, dependency graphs, failure policies |
-| 7 — Bidirectional Callbacks | [ch7-callbacks.md](ch7-callbacks.md) | Python→Swift sync/async/reentrant/streaming callbacks |
-| 8 — Generated Modules | [ch8-generated-modules.md](ch8-generated-modules.md) | NumPy, Pandas, Sklearn, MLX, Transformers, etc. |
+The private SwiftPython implementation, generator pipeline, and internal test
+layout are intentionally not documented here. Everything below is supported from
+the public package artifacts: `SwiftPythonRuntime.xcframework`,
+`SwiftPythonWorker`, `VMWorker/`, and the entitlement templates.
 
+## Chapters
 
-## Quick API Decision Map
+| Chapter | File | Use it for |
+|---------|------|------------|
+| 1 - Core Runtime | [ch1-core-runtime.md](ch1-core-runtime.md) | In-process `Python.run`, dynamic Python objects, errors, context managers |
+| 2 - Data Interop | [ch2-data-interop.md](ch2-data-interop.md) | Swift/Python conversion, remote arguments, buffers, shared tensors |
+| 3 - Concurrency & Handles | [ch3-concurrency-handles.md](ch3-concurrency-handles.md) | GIL rules, `PyHandle`, `OwnedPyHandle`, handle lifetime |
+| 4 - ProcessPool | [ch4-process-pool.md](ch4-process-pool.md) | Multi-process workers, lifecycle, events, resource limits |
+| 5 - Streaming | [ch5-streaming.md](ch5-streaming.md) | Python generators, cancellation, progress events, long-running streams |
+| 6 - DAG Orchestration | [ch6-dag.md](ch6-dag.md) | Dependency-aware parallel jobs over a pool |
+| 7 - Callbacks | [ch7-callbacks.md](ch7-callbacks.md) | Python calling Swift functions, reentrant work, streaming callbacks |
+| 8 - Python Packages | [ch8-generated-modules.md](ch8-generated-modules.md) | Building app-level wrappers over NumPy, Pandas, ML, CLI tools, or your own modules |
+| 9 - Sandbox & VM Exec | [ch9-sandbox-vm.md](ch9-sandbox-vm.md) | Ubuntu VM tenants, shell exec, PTY sessions, VM-backed pools |
 
-| I want to… | Use |
-|------------|-----|
-| Run Python in-process, get a Swift value back | `Python.run { }` → `PythonConvertible` (ch1, ch2) |
-| Keep a Python object across async boundaries | `PythonExecutor.shared.store()` → `PyHandle` (ch3) |
-| Auto-release a remote Python object on scope exit | `pool.evalOwned()` → `OwnedPyHandle` (ch3, v0.2.0+) |
-| Execute Python across multiple CPU cores | `PythonProcessPool` → `eval`/`invoke`/`method` (ch4) |
-| Iterate a Python generator over IPC | `pool.evalStream<T>(options:)` → `CancellableStream` (ch5) |
-| Iterate a Python generator with progress events | `pool.evalEventStream<T>(options:)` → `CancellableStream<StreamEvent<T>>` (ch5, v0.2.0+) |
-| Subscribe to pool worker lifecycle (spawns, deaths, orphaned callbacks) | `pool.events()` → `AsyncStream<PoolEvent>` (ch4, v0.2.0+) |
-| Run parallel tasks with dependencies | `ProcessPoolDAG` (ch6) |
-| Let Python call a Swift function | `pool.registerCallback` / `registerReentrantCallback` (ch7) |
-| Call NumPy / Pandas / MLX etc. with type safety | Generated module APIs (ch8) |
+## Decision Map
+
+| Goal | Public API |
+|------|------------|
+| Run small Python code in the app process | `try await Python.run { ... }` |
+| Convert Swift values to/from Python | `PythonConvertible`, `pyList`, `pyDict`, `PythonBuffer` |
+| Hold a Python object across actor/task boundaries | `PyHandle` |
+| Hold a remote worker object with automatic cleanup | `OwnedPyHandle` |
+| Run CPU-bound Python in parallel | `PythonProcessPool` |
+| Keep work pinned to one worker | `pool.worker(index)` / `StreamOptions.pinned(worker:)` |
+| Stream a Python generator | `evalStream`, `invokeStream`, `methodStream` |
+| Stream values plus progress | `evalEvents`, `invokeEvents`, `methodEvents` |
+| Observe worker lifecycle | `pool.events()` |
+| Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
+| Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
+| Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
+
+## Public Package Boundary
+
+This public repository is a commercial binary distribution. Use the documented
+runtime APIs to build your app-level integration. Do not depend on private source
+paths, private generated bindings, internal test fixtures, or implementation
+details from a SwiftPython source checkout.
+
+When in doubt, treat the public Swift interface inside the XCFramework as the
+contract and keep your app code behind your own small facade.

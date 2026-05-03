@@ -1,157 +1,205 @@
-# Chapter 7 — Bidirectional Callbacks (Python→Swift)
+# Chapter 7 - Callbacks
 
-SwiftPython lets Python code call back into Swift across the process boundary. All callbacks are registered on the pool and automatically re-registered on worker respawn.
+Callbacks let Python code running in a worker call Swift. Use them for host
+services, progress decisions, scoring functions, cancellation policy, streaming
+data sources, or any operation that must stay in Swift while Python controls the
+loop.
 
-## Sync callbacks
+Pool callbacks are registered on `PythonProcessPool` and reinstalled when a
+worker respawns.
+
+## Synchronous Callbacks
 
 ```swift
-// Register
-let reg = try await pool.registerCallback(name: "add") {
-    @Sendable (a: Int, b: Int) -> Int in a + b
+let registration = try await pool.registerCallback(name: "add") {
+    @Sendable (a: Int, b: Int) -> Int in
+    a + b
 }
-// reg is a CallbackRegistration — keeps the callback alive. Store it.
-// deinit auto-unregisters from all workers.
 
-// Python side
-let result: Int = try await pool.evalResult("""
-    import swift_bridge
-    swift_bridge.call("add", 3, 7)
+let value: Int = try await pool.evalResult("""
+import swift_bridge
+swift_bridge.call("add", 3, 7)
 """)
-// result == 10
 ```
 
-**Typed overloads:** 0-arg, 1-arg, 2-arg, raw `[Any]` array.
-**Supported cross-process types:** `Int`, `Double`, `String`, `Bool`, `[Int]`, `[Double]`, `[String]`.
-The pool JSON-encodes args on the worker and JSON-decodes the result back — no GIL needed on the Swift side.
+Keep `registration` alive for as long as Python should be able to call it.
+`CallbackRegistration` unregisters when it is deallocated.
 
-## Reentrant callbacks
-
-When the callback needs to execute Python **on the same worker** that triggered it:
+Typed callback overloads support one-argument and two-argument forms. There is
+also a raw `[Any]` form for dynamic argument lists:
 
 ```swift
-let reg = try await pool.registerReentrantCallback(name: "objective") {
-    @Sendable (ctx: WorkerCallbackContext, params: [Double]) -> Double in
-    // Re-enter the same worker — no deadlock
-    let value: Double = try ctx.evalResult("rosenbrock(\(params))")
-    return value + swiftSideConstraintPenalty(params)
+let anyArgs = try await pool.registerCallback(name: "describe") {
+    @Sendable (args: [Any]) -> Any in
+    "received \(args.count) args"
 }
 ```
 
-`WorkerCallbackContext` API:
-- `ctx.evalResult<T>(_ code:)` → typed Swift value from Python
-- `ctx.eval(_ code:)` → `HandleDescriptor`
-- `ctx.release(id:)` — release a handle
-- `ctx.workerID` — which worker this is running on
-- `ctx.sendNestedCommand(_:timeout:)` — raw IPC (bypass socket lock)
+Use simple JSON-compatible values for cross-process callbacks: numbers, strings,
+booleans, and arrays of those values. For large data, pass a handle or file path
+and let Python fetch the data where it already lives.
 
-Supports arbitrary nesting: callback → eval → callback → eval → ...
+## Reentrant Callbacks
 
-## Streaming callbacks
-
-Register a callback that yields values one at a time back to Python:
+Use a reentrant callback when Swift needs to call back into the same worker that
+triggered the callback.
 
 ```swift
-let reg = try await pool.registerStreamingCallback(name: "sensor_stream") {
-    (jsonData: Data, _: WorkerCallbackContext) -> StreamingCallbackIterator in
-    let args = try JSONSerialization.jsonObject(with: jsonData) as? [Any] ?? []
-    let count = (args.first as? NSNumber)?.intValue ?? 100
+let registration = try await pool.registerReentrantCallback(name: "objective") {
+    @Sendable (ctx: WorkerCallbackContext, params: [Double]) -> Double in
+    let baseline: Double = try ctx.evalResult("current_baseline_score()")
+    return baseline + penalty(params)
+}
+```
 
-    return StreamingCallbackIterator { yield in   // eager — all in memory
+`WorkerCallbackContext` gives you same-worker access:
+
+| API | Use |
+|-----|-----|
+| `workerID` | Identify the worker that called Swift |
+| `eval` | Run code and keep a handle descriptor on that worker |
+| `evalResult` | Run code and return a Swift value |
+| `release(id:)` | Release a handle created through the context |
+| `sendNestedCommand` | Low-level escape hatch for custom integrations |
+
+Reentrant callbacks avoid deadlocks by routing nested work through the worker's
+callback-safe path.
+
+## Raw Callbacks
+
+Use raw callbacks when your Python side already serializes data.
+
+```swift
+let registration = try await pool.registerRawCallback(name: "uppercase_json") {
+    @Sendable data in
+    let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let text = object?["text"] as? String ?? ""
+    return try JSONSerialization.data(withJSONObject: ["text": text.uppercased()])
+}
+```
+
+Raw reentrant callbacks receive `WorkerCallbackContext` as a second argument.
+
+## Streaming Callbacks
+
+Streaming callbacks let Swift provide an iterator to Python.
+
+```swift
+let registration = try await pool.registerStreamingCallback(name: "numbers") {
+    @Sendable (count: Int) throws -> StreamingCallbackIterator in
+    StreamingCallbackIterator(bufferCapacity: 8) { yield in
         for i in 0..<count {
-            yield(try JSONSerialization.data(withJSONObject: [i]))
+            let data = try JSONSerialization.data(withJSONObject: i)
+            try yield(data)
         }
     }
 }
 ```
 
 Python side:
+
 ```python
 import swift_bridge
-for value in swift_bridge.call_stream("sensor_stream", 50):
-    print(value)   # 0, 1, 2, ...
+
+for item in swift_bridge.call_stream("numbers", 100):
+    print(item)
 ```
 
-### Eager vs lazy (bounded) iterators
+Iterator options:
 
-| | Eager | Lazy |
-|---|---|---|
-| Memory | O(total items) | O(bufferCapacity) |
-| Producer runs on | Same thread | Background thread |
-| `yield` signature | `(Data) -> Void` | `(Data) throws -> Void` |
-| Backpressure | None | `yield` blocks when buffer full |
-| Cancellation | No-op | `yield` throws `CancellationError` |
+| Initializer | Behavior |
+|-------------|----------|
+| `StreamingCallbackIterator(produce:)` | Eager producer; simple but can buffer all output |
+| `StreamingCallbackIterator(bufferCapacity:produce:)` | Bounded producer; `yield` can throw on cancellation |
+
+Prefer the bounded initializer for unbounded or large streams.
+
+## Python `swift_bridge`
+
+Inside worker Python code:
+
+```python
+import swift_bridge
+
+swift_bridge.call(name, *args, **kwargs)
+swift_bridge.call_stream(name, *args)
+swift_bridge.is_registered(name)
+swift_bridge.registered_names()
+swift_bridge.progress("optional hint")
+swift_bridge.check_cancel()
+```
+
+`progress` and `check_cancel` are covered in
+[Chapter 5](ch5-streaming.md). They are useful inside Python generators even
+when no Swift callback is registered.
+
+## Error Propagation
+
+| Swift side | Python side |
+|------------|-------------|
+| Callback throws | Python receives a runtime error |
+| Callback name missing | Python receives a key error |
+| Argument conversion fails | Python receives a type error |
+| Reentrant Python call fails | Error propagates through the callback |
+
+Design callback errors as part of your API. If Python can recover, throw clear
+messages and catch them in Python.
+
+## Callback Lifetime
+
+Store registrations in the owning service:
 
 ```swift
-// Lazy — bounded memory, producer blocks when full
-StreamingCallbackIterator(bufferCapacity: 8) { yield in
-    for i in 0..<1_000_000 {
-        try yield(try JSONSerialization.data(withJSONObject: [i]))
+actor HostBridge {
+    private let pool: PythonProcessPool
+    private var registrations: [CallbackRegistration] = []
+
+    init(pool: PythonProcessPool) {
+        self.pool = pool
+    }
+
+    func install() async throws {
+        let log = try await pool.registerCallback(name: "host_log") {
+            @Sendable (message: String) -> Bool in
+            print(message)
+            return true
+        }
+        registrations.append(log)
     }
 }
 ```
 
-Always spell `bufferCapacity:` explicitly (no default, prevents accidental overload resolution).
+Explicit removal is also available:
 
-## Python `swift_bridge` module reference
-
-```python
-import swift_bridge
-
-swift_bridge.call(name, *args, **kwargs)        # Sync → blocks until Swift returns
-swift_bridge.call_async(name, *args, **kwargs)  # Async → concurrent.futures.Future
-swift_bridge.call_stream(name, *args)           # Streaming → Python iterator
-swift_bridge.is_registered(name)                # bool
-swift_bridge.registered_names()                 # list[str]
+```swift
+try await pool.unregisterCallback(name: "host_log")
 ```
 
-## Error propagation
+## Observability
 
-| Swift side | Python side |
-|---|---|
-| `throw SomeError(...)` | `RuntimeError` with error description |
-| Callback not registered | `KeyError` |
-| Wrong argument type | `TypeError` |
-| Reentrant `ctx.evalResult` throws | Propagates through callback stack |
-
-## Lifecycle & cleanup
-
-- `CallbackRegistration` unregisters on `deinit` — store it in your actor/class.
-- Worker respawn (crash recovery) re-registers all pool callbacks automatically.
-- Explicit removal: `await pool.unregisterCallback(name: "add")`
-
-## Observability — orphan events (v0.2.0+ / Phase C1)
-
-When a worker dies (crash, SIGKILL, idle-shed, respawn, or graceful shutdown) with cross-process callbacks in flight, the pool emits one `PoolEvent.callbackOrphaned(workerID:callID:callbackName:kind:)` event per orphaned callback to every `pool.events()` subscriber.
+When a worker dies with callbacks in flight, `pool.events()` emits
+`.callbackOrphaned`. This is diagnostic information; the original pool command
+still fails through its normal error path.
 
 ```swift
 Task {
     for await event in pool.events() {
-        if case .callbackOrphaned(let workerID, _, let name, let kind) = event {
-            logger.warn("callback \(name) (kind: \(kind)) orphaned by worker \(workerID) death")
+        if case .callbackOrphaned(let workerID, _, let name, let kind, _) = event {
+            logger.warning("callback \(name) on worker \(workerID) orphaned: \(String(describing: kind))")
         }
     }
 }
 ```
 
-`CallbackKind`:
-- `.regular` — synchronous request/response handler (`registerCallback` / `registerReentrantCallback` / `registerRawCallback` family).
-- `.streaming` — `registerStreamingCallback` iterator. The orphan event carries the user-facing name (e.g. `"sensor_stream"`), NOT the wire init placeholder `"__swift_stream_init__"`.
+Use this to annotate logs, cancel dependent UI work, or explain why a callback
+never returned.
 
-### What orphan events tell you (and don't)
+## Common Pitfalls
 
-- **Do** use them to log which named callbacks were live at the moment of worker loss — information the generic `PythonWorkerError.workerCrashed` does not carry.
-- **Don't** treat them as a replacement for the existing error path — the parent `eval` / `invoke` / `method` that triggered the callback still throws `PythonWorkerError.workerCrashed` (or similar) through its normal return. Orphan events are observability-only, not a control-flow primitive.
-
-### Excluded callbacks
-
-The internal `__swiftpython_dequeue__` callback (used by `pool.enqueue(...)` for the StreamQueue mechanism) is **deliberately excluded** from orphan reporting. Every Python generator that polls the StreamQueue would otherwise spam events on every dead worker — meaningless noise for an internal mechanism.
-
-## Example scenarios
-
-| Scenario | Proof point |
-|----------|-------------|
-| Reentrant optimization (scipy.optimize → NumPy on same worker) | `Examples/example_callbacks.swift:103` |
-| Competitive parallel search (two workers race, shared Swift state) | `Examples/example_callbacks.swift:185` |
-| Adaptive streaming hyperparameter sweep | `Examples/example_callbacks.swift:274` |
-| Cross-boundary error recovery | `Examples/example_callbacks.swift:395` |
-| Backpressure streaming (50k sensor readings, ring buffer 8) | `Examples/example_callbacks.swift:471` |
+| Issue | Fix |
+|-------|-----|
+| Callback stops working unexpectedly | Keep the returned `CallbackRegistration` alive |
+| Large payloads make callbacks slow | Pass handles, file paths, or shared memory instead |
+| Callback needs same-worker Python state | Use `registerReentrantCallback` |
+| Python iterator should stop when consumer leaves | Use bounded `StreamingCallbackIterator` and handle thrown cancellation |
+| Callback errors are hard to debug | Include stable callback names and log `.callbackOrphaned` events |

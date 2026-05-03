@@ -1,263 +1,306 @@
-# Chapter 4 — ProcessPool
+# Chapter 4 - ProcessPool
 
-`PythonProcessPool` is a Swift actor that manages N isolated Python worker processes. Each worker has its own GIL — true parallelism.
+`PythonProcessPool` runs Python work in separate worker processes. Each worker
+has its own interpreter and GIL, so CPU-bound Python can run in parallel and
+native extension crashes do not take down your app process.
 
-## Creating a pool
+Use a process pool for model inference, data transforms, document processing,
+image/video pipelines, and any workload that is too heavy or risky for
+`Python.run`.
+
+## Creating a Pool
 
 ```swift
-// Simple
 let pool = try await PythonProcessPool(workers: 4)
+defer { Task { await pool.shutdown() } }
+```
 
-// With resource limits and backpressure
-let pool = try await PythonProcessPool(
-    workers: 4,
-    resourceLimits: WorkerResourceLimits(maxMemoryBytes: 4 * 1024 * 1024 * 1024),
-    backpressure: .suspend(maxInFlight: 16)
-)
+For scoped lifetimes, prefer `withProcessPool`:
 
-// Scoped lifetime — always prefer this
+```swift
 try await withProcessPool(workers: 4) { pool in
-    // pool.shutdown() is awaited automatically on exit
+    let value: Double = try await pool.invokeResult(
+        module: "math",
+        function: "sqrt",
+        args: [.python(144.0)]
+    )
+    print(value)
 }
 ```
 
-**`withProcessPool` is strongly preferred** over manual `init`/`shutdown`. It guarantees cleanup on both success and error paths.
+`withProcessPool` awaits shutdown on success and error paths.
 
-## Core execution APIs
-
-All methods come in two flavours:
-- **`eval`/`invoke`/`method`** — returns `PyHandle` (object stays on worker)
-- **`evalResult`/`invokeResult`/`methodResult`** — pickles result back, returns `T: PythonConvertible`
+## Configuration
 
 ```swift
-// eval — run arbitrary code, keep result on worker
-let handle: PyHandle = try await pool.eval("import numpy as np; np.arange(100)")
-
-// evalResult — run code, get Swift value back
-let values: [Double] = try await pool.evalResult("list(range(10))")
-
-// invoke — call a module-level function
-let h = try await pool.invoke(module: "numpy", function: "zeros", args: [1024])
-let r: [Double] = try await pool.invokeResult(module: "math", function: "sqrt", args: [144.0])
-
-// method — call a method on a remote handle
-let result = try await pool.method(handle: h, name: "tolist")
-let arr: [Double] = try await pool.methodResult(handle: h, name: "flatten")
-```
-
-### Pinning to a specific worker
-
-```swift
-// explicit worker index
-let h = try await pool.eval("build_model()", worker: 2)
-
-// WorkerContext — binds a series of calls to one worker
-let ctx = pool.worker(2)
-let h1 = try await ctx.eval("import sklearn; clf = sklearn.ensemble.RandomForestClassifier()")
-let h2 = try await ctx.invoke(module: "numpy", function: "random.randn", args: [100, 4])
-let result: [Int] = try await ctx.methodResult(handle: h1, name: "predict", args: [r.arg(h2)])
-```
-
-### Builder syntax for args/kwargs
-
-```swift
-try await pool.invoke(module: "numpy", function: "arange") {
-    0; 100        // positional args (RemoteArgsBuilder)
-} kwargs: {
-    ("dtype", "float32")   // (String, Value) tuples (RemoteKwargsBuilder)
-}
-```
-
-### Scoped handle helpers
-
-```swift
-// Auto-release when body exits
-try await pool.worker(0).withEvalHandle("np.eye(4)") { h in
-    let tr: Double = try await pool.methodResult(handle: h, name: "trace")
-}
-
-try await pool.withTemporaryHandle(createdBy: { try await pool.eval("expensive()") }) { h in
-    // h is released after this block
-}
-```
-
-## `pool.map` — bulk transform
-
-```swift
-// Run the same code on each handle in parallel, across workers
-let results: [PyHandle] = try await pool.map(handles, code: "item * 2")
-// 'item' is bound to each handle by default; customise with bindingName:
-let results: [PyHandle] = try await pool.map(handles, code: "process(x)", bindingName: "x")
-```
-
-Each handle is dispatched to a worker; results come back in input order.
-
-## Persistent namespace
-
-`eval` calls on the same worker share a **persistent Python namespace** (like a REPL). Variables defined in one `eval` are visible in subsequent `eval` calls on that worker.
-
-```swift
-_ = try await pool.eval("x = 42", worker: 0)
-let val: Int = try await pool.evalResult("x * 2", worker: 0)  // 84
-```
-
-Sentinel variables used internally (`__result__`, `__swiftpython_*`, etc.) are scrubbed at the start of each call.
-
-## Worker states & quarantine
-
-```swift
-public enum WorkerState: Sendable {
-    case cold                      // reserved slot, no process — spawns on demand
-    case healthy                   // connected, ready
-    case quarantined(until: Date)  // skipped for 10s after 5 consecutive soft failures
-    case respawning                // being respawned after a crash
-    case dead                      // exhausted respawn budget
-}
-```
-
-- After **5 consecutive soft failures** a worker enters `.quarantined(until:)` and is skipped by `selectWorker()` for 10 seconds.
-- Worker 0 is never shed (always at least one warm worker).
-- Cold workers re-spawn on demand when `selectWorker()` finds no warm workers.
-
-## Backpressure policies
-
-```swift
-.unbounded                    // no limit (default)
-.reject(maxInFlight: 16)      // throw .backpressure when full
-.suspend(maxInFlight: 16)     // FIFO cooperative throttle — callers wait
-```
-
-## Resource monitor (Darwin)
-
-```swift
-ResourceMonitorConfig(
-    sampleInterval: 2.0,
-    memoryPressureThrottle: 0.85,   // ≥85% → force-suspend new submissions
-    memoryPressureReject: 0.95,     // ≥95% → throw .backpressure
-    thermalThrottleLevel: .fair,    // ≥.fair → force-suspend
-    workerCPUThrottlePercent: 90.0, // skip CPU-hot workers in selectWorker
-    enabled: true                   // default true on Darwin, false on Linux
+let ipc = IPCConfiguration(
+    receiveTimeout: 60,
+    streamKeepaliveInterval: 5,
+    maxPayloadBytes: 32 * 1024 * 1024
 )
 
-// Inspect current state
-let snap: ResourceSnapshot = await pool.resourceSnapshot()
-// snap.systemMemoryPressure, .freeMemoryBytes, .thermalLevel, .workerStats
+let pool = try await PythonProcessPool(
+    workers: PythonProcessPool.recommended(for: .cpuBound),
+    workerExecutablePath: "/path/to/SwiftPythonWorker",
+    ipc: ipc,
+    maxRespawns: 3,
+    resourceLimits: WorkerResourceLimits(maxMemoryBytes: 4 * 1024 * 1024 * 1024),
+    backpressure: .suspend(maxInFlight: 32)
+)
 ```
 
-Memory-pressure-aware worker lifecycle:
-- Workers can be **shed** when idle (worker 0 is never shed)
-- Shed workers enter `.cold` state and are re-spawned on demand
-- Sampling is adaptive: **2s** when idle, **0.5s** when under pressure
-- `ProcessInfo.thermalStateDidChangeNotification` triggers an immediate sample on thermal change (Darwin only)
-- Same 0.85/0.95 thresholds gate both task submission **and** worker spawning
+The common knobs are:
+
+| Option | Use |
+|--------|-----|
+| `workers` | Number of worker processes |
+| `workerExecutablePath` | Explicit sidecar path when auto-discovery is not enough |
+| `ipc` | Timeouts, payload caps, protocol version, keepalive |
+| `maxRespawns` | Crash recovery budget per worker |
+| `resourceLimits` | Per-worker memory guardrails |
+| `backpressure` | What to do when too many commands are in flight |
+| `resourceMonitor` | Darwin memory/thermal sampling and throttling |
+
+## Core Calls
+
+The pool has three verbs:
+
+| Verb | Purpose |
+|------|---------|
+| `eval` | Run Python code in the worker namespace |
+| `invoke` | Import a module and call a module-level function |
+| `method` | Call a method on an object referenced by a handle |
+
+Each verb has two result shapes:
+
+| Shape | Returns | Use when |
+|-------|---------|----------|
+| `eval` / `invoke` / `method` | `PyHandle` | The Python object should stay on the worker |
+| `evalResult` / `invokeResult` / `methodResult` | `T: PythonConvertible` | You want a Swift value back |
+
+```swift
+let arr = try await pool.invoke(
+    module: "numpy",
+    function: "arange",
+    args: [.python(10_000)]
+)
+
+let count: Int = try await pool.methodResult(handle: arr, name: "__len__")
+let total: Double = try await pool.methodResult(handle: arr, name: "sum")
+
+try await pool.release(arr)
+```
+
+## Persistent Worker Namespace
+
+`eval` calls on the same worker share a namespace, similar to a REPL.
+
+```swift
+_ = try await pool.eval("x = 21", worker: 0)
+let doubled: Int = try await pool.evalResult("x * 2", worker: 0)
+```
+
+Prefer module functions for application code you own. Use `eval` for setup,
+quick glue, or expressions that are easier to keep local.
+
+## Worker Affinity
+
+Handles live on the worker that created them. Use `WorkerContext` when a flow
+needs to stay pinned.
+
+```swift
+let worker = pool.worker(0)
+
+let model = try await worker.invoke(
+    module: "my_model",
+    function: "load",
+    args: [.python("/models/model.bin")]
+)
+
+let output: [Double] = try await worker.methodResult(
+    handle: model,
+    name: "predict",
+    args: [.python([[0.1, 0.2, 0.3]])]
+)
+```
+
+`WorkerContext` is also useful for warming worker-local imports, caches, and
+GPU state.
+
+## Remote Arguments
+
+Most pool APIs accept `[RemotePythonValue]` for arguments and
+`[String: RemotePythonValue]` for keyword arguments.
+
+```swift
+let values = [1.0, 2.0, 3.0, 4.0]
+
+let mean: Double = try await pool.invokeResult(
+    module: "statistics",
+    function: "fmean",
+    args: [.python(values)]
+)
+```
+
+Keyword arguments use a dictionary:
+
+```swift
+let rounded: Double = try await pool.invokeResult(
+    module: "builtins",
+    function: "round",
+    args: [.python(3.14159)],
+    kwargs: ["ndigits": .python(2)]
+)
+```
+
+`WorkerContext` additionally offers builder overloads when that reads better:
+
+```swift
+let worker = pool.worker(0)
+let rounded: Double = try await worker.invokeResult(
+    module: "builtins",
+    function: "round"
+) {
+    3.14159
+} kwargs: {
+    ("ndigits", 2)
+}
+```
 
 ## Lifecycle
 
 ```swift
-// Warmup — run setup code on all workers in parallel
-try await pool.warmup("import numpy as np; import sklearn")
+try await pool.warmup("import numpy as np")
+let health: [Bool] = try await pool.healthCheck()
 
-// Drain — wait for in-flight work, block new submissions
 try await pool.drain(timeout: .seconds(30))
-
-// Resume — re-enable after drain
 pool.resume()
 
-// Health check — returns [Bool] per worker
-let health = try await pool.healthCheck()
-
-// Shutdown — clean teardown (5s default timeout)
+try await pool.respawnWorker(0, reason: .userInitiated, force: true)
 await pool.shutdown()
 ```
 
-## `pool.events()` — lifecycle broadcast (v0.2.0+ / Phase B3)
+| API | Use |
+|-----|-----|
+| `warmup` | Run setup code on every worker |
+| `healthCheck` | Confirm workers respond |
+| `drain` | Stop accepting new work and wait for in-flight work |
+| `resume` | Leave drained mode |
+| `respawnWorker` | Replace a worker, optionally force-killing it |
+| `shutdown` | Stop all workers |
 
-`pool.events(bufferSize:)` returns an `AsyncStream<PoolEvent>` that broadcasts every lifecycle transition the pool tracks: worker spawns, respawns, deaths, quarantine entry/expiry, idle-shedding, drain/resume/shutdown, and resource-pressure events.
+## Events
+
+`pool.events(bufferSize:)` returns an independent `AsyncStream<PoolEvent>` for
+each subscriber.
 
 ```swift
 Task {
     for await event in pool.events() {
         switch event {
-        case .workerSpawned(let id, let pid, let gen):
-            logger.info("worker \(id) spawned (pid=\(pid), gen=\(gen))")
-        case .workerRespawned(let id, let oldPID, let newPID, _, let reason):
-            logger.warn("worker \(id) respawned: \(oldPID) → \(newPID), reason=\(reason)")
+        case .workerRespawned(let id, _, let newPID, _, let reason):
+            logger.warning("worker \(id) respawned as \(newPID): \(String(describing: reason))")
         case .workerDied(let id, let reason):
-            logger.error("worker \(id) died: \(reason)")
+            logger.error("worker \(id) died: \(String(describing: reason))")
+        case .eventsDropped(let count):
+            logger.warning("missed \(count) pool events")
         case .poolStateChanged(_, .shutdown):
-            return  // pool is shutting down — exit the consumer
-        case .eventsDropped(let n):
-            logger.warn("event subscriber missed \(n) events (consumer too slow)")
+            return
         default:
-            continue
+            break
         }
     }
 }
 ```
 
-### Subscriber model
+Event cases cover worker spawn/respawn/death, worker state changes,
+quarantine, idle shedding, pool state changes, drain completion, resource
+pressure, orphaned callbacks, and dropped subscriber events.
 
-- Each call to `pool.events()` returns a **fresh, independent** `AsyncStream`. Multiple subscribers each receive their own copy of every emission.
-- Bounded buffer per subscriber (default 256, drop-oldest). Slow consumers do not back-pressure other subscribers.
-- When events are dropped, the next successful delivery is preceded by a synthesised `.eventsDropped(count:)` event so loss is detectable (rather than silent).
-- Subscribers auto-unregister when the iterator drops or the pool deallocates.
-
-### `PoolEvent` cases
-
-| Case | When it fires |
-|------|---------------|
-| `.workerSpawned(workerID:pid:generation:)` | Initial pool init AND lazy cold→warm spawns |
-| `.workerRespawned(workerID:oldPID:newPID:generation:reason:)` | After successful respawn |
-| `.workerStateChanged(workerID:from:to:)` | Every worker-state transition (paired with the more specific events) |
-| `.workerDied(workerID:reason:)` | Respawn budget exhausted, VM unhealthy, or terminal respawn failure |
-| `.workerQuarantined(workerID:until:)` | After 5 consecutive soft failures |
-| `.workerQuarantineExpired(workerID:)` | When the quarantine deadline passes (lazy, on next `selectWorker`) |
-| `.workerIdleShed(workerID:)` | When the idle-shed policy retires a worker to `.cold` |
-| `.poolStateChanged(from:to:)` | Pool-level state transitions |
-| `.drainCompleted(durationMs:)` | After `drain()` completes (in-flight count reaches zero) |
-| `.spawnRejected(workerID:memoryPressure:freeBytes:)` | When `waitForSpawnPressure` rejects pre-spawn (Darwin) |
-| `.memoryPressureChanged(level:)` | OS memory pressure transitions (Darwin DispatchSourceMemoryPressure) |
-| `.resourcePressureSampled(snapshot:)` | Per-monitor-tick — opt-in via `IPCConfiguration.broadcastResourceSamples` |
-| `.eventsDropped(count:)` | Synthesised when a subscriber's buffer overflowed |
-
-### Notes and constraints
-
-- **Subscribers attached AFTER `init` returns will not see the initial `.workerSpawned` events** for the original pool topology. Subscribe before init if you need that, or rely on `lazy spawn → .workerSpawned` for the on-demand topology changes that follow.
-- **Cross-subscriber ordering is not guaranteed.** Within a single subscriber events are FIFO; two subscribers may interleave the same emissions differently relative to other concurrent work.
-- **No synthetic terminator on `shutdown()`.** The `AsyncStream` naturally terminates when the pool deallocates; the terminal lifecycle event is `.poolStateChanged(.shuttingDown, .shutdown)`.
-- `PoolEvent` is **non-`@frozen`** — handle a `default:` arm in exhaustive switches so future v0.2.x phases can add cases without breaking your call sites.
-
-## Worker executable discovery
-
-The pool auto-discovers `SwiftPythonWorker` by searching (in order):
-1. Bundle auxiliary executables (app bundles)
-2. Same directory as main executable
-3. Dynamic detection from `.build/` location
-4. Arch-specific paths (`arm64-apple-macosx/`, etc.)
-5. Generic fallback (`debug/`, `release/`)
-
-If not found: `swift build --product SwiftPythonWorker`
-
-For packaged apps: set `SWIFTPYTHON_WORKER_PATH` env var.
-
-## Error types
+## Backpressure
 
 ```swift
-PythonWorkerError.pythonException(type:message:traceback:)
-PythonWorkerError.backpressure
-PythonWorkerError.socketError(String)
-PythonWorkerError.protocolError(String)
-PythonWorkerError.poolDrained
-PythonWorkerError.spawnRejected(memoryPressure:freeBytes:workerID:)
-PythonWorkerError.invalidConfiguration(String)
-PythonWorkerError.workerNotFound(Int)
+let rejecting = try await PythonProcessPool(
+    workers: 4,
+    backpressure: .reject(maxInFlight: 16)
+)
+
+let suspending = try await PythonProcessPool(
+    workers: 4,
+    backpressure: .suspend(maxInFlight: 16)
+)
 ```
 
-## Common pitfalls
+Use `.suspend` for app workflows where callers can wait. Use `.reject` when you
+need immediate overload feedback and can retry at a higher level.
+
+## Resource Monitoring
+
+On Darwin, the resource monitor can throttle submissions during memory or
+thermal pressure.
+
+```swift
+let monitor = ResourceMonitorConfig(
+    memoryPressureThrottle: 0.85,
+    memoryPressureReject: 0.95,
+    thermalThrottleLevel: .fair,
+    enabled: true
+)
+
+let pool = try await PythonProcessPool(
+    workers: 4,
+    resourceMonitor: monitor
+)
+
+if let snapshot = await pool.resourceSnapshot() {
+    print(snapshot.freeMemoryBytes)
+}
+```
+
+Resource samples can also be broadcast through `pool.events()` by setting
+`IPCConfiguration.broadcastResourceSamples`.
+
+## Worker Discovery and Packaging
+
+The process pool needs the `SwiftPythonWorker` binary from the same commercial
+release as the XCFramework.
+
+During development, either keep the package checkout available or pass an
+explicit path:
+
+```swift
+let pool = try await PythonProcessPool(
+    workers: 2,
+    workerExecutablePath: "/absolute/path/to/SwiftPythonWorker"
+)
+```
+
+For `.app` bundles, copy `SwiftPythonWorker` into
+`YourApp.app/Contents/MacOS/` and re-sign it with the provided entitlement
+template. The root README has the app bundle and signing commands.
+
+Do not mix worker binaries from older tags with a newer XCFramework. Protocol
+mismatches fail fast as `PythonWorkerError.protocolError`.
+
+## Errors Worth Handling
+
+| Error | Meaning |
+|-------|---------|
+| `.pythonException(type:message:traceback:workerID:)` | Python raised an exception |
+| `.backpressure(inFlight:maxInFlight:)` | The selected backpressure policy rejected work |
+| `.timeout(workerID:seconds:)` | Worker did not respond within the configured timeout |
+| `.workerCrashed(workerID:exitCode:)` | Worker exited during a command |
+| `.workerForciblyRespawned(workerID:)` | Caller killed the worker explicitly |
+| `.staleHandle(handleID:workerID:)` | Handle belonged to an older worker generation |
+| `.workerNotFound(searchedPaths:)` | `SwiftPythonWorker` could not be located |
+| `.protocolError(String)` | Runtime and sidecar protocol mismatch |
+
+## Common Pitfalls
 
 | Issue | Fix |
 |-------|-----|
-| Handle used on wrong worker | Worker affinity is validated; use matching `worker:` index |
-| `withProcessPool` not used | `defer { Task { await pool.shutdown() } }` is fire-and-forget — use `withProcessPool` |
-| Worker not found at startup | `swift build --product SwiftPythonWorker` |
-| Pool hangs at high memory | ResourceMonitor thresholds gate spawning; check `resourceSnapshot()` |
+| Worker cannot start in packaged app | Copy and re-sign `SwiftPythonWorker` inside `Contents/MacOS` |
+| Calls fail after worker respawn | Recreate worker-owned objects; old handles are stale |
+| Large results hit payload limits | Return a handle or use shared memory instead of pickling the full object |
+| UI blocks waiting for a pool call | Keep pool use behind an actor/task and update UI from the main actor |
+| Multiple tenants need isolation | Use `SandboxPool` instead of a shared process pool |

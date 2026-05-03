@@ -1,153 +1,198 @@
-# Chapter 8 — Generated Modules
+# Chapter 8 - Python Packages and App Facades
 
-Generated modules are type-safe Swift APIs produced from Python `.pyi` stubs. Never hand-edit them — regenerate from stubs instead.
+The public commercial package exposes the SwiftPython runtime, worker, VM
+scripts, and integration templates. It does not require a SwiftPython source
+checkout, and this public guide does not document the private generator or
+private generated module sources.
 
-## Available modules
+Build application features by importing Python packages dynamically, calling
+module functions through `PythonProcessPool`, and wrapping those calls in your
+own small Swift facades.
 
-| Swift target | Python module | Key examples |
-|---|---|---|
-| `NumPy` | `numpy` | `example_numpy.swift`, `example_slicing.swift` |
-| `Pandas` | `pandas` | `example_pandas.swift`, `example_async.swift` |
-| `SciPy` | `scipy` | `example_scipy.swift` |
-| `Sklearn` | `sklearn` | `example_sklearn.swift`, `example_sklearn_advanced.swift` |
-| `SQLite3` | `sqlite3` | `example_sqlite3.swift` |
-| `OpenCV` | `cv2` | `example_opencv.swift` |
-| `PIL` | `PIL` | (used transitively in vision examples) |
-| `Matplotlib` | `matplotlib` | `example_matplotlib.swift` |
-| `PyTorch` | `torch` | `example_pytorch.swift`, `example_image_classification.swift` |
-| `Torchvision` | `torchvision` | `example_image_classification.swift` |
-| `Transformers` | `swiftpython_transformers` | `example_transformers.swift`, `example_transformers_local.swift` |
-| `MLX` | `mlx` | `example_mlx.swift`, `example_mlx_dag.swift` |
-| `NetworkX` | `networkx` | `example_networkx.swift` |
-| `LlamaCpp` | `llama_cpp` | `example_llamacpp.swift` |
+## In-Process Package Use
 
-Optional modules (skip gracefully if Python package missing): `PyTorch`, `Torchvision`, `MLX`, `Transformers`, `LlamaCpp`.
-
-## API shape conventions
-
-All generated modules follow the same pattern:
+For lightweight calls:
 
 ```swift
-// Module-level enum namespace
-NumPy.linspace(start: 0.0, stop: 1.0, num: 100)
-Pandas.read_csv(filepath_or_buffer: "/data/file.csv")
-
-// Generated wrapper structs for Python classes
-let arr: ndarray = try await NumPy.zeros([100, 100])
-let df: DataFrame = try await Pandas.read_csv(filepath_or_buffer: "/data/file.csv")
-
-// Async methods mirroring Python methods
-let mean: Double = try await arr.mean()
-let shaped: ndarray = try await arr.reshape([10, 10])
-```
-
-Optional/keyword arguments map to Swift optionals:
-
-```swift
-// Python: numpy.linspace(start, stop, num=50, endpoint=True, ...)
-NumPy.linspace(start: 0.0, stop: 1.0)            // num defaults to nil
-NumPy.linspace(start: 0.0, stop: 1.0, num: 200)  // explicit
-```
-
-Variadic args/kwargs passthrough:
-
-```swift
-func someFunc(_ args: [any PythonConvertible] = [], extraKwargs: [String: any PythonConvertible] = [:])
-```
-
-## Remote (ProcessPool) wrappers — `rNumPy`, `rPandas`, etc.
-
-Generated with `--remote`, these wrap the same Python APIs but route through `PythonProcessPool`:
-
-```swift
-// Module-level remote call
-let h: PyHandle = try await rNumPy.zeros(pool, [1000, 1000])
-
-// Remote wrapper type — stays on the worker
-let remote: RemoteNDArray = ...
-let result: [Double] = try await remote.tolist(pool)
-
-// Worker-bound
-let ctx = pool.worker(1)
-let h = try await rNumPy.eye(ctx, 4)
-```
-
-`rNDArray` is a convenience alias for `RemoteNDArray`.
-
-## Escape hatch for missing bindings
-
-When a Python API has no generated wrapper:
-
-```swift
-let result: ndarray = try await Python.run {
-    let np = try Python.import("numpy")
-    let rng = try np.random.default_rng(42)
-    return ndarray(pythonObject: try rng.standard_normal([100, 4]))
+let result: Double = try await Python.run {
+    let statistics = try Python.import("statistics")
+    return try Double(pythonObject: try statistics.fmean([1.0, 2.0, 3.0]))
 }
 ```
 
-Rule: keep dynamic access local; re-wrap into the typed wrapper at the boundary.
+Use this when the work is fast, trusted, and safe to run in the app process.
 
-## Transformers — special case
+## ProcessPool Package Use
 
-Transformers is generated in-place against an internal shim module (`swiftpython_transformers`). No `PYTHONPATH` setup required — the shim is bundled as a runtime resource.
-
-```swift
-// Load a pipeline
-let pipeline = try await Transformers.pipeline(task: "text-classification")
-
-// Classify
-let predictions: [[TextClassificationPrediction]] = try await pipeline.classify(
-    inputs: ["I love this!", "This is terrible."]
-)
-// predictions[0][0].label, .score
-
-// Tokenization boundary report
-let report: TokenizationBoundaryReport = try await pipeline.tokenizationBoundaryReport(
-    inputs: texts, maxLength: 512
-)
-```
-
-Value types: `TextClassificationPrediction`, `TokenizationBoundaryRow`, `TokenizationBoundaryReport`.
-
-## LlamaCpp — value-type structs
-
-LlamaCpp generates 8 value-type Swift structs decoded from Python dicts:
-
-`CompletionResult`, `ChatCompletionResult`, `CompletionUsage`, `CompletionChoice`,
-`ChatCompletionChoice`, `ChatMessage`, `EmbeddingResult`, `EmbeddingData`
+For CPU-heavy or crash-prone packages:
 
 ```swift
-let model = try await LlamaCpp.Llama(model_path: "/models/llama.gguf")
-let result: CompletionResult = try await model.createCompletion(prompt: "Hello")
-print(result.choices[0].text)
+try await withProcessPool(workers: 2) { pool in
+    let norm: Double = try await pool.invokeResult(
+        module: "numpy.linalg",
+        function: "norm",
+        args: [.python([3.0, 4.0])]
+    )
+
+    print(norm)
+}
 ```
 
-## Regeneration workflow
+`invoke` imports the module inside the worker and calls the named function.
+`invokeResult` pickles the result back to Swift. Use plain `invoke` when the
+result should stay on the worker as a handle.
 
-```bash
-# Single module
-swift run swift-python-gen --module NumPy --stub-dir stubs/numpy --output Sources/NumPy
+## App-Level Swift Facade
 
-# Custom Python module name (e.g. PyTorch uses 'torch')
-swift run swift-python-gen --module PyTorch --python-module torch --stub-dir stubs/torch --output Sources/PyTorch
+Hide stringly Python calls behind a small Swift type owned by your app.
 
-# Remote (ProcessPool) wrappers
-swift run swift-python-gen --module NumPy --python-module numpy --stub-dir stubs/numpy --output Sources/NumPy/Remote --remote
+```swift
+actor EmbeddingService {
+    private let pool: PythonProcessPool
+    private var model: OwnedPyHandle?
+
+    init(pool: PythonProcessPool) {
+        self.pool = pool
+    }
+
+    func load(modelPath: String) async throws {
+        model = try await pool.invokeOwned(
+            module: "my_embeddings",
+            function: "load_model",
+            args: [.python(modelPath)]
+        )
+    }
+
+    func embed(_ text: String) async throws -> [Float] {
+        guard let model else { return [] }
+        return try await pool.methodResult(
+            handle: model,
+            name: "embed",
+            args: [.python(text)]
+        )
+    }
+}
 ```
 
-Stubs live in `stubs/<package>/`. See the stub generation guide for stub authoring.
+This keeps Python module names, method names, and conversion choices in one
+place. The rest of your app gets a normal Swift API.
 
-**CI regenerates all bindings on every push and fails if there's a diff.** Always commit regenerated files.
+## Recommended Python Module Shape
 
-## Stub-directed value types
-
-Mark a class in the stub with `# swiftpython: value-type` to generate a Swift struct instead of a wrapper class:
+Put reusable Python code in modules importable by the app's Python 3.13
+environment:
 
 ```python
-class MyResult:  # swiftpython: value-type
-    score: float
-    label: str
+# my_embeddings.py
+
+def load_model(path):
+    return Model.load(path)
+
+def summarize(text):
+    return {"chars": len(text), "words": len(text.split())}
 ```
 
-Generates `struct MyResult: Sendable, PythonConvertible` — decoded via dict keys, encoded via constructor kwargs.
+Then call it from Swift:
+
+```swift
+let summary: [String: Int] = try await pool.invokeResult(
+    module: "my_embeddings",
+    function: "summarize",
+    args: [.python("Swift calling Python")]
+)
+```
+
+Avoid embedding large Python programs as Swift string literals. Use `eval` for
+small glue and `invoke` for stable app logic.
+
+## Packaging Python Dependencies
+
+SwiftPython uses the Python runtime your app launches with. The commercial
+XCFramework is built for Python 3.13 on macOS.
+
+Common deployment patterns:
+
+| Pattern | Use |
+|---------|-----|
+| Homebrew Python | Developer tools and internal apps |
+| Bundled framework/venv | Apps that must run without a system package manager |
+| VM tenant image | Isolated Linux tools, untrusted jobs, or per-tenant dependencies |
+
+Make sure the same environment is visible to:
+
+- your main app process for `Python.run`,
+- `SwiftPythonWorker` for process pools,
+- VM images if you use `SandboxPool`.
+
+For Finder/Dock apps, set `PYTHONHOME` and any required `PATH`/package search
+paths in the launcher or app bootstrap. Terminal shell state is not inherited by
+Finder launches.
+
+## Numeric Packages
+
+For NumPy-like workloads:
+
+```swift
+let arr = try await pool.invoke(
+    module: "numpy",
+    function: "array",
+    args: [.python([1.0, 2.0, 3.0, 4.0])]
+)
+
+let mean: Double = try await pool.methodResult(handle: arr, name: "mean")
+```
+
+For large arrays, keep the object on the worker or move to shared memory:
+
+```swift
+let shared = try await pool.copyToShared(arr)
+let values: [Double] = try await pool.readFromShared(shared, as: Double.self)
+```
+
+## Long-Running Package Calls
+
+If a Python package can report incremental values, expose a generator and use
+streaming:
+
+```python
+# my_inference.py
+from swift_bridge import progress, check_cancel
+
+def generate(prompt):
+    progress("starting")
+    for token in model.generate(prompt):
+        check_cancel()
+        yield token
+```
+
+```swift
+let stream: CancellableStream<StreamEvent<String>> = try await pool.invokeEvents(
+    module: "my_inference",
+    function: "generate",
+    args: [.python(prompt)],
+    options: .longRunning(timeout: 1800)
+)
+```
+
+## Tenant or Tool Packages
+
+When the package is a CLI tool, needs Linux, or should not share the user's
+local Python environment, put it in a SandboxPool image and call it through
+`execShell`, `execShellStream`, or `execShellPTY`.
+
+See [Chapter 9](ch9-sandbox-vm.md).
+
+## Boundary Guidance
+
+Use the public runtime API as the contract. Do not couple your app to:
+
+- private SwiftPython source paths,
+- private generator commands,
+- private test fixtures,
+- package-internal Python shims,
+- a local checkout layout.
+
+If your commercial agreement includes additional typed wrappers or generated
+surfaces, document them in your application repository as app-specific facades.
+This public guide stays focused on the binary runtime anyone can consume from
+this package.

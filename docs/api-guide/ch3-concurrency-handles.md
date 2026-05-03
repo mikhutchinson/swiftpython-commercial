@@ -1,199 +1,211 @@
-# Chapter 3 — Concurrency & Handles
+# Chapter 3 - Concurrency & Handles
 
-## `PythonExecutor` — the GIL-owning actor
+Swift concurrency and CPython have different ownership rules. The safe pattern
+is simple:
 
-All in-process Python work runs on a single dedicated Python thread managed by `PythonExecutor.shared`. The actor dispatches closures to `PythonThreadExecutor`'s dedicated thread via `runOnThreadAsync`, which acquires/releases the GIL and preserves TLS state for PyTorch/pybind11.
+- Use `Python.run` for in-process GIL-held work.
+- Do not move `PyObjectRef` across `await` boundaries.
+- Store long-lived Python objects as `PyHandle` or `OwnedPyHandle`.
+- Keep worker-owned handles on the pool and worker that created them.
 
-> **Note:** `run` / `execute` / `Python.run` are `async throws` (not `rethrows`) because errors are transported across threads. Closures are `@escaping @Sendable`. All callsites need `try await`.
+## The Python Executor
+
+`PythonExecutor.shared` owns the dedicated Python thread. `Python.run` delegates
+to it and is the right entry point for most application code.
 
 ```swift
-// Preferred — via Python.run (delegates to executor)
-let result = try await Python.run { /* GIL held on dedicated thread */ }
-
-// Direct — when you need TLS/thread continuity (e.g. PyTorch training loops)
-let result = try await PythonExecutor.shared.run {
-    // same thread across repeated calls
-}
-
-// Typed convenience
-let count: Int = try await PythonExecutor.shared.execute {
-    try Python.import("os").cpu_count()
+let version: String = try await Python.run {
+    try String(pythonObject: Python.sys.version)
 }
 ```
 
-**Rule:** Use `Python.run` for most cases. Use `PythonExecutor.shared.run` only when you need TLS/thread continuity across multiple calls (e.g. PyTorch training state).
-
-## `withGIL` — sync GIL helper
-
-For non-async contexts that already run on the Python thread:
+Use `PythonExecutor.shared.run` directly only when you are building a wrapper
+that needs explicit executor access:
 
 ```swift
-let value = withGIL {
-    // GIL acquired for this scope
+let result: Int = try await PythonExecutor.shared.run {
+    let os = try Python.os
+    return try Int(pythonObject: try os.cpu_count())
+}
+```
+
+Both APIs are `async throws` because the closure is executed on the Python
+thread and any thrown error must cross an executor boundary.
+
+## `withGIL`
+
+`withGIL` is a synchronous helper for code that already knows it is allowed to
+touch CPython directly.
+
+```swift
+let none = withGIL {
     PyObjectRef.none
 }
 ```
 
-## `PyHandle` — cross-boundary object reference
+Application code should rarely need it. Prefer `Python.run` unless you are
+inside low-level bridging code.
 
-`PyObjectRef` cannot leave the Python thread. `PyHandle` is its `Sendable` counterpart — an opaque token you can freely pass across actors and task boundaries.
+## `PyHandle`
+
+`PyHandle` is a sendable token for a Python object. It does not expose the
+object directly; it lets SwiftPython find that object later on the correct
+Python executor or worker.
 
 ```swift
-// Store → get a handle
-let handle: PyHandle = try await PythonExecutor.shared.store(someRef)
-
-// Use → scoped access
-let result: String = try await PythonExecutor.shared.withObject(handle) { ref in
-    try String(pythonObject: ref)
+let handle: PyHandle = try await Python.run {
+    let json = try Python.json
+    let obj = try json.loads(#"{"count": 3}"#)
+    return PythonExecutor.storeSync(obj)
 }
 
-// Multi-object scoped access
-try await PythonExecutor.shared.withObjects(h1, h2) { ref1, ref2 in
-    // both refs valid here
+let count: Int = try await PythonExecutor.shared.withObject(handle) { obj in
+    try Int(pythonObject: obj[pyKey: "count"])
 }
 
-// Release when done
 try await PythonExecutor.shared.release(handle)
 ```
 
-### `PyHandle` anatomy
+Use `storeSync` inside `Python.run` because the closure itself is synchronous.
+Use `PythonExecutor.shared.store(_:)` only from code that already has a
+`PyObjectRef` in an executor-safe context.
+
+## Worker-Owned Handles
+
+`PythonProcessPool` returns handles for objects that live in worker processes.
 
 ```swift
-public struct PyHandle: Sendable, Hashable {
-    public let id: UUID
-    public let processID: PyHandleProcessID?  // nil = main process
-    public let sharedMemory: PyHandleSharedMemoryRef?
-    public var isMainProcess: Bool
-    public var isShared: Bool
-}
+let pool = try await PythonProcessPool(workers: 2)
+let arr = try await pool.invoke(
+    module: "numpy",
+    function: "arange",
+    args: [.python(1_000_000)]
+)
 
-public enum PyHandleProcessID: Sendable, Hashable {
-    case main
-    case worker(index: Int, generation: UInt64)
-}
+let total: Double = try await pool.methodResult(handle: arr, name: "sum")
+try await pool.release(arr)
+await pool.shutdown()
 ```
 
-A handle with `processID == .worker(index:generation:)` is owned by a specific ProcessPool worker. Pass it back to the **same pool** via `pool.method(handle:…)` — cross-worker handle use is rejected with a diagnostic error.
+A worker handle carries the worker index and generation that created it. Use it
+with the same pool. If you pin follow-up work manually, pin it to the same
+worker.
 
-### `storeSync` — sync store for app startup code
+## `OwnedPyHandle`
 
-```swift
-let handle = PythonExecutor.storeSync(ref)  // no await needed
-```
-
-## `OwnedPyHandle` — auto-release handles (v0.2.0+ / Phase B2)
-
-`OwnedPyHandle` is a `final class` wrapper around `PyHandle` whose `deinit`
-automatically releases the underlying Python object. Eliminates the
-`defer { Task { try? await pool.release(h) } }` boilerplate and the leak risk
-on `throw` paths.
+`OwnedPyHandle` is the default choice for remote objects whose lifetime should
+follow Swift scope. It releases the remote object automatically when the wrapper
+is deallocated.
 
 ```swift
-do {
-    let model = try await pool.evalOwned("load_model('foo')")
-    let result: Float = try await pool.method(
-        handle: model, name: "predict", args: [.python(input)]
+try await withProcessPool(workers: 2) { pool in
+    let model = try await pool.evalOwned("load_model()")
+
+    let output: [Double] = try await pool.methodResult(
+        handle: model,
+        name: "predict",
+        args: [.python([[0.1, 0.2, 0.3]])]
     )
-    // exit scope: model deinit fires, release dispatched
+
+    print(output)
+} // model release is scheduled when it leaves scope
+```
+
+`PyHandle` and `OwnedPyHandle` both conform to `HandleConvertible`, so most
+handle-taking APIs accept either form.
+
+```swift
+let matrix = try await pool.invokeOwned(
+    module: "numpy",
+    function: "eye",
+    args: [.python(4)]
+)
+
+let trace: Double = try await pool.methodResult(handle: matrix, name: "trace")
+```
+
+For dictionary bindings, use `.handles`:
+
+```swift
+let total: Double = try await pool.evalResult(
+    "float(matrix.sum())",
+    bindings: ["matrix": matrix].handles
+)
+```
+
+## Deterministic Release
+
+ARC-driven release is convenient, but deterministic cleanup is sometimes useful
+for very large objects.
+
+```swift
+let temp = try await pool.evalOwned("make_large_temp()")
+let result: Double = try await pool.methodResult(handle: temp, name: "score")
+try await temp.release()
+
+try await uploadResult(result)
+```
+
+`release()` is idempotent. After it succeeds, `deinit` has nothing left to do.
+
+## Temporary Handle Helpers
+
+Use the pool helpers when you want raw `PyHandle` lifetime to be visibly scoped.
+
+```swift
+let count: Int = try await pool.withTemporaryHandle(
+    createdBy: {
+        try await pool.invoke(module: "numpy", function: "arange", args: [.python(100)])
+    }
+) { handle in
+    try await pool.methodResult(handle: handle, name: "__len__")
 }
 ```
 
-### Constructors
+Worker contexts also expose `withEvalHandle`, `withInvokeHandle`, and
+`withMethodHandle` for worker-pinned flows.
 
-| Method | Returns |
-|--------|---------|
-| `pool.evalOwned(_:bindings:timeout:)` | `OwnedPyHandle` |
-| `pool.evalOwned(_:bindings:worker:timeout:)` | `OwnedPyHandle` |
-| `pool.invokeOwned(module:function:args:kwargs:timeout:)` | `OwnedPyHandle` |
-| `pool.invokeOwned(module:function:args:kwargs:worker:timeout:)` | `OwnedPyHandle` |
-| `pool.methodOwned(handle:name:args:kwargs:timeout:)` | `OwnedPyHandle` |
-| `pool.methodOwned(handle:name:args:kwargs:worker:timeout:)` | `OwnedPyHandle` |
+## Actor Pattern
 
-Each `*Owned` method has a sibling that takes `OwnedPyHandle` for the target
-or bindings:
+Wrap Python state behind a Swift actor. Store handles, not `PyObjectRef`.
 
 ```swift
-// Drop-in: pass OwnedPyHandle directly, no .handle unwrap
-let lengthHandle = try await pool.method(handle: model, name: "__len__")
+actor VectorIndex {
+    private let pool: PythonProcessPool
+    private var index: OwnedPyHandle?
 
-// Bindings can be [String: OwnedPyHandle]
-let owned = try await pool.evalOwned(
-    "sum(model)", bindings: ["model": model]
-)
-
-// Streams accept it too
-let stream: CancellableStream<Int> = try await pool.methodStream(
-    handle: model, name: "__iter__", options: .pinned(worker: 0)
-)
-```
-
-### Explicit release
-
-For deterministic early release inside a scope:
-
-```swift
-let h = try await pool.evalOwned("expensive_temp()")
-let result = try await pool.method(handle: h, name: "compute")
-try await h.release()       // free `h` now, before downstream long work
-try await longDownstreamWork(result)
-```
-
-`release()` is idempotent — calling twice no-ops the second call. After
-`release()`, the wrapper's `deinit` becomes a no-op.
-
-### When to use raw `PyHandle` instead
-
-`OwnedPyHandle` is the right default. Use raw `PyHandle` when:
-
-- The handle's lifetime crosses logical boundaries the type system can't
-  easily express (long-lived caches, manual transfer-of-ownership patterns).
-- You want explicit lifetime visible in the call site (e.g. for diagnostic
-  logging at release time).
-- You're working in a context where ARC's release timing is inconvenient
-  (typically rare).
-
-`OwnedPyHandle.handle` exposes the underlying `PyHandle` for explicit
-unwrap when an API requires it.
-
-## Concurrency patterns
-
-### Independent parallel work
-
-```swift
-async let r1 = Python.run { try compute1() }
-async let r2 = Python.run { try compute2() }
-let (a, b) = try await (r1, r2)
-```
-
-Each `Python.run` hops to the executor; Swift schedules concurrency around the GIL.
-
-### Actor-isolated model with PyHandle
-
-```swift
-actor ModelService {
-    private var modelHandle: PyHandle?
-
-    func load() async throws {
-        modelHandle = try await Python.run {
-            let sklearn = try Python.import("sklearn.ensemble")
-            return try PythonExecutor.shared.store(try sklearn.RandomForestClassifier())
-        }
+    init(pool: PythonProcessPool) {
+        self.pool = pool
     }
 
-    func predict(_ data: [Double]) async throws -> Int {
-        guard let h = modelHandle else { throw ... }
-        return try await PythonExecutor.shared.withObject(h) { model in
-            let result = try model.predict([data])
-            return try Int(pythonObject: result[0])
-        }
+    func load(path: String) async throws {
+        index = try await pool.invokeOwned(
+            module: "my_search",
+            function: "load_index",
+            args: [.python(path)]
+        )
+    }
+
+    func search(_ query: [Double]) async throws -> [Int] {
+        guard let index else { return [] }
+        return try await pool.methodResult(
+            handle: index,
+            name: "search",
+            args: [.python(query)]
+        )
     }
 }
 ```
 
-## Common pitfalls
+This keeps Python object lifetime explicit and avoids crossing the GIL boundary
+with raw references.
+
+## Common Pitfalls
 
 | Issue | Fix |
 |-------|-----|
-| `PyObjectRef` captured across `await` | Store it first → `PyHandle` |
-| Handle used on wrong worker | Use `pool.method(handle:worker:)` with matching worker index |
-| `storeSync` called outside Python thread | Only safe during init or `Python.run` context |
+| Capturing `PyObjectRef` in a `Task` | Convert it to a Swift value or store it as `PyHandle` first |
+| Calling `await` inside `Python.run` | Move async work outside the closure; use `storeSync` for handles |
+| Reusing a worker handle after respawn | Recreate the object; stale handles are rejected |
+| Passing a handle to a different pool | Keep handles private to the pool or actor that created them |
+| Relying on ARC for huge temporary arrays | Call `release()` when the array is no longer needed |

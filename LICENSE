@@ -1,0 +1,48 @@
+SwiftPython Commercial Runtime License
+
+Copyright (c) 2026 Dr. Mikholae Hutchinson. All rights reserved.
+
+This repository is a public distribution point for the SwiftPython Commercial
+Runtime binary artifacts, documentation, and integration templates. The
+SwiftPython source code, build system, generator pipeline, private tests, and
+implementation internals are not licensed by this repository.
+
+Permission is granted to licensed SwiftPython Commercial customers to use the
+materials in this repository under the terms of their commercial agreement,
+including:
+
+1. downloading and pinning this package with Swift Package Manager;
+2. linking applications against SwiftPythonRuntime.xcframework;
+3. bundling SwiftPythonWorker with licensed applications;
+4. deploying the VMWorker scripts with licensed applications or tenant images;
+5. copying and adapting the entitlement templates for licensed applications;
+6. using the public documentation as integration guidance.
+
+Restrictions:
+
+1. You may not sell, sublicense, or redistribute the binary artifacts except as
+   embedded in a licensed application or as otherwise allowed by a written
+   commercial agreement with Dr. Mikholae Hutchinson.
+2. You may not reverse engineer, decompile, disassemble, or otherwise attempt to
+   derive source code, private protocols, build scripts, generator logic, or
+   implementation internals from the binary artifacts, except to the extent such
+   restriction is prohibited by applicable law.
+3. You may not remove copyright, license, or attribution notices.
+4. You may not publish extracted private implementation details or use this
+   repository to reconstruct the private SwiftPython source tree.
+5. You may not use the SwiftPython name, trademarks, or branding to imply
+   endorsement of an unrelated product without written permission.
+
+Public viewing of this repository and its documentation is permitted. Production
+use of the binary artifacts requires a valid SwiftPython Commercial license.
+
+Third-party software, Python packages, and Apple platform components remain
+subject to their own licenses.
+
+THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM USE OF
+THE MATERIALS, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE.
+
+For licensing inquiries: admin@swiftpython.dev

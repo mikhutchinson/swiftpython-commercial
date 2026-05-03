@@ -1,6 +1,14 @@
-# Chapter 2 — Type Conversion & Buffers
+# Chapter 2 - Data Interop
 
-## `PythonConvertible` — the conversion protocol
+SwiftPython gives you three levels of data exchange:
+
+1. Convert normal Swift values with `PythonConvertible`.
+2. Pass remote worker objects by handle with `PyHandle` / `OwnedPyHandle`.
+3. Share larger numeric buffers with `PythonBuffer` or pool shared memory.
+
+Use the simplest level that fits the size and lifetime of your data.
+
+## `PythonConvertible`
 
 ```swift
 public protocol PythonConvertible: Sendable {
@@ -9,154 +17,195 @@ public protocol PythonConvertible: Sendable {
 }
 ```
 
-**Built-in conformances:** `Int`, `Double`, `Bool`, `String`, `Data`,
-`Array where Element: PythonConvertible`,
-`Dictionary where Key: PythonConvertible, Value: PythonConvertible`,
-`Optional where Wrapped: PythonConvertible`,
-`PyObjectRef`, and all generated wrapper types.
+Built-in conformances include:
+
+- `Int`, fixed-width integer types, `Float`, `Double`, `Bool`, `String`, `Data`
+- `Array`, `Set`, `Dictionary`, and `Optional` when their elements conform
+- `PyObjectRef`
 
 ```swift
-// Swift → Python
-let pyVal = try (42).toPythonObject()
-
-// Python → Swift
-let n = try Int(pythonObject: someRef)
-let d = try Double(pythonObject: someRef)
-let s = try String(pythonObject: someRef)
-```
-
-## Heterogeneous collection helpers
-
-Build Python lists, tuples, sets, and dicts from mixed Swift values:
-
-```swift
-let lst  = try pyList(1, "hello", 3.14)
-let tpl  = try pyTuple(1, "hello", 3.14)
-let st   = try pySet(1, 2, 3)
-let dict = try pyDict(("key", "value"), ("count", 42))
-```
-
-## Remote value helpers (ProcessPool call sites)
-
-When passing arguments to `pool.invoke` / `pool.method`:
-
-```swift
-// Implicit conversion — preferred
-try await pool.invoke(module: "math", function: "sqrt", args: [4.0])
-
-// Explicit — when mixing handles and values
-let h: PyHandle = ...
-try await pool.method(handle: h, name: "fit", args: [r.arg(xTrain), r.arg(yTrain)])
-
-// Builder syntax
-try await pool.invoke(module: "numpy", function: "arange") {
-    0; 10          // positional args
-} kwargs: {
-    ("dtype", "float32")
+let swiftValue: [Double] = try await Python.run {
+    let builtins = try Python.builtins
+    let values = try builtins.list([1.0, 2.0, 3.0])
+    return try [Double](pythonObject: values)
 }
 ```
 
-`RemotePythonValue` wraps either a plain `PythonConvertible` or a `PyHandle`. Use `r.arg(_:)` or `remoteArg(_:)` to construct explicitly.
+## Collection Helpers
 
-## Slicing and indexing
+Use these inside a GIL-held scope when you need Python containers containing
+mixed Swift values:
 
 ```swift
-// Python-style: arr[1:10:2]
+let list = try pyList(1, "two", 3.0)
+let tuple = try pyTuple("x", 42)
+let set = try pySet("red", "green", "blue")
+let dict = try pyDict(("name", "Ada"), ("score", 99))
+```
+
+For homogeneous Swift arrays and dictionaries, direct `toPythonObject()` usually
+reads better.
+
+## Remote Arguments
+
+`PythonProcessPool` calls accept `RemotePythonValue`. It can hold either a
+plain converted Swift value or a handle to an object already living on a worker.
+
+```swift
+let mean: Double = try await pool.invokeResult(
+    module: "statistics",
+    function: "mean",
+    args: [.python([1.0, 2.0, 3.0, 4.0])]
+)
+
+let model = try await pool.evalOwned("load_model()")
+let prediction: [Double] = try await pool.methodResult(
+    handle: model,
+    name: "predict",
+    args: [.python([[0.2, 0.4, 0.6]])]
+)
+```
+
+Convenience initializers let you write `.python(value)` or `.handle(handle)`.
+`WorkerContext` also has builder overloads that accept plain
+`PythonConvertible` values and `PyHandle` values directly:
+
+```swift
+let values: [Double] = [1, 2, 3, 4]
+let worker = pool.worker(0)
+
+let result: Double = try await worker.invokeResult(
+    module: "statistics",
+    function: "fmean"
+) {
+    values
+}
+```
+
+For `eval` bindings, only handles are accepted because the binding namespace is
+remote:
+
+```swift
+let arr = try await pool.invokeOwned(
+    module: "numpy",
+    function: "array",
+    args: [.python([1.0, 2.0, 3.0])]
+)
+
+let total: Double = try await pool.evalResult(
+    "float(x.sum())",
+    bindings: ["x": arr].handles
+)
+```
+
+## Slices and Indexing
+
+The runtime includes Python-style index helpers for dynamic objects and wrapper
+types that expose Python indexing.
+
+```swift
 let slice = PythonSlice(start: 1, stop: 10, step: 2)
+let matrixIndex = MultiIndex(.index(0), .slice(PythonSlice(stop: 5)))
 
-// Multi-dimensional: arr[0, 1:5]
-let idx = MultiIndex([.index(0), .slice(PythonSlice(stop: 5))])
-```
-
-Types: `PythonSlice`, `StridedSlice`, `MultiIndex`, `IndexElement`, `SliceMarker`.
-Examples: `example_slicing.swift`, `example_advanced_slicing.swift`.
-
-## Generic Python buffer API (`PythonBuffer`)
-
-Zero-copy access to any Python object implementing the buffer protocol:
-
-```swift
-let buf = try PythonBuffer(object: arr)
-// buf.pointer, .length, .itemSize, .ndim, .shape, .strides, .format
-
-let values: [Double] = buf.toArray()
-let raw: Data = buf.toData()
-
-try buf.withValidatedBufferPointer { (ptr: UnsafeBufferPointer<Float>) in
-    // zero-copy read
+let value = try await Python.run {
+    let np = try Python.import("numpy")
+    let arr = try np.arange(20)
+    return try [Int](pythonObject: arr[slice])
 }
-buf.release()
 ```
 
-## NumPy `ndarray` typed buffer helpers
+## `PythonBuffer`
 
-Fast-path helpers that are zero-copy when dtype and layout match:
+`PythonBuffer` exposes the Python buffer protocol. It is useful for NumPy
+arrays, byte arrays, image buffers, and other contiguous binary data.
 
 ```swift
-// Typed async accessors (return Swift arrays — copy)
-let doubles = try await arr.toDoubleArray()
-let floats  = try await arr.toFloatArray()
-let ints64  = try await arr.toInt64Array()
-let ints32  = try await arr.toInt32Array()
-let bytes   = try await arr.toUInt8Array()
+let average: Double = try await Python.run {
+    let np = try Python.import("numpy")
+    let arr = try np.array([1.0, 2.0, 3.0, 4.0], dtype: "float64")
+    let buffer = try PythonBuffer(object: arr)
+    defer { buffer.release() }
 
-// Scoped zero-copy access
-try await arr.withDoubleBuffer { ptr in
-    // ptr: UnsafeBufferPointer<Double> — no copy
+    return try buffer.withValidatedBufferPointer { (ptr: UnsafeBufferPointer<Double>) in
+        ptr.reduce(0, +) / Double(ptr.count)
+    }
 }
-try await arr.withFloatBuffer  { ptr in /* UnsafeBufferPointer<Float>  */ }
-try await arr.withInt64Buffer  { ptr in /* UnsafeBufferPointer<Int64>  */ }
-try await arr.withInt32Buffer  { ptr in /* UnsafeBufferPointer<Int32>  */ }
-try await arr.withUInt8Buffer  { ptr in /* UnsafeBufferPointer<UInt8>  */ }
-
-// dtype inspection (properties, no async)
-arr.isFloat64, arr.isFloat32, arr.isInt64, arr.isInt32, arr.isUInt8
-arr.dtypeString  // "float64", "int32", etc.
 ```
 
-## Accelerate integration (vDSP on `ndarray`)
+Useful members:
+
+| API | Purpose |
+|-----|---------|
+| `pointer`, `length`, `itemSize` | Raw storage information |
+| `shape`, `strides`, `ndim`, `format` | Array metadata |
+| `toArray<T>()` | Copy into a Swift array |
+| `toData()` | Copy into `Data` |
+| `withValidatedBufferPointer` | Scoped typed read-only access |
+| `withValidatedMutableBufferPointer` | Scoped typed mutable access |
+
+The buffer is valid only while the underlying Python object is alive and the
+buffer has not been released.
+
+## Shared Memory in `PythonProcessPool`
+
+For large numeric arrays that should stay out of pickle payloads, use the pool
+shared-memory helpers.
 
 ```swift
-// Synchronous (call from within Python.run or withGIL)
-let mean = try arr.vDSPMean()
-let sum  = try arr.vDSPSum()
-let min  = try arr.vDSPMin()
-let max  = try arr.vDSPMax()
+let shared = try await pool.createSharedTensor(
+    shape: [1024, 1024],
+    dtype: .float32
+)
 
-// Async variants
-let mean = try await arr.vDSPMeanAsync()
+try await pool.writeToShared(Array(repeating: Float(1), count: 1024 * 1024), to: shared)
+
+let total: Float = try await pool.evalResult("""
+import numpy as np
+float(x.sum())
+""", bindings: ["x": shared])
 ```
 
-These use vDSP under the hood and require contiguous float64 layout. For float32 use `vDSPMeanFloat()` / `vDSPSumFloat()`.
-
-## Swift callables passed to Python
-
-Create a Python callable from a Swift closure:
+You can also copy an existing worker object into shared memory:
 
 ```swift
-// Typed args and return
-let fn = try createPythonCallable { (x: Double) throws -> Double in x * x }
-
-// Use with Python functions
-let result = try await ScipyOptimize.minimize(fun: fn, x0: [1.0, 2.0])
+let arr = try await pool.invoke(
+    module: "numpy",
+    function: "ones",
+    args: [.python([2048, 2048])],
+    kwargs: ["dtype": .python("float32")]
+)
+let sharedArr = try await pool.copyToShared(arr)
+let bytes: [Float] = try await pool.readFromShared(sharedArr, as: Float.self)
 ```
 
-For deterministic cleanup tied to Swift scope, use `PythonCallableWrapper`:
+Shared memory is a performance feature, not the default. Start with normal
+`PythonConvertible` arguments and handles, then move hot paths to shared memory
+after profiling.
+
+## Capsules
+
+Use capsules to pass an opaque Swift object reference through Python code.
 
 ```swift
-let wrapper = try PythonCallableWrapper { (x: Double) throws -> Double in x * x }
-// wrapper.callable is the PyObjectRef to pass to Python
-// wrapper deinit unregisters the closure
+final class Engine {}
+
+let recovered: Engine = try await Python.run {
+    let engine = Engine()
+    let capsule = try PyObjectRef.capsule(engine, name: "com.example.Engine")
+    try capsule.extractCapsule(as: Engine.self, name: "com.example.Engine")
+}
 ```
 
-**Supported overloads:** 0-arg, 1-arg, 2-arg, 3-arg — with or without typed return.
+Use a stable capsule name and treat the reference as process-local. Capsules are
+not portable across `PythonProcessPool` worker processes.
 
-## Capsules (opaque Swift object references)
+## Choosing a Transfer Shape
 
-Wrap a Swift object as an opaque Python capsule and extract it back:
-
-```swift
-let cap = try PyObjectRef.capsule(mySwiftObj, name: "MyType")
-let obj = try cap.extractCapsule(as: MyClass.self, name: "MyType")
-let ok  = cap.isCapsule(name: "MyType")
-```
+| Data shape | Recommended approach |
+|------------|----------------------|
+| Small scalar/list/dict | `PythonConvertible` |
+| Python object reused across calls | `PyHandle` or `OwnedPyHandle` |
+| Large local array inspected in-process | `PythonBuffer` |
+| Large worker array reused across calls | `PyHandle` |
+| Large worker array read/write from Swift | pool shared memory |
+| Tenant-isolated file or process output | `SandboxPool.execShell*` |
