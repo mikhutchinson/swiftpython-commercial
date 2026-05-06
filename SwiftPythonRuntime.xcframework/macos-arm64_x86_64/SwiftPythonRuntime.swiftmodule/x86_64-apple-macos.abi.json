@@ -11796,6 +11796,150 @@
           },
           {
             "kind": "Var",
+            "name": "callbackAsyncInvocation",
+            "printedName": "callbackAsyncInvocation",
+            "children": [
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(SwiftPythonRuntime.WorkerResponse.Type) -> (Swift.UInt64, Swift.String, Foundation.Data, Swift.UInt32) -> SwiftPythonRuntime.WorkerResponse",
+                "children": [
+                  {
+                    "kind": "TypeFunc",
+                    "name": "Function",
+                    "printedName": "(Swift.UInt64, Swift.String, Foundation.Data, Swift.UInt32) -> SwiftPythonRuntime.WorkerResponse",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "WorkerResponse",
+                        "printedName": "SwiftPythonRuntime.WorkerResponse",
+                        "usr": "s:18SwiftPythonRuntime14WorkerResponseO"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Tuple",
+                        "printedName": "(callId: Swift.UInt64, name: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32)",
+                        "children": [
+                          {
+                            "kind": "TypeNominal",
+                            "name": "UInt64",
+                            "printedName": "Swift.UInt64",
+                            "usr": "s:s6UInt64V"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "String",
+                            "printedName": "Swift.String",
+                            "usr": "s:SS"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Data",
+                            "printedName": "Foundation.Data",
+                            "usr": "s:10Foundation4DataV"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "UInt32",
+                            "printedName": "Swift.UInt32",
+                            "usr": "s:s6UInt32V"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Metatype",
+                    "printedName": "SwiftPythonRuntime.WorkerResponse.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "WorkerResponse",
+                        "printedName": "SwiftPythonRuntime.WorkerResponse",
+                        "usr": "s:18SwiftPythonRuntime14WorkerResponseO"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "declKind": "EnumElement",
+            "usr": "s:18SwiftPythonRuntime14WorkerResponseO23callbackAsyncInvocationyACs6UInt64V_SS10Foundation4DataVs6UInt32VtcACmF",
+            "mangledName": "$s18SwiftPythonRuntime14WorkerResponseO23callbackAsyncInvocationyACs6UInt64V_SS10Foundation4DataVs6UInt32VtcACmF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "RawDocComment"
+            ]
+          },
+          {
+            "kind": "Var",
+            "name": "callbackAsyncAck",
+            "printedName": "callbackAsyncAck",
+            "children": [
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(SwiftPythonRuntime.WorkerResponse.Type) -> (Swift.UInt64, Swift.UInt32) -> SwiftPythonRuntime.WorkerResponse",
+                "children": [
+                  {
+                    "kind": "TypeFunc",
+                    "name": "Function",
+                    "printedName": "(Swift.UInt64, Swift.UInt32) -> SwiftPythonRuntime.WorkerResponse",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "WorkerResponse",
+                        "printedName": "SwiftPythonRuntime.WorkerResponse",
+                        "usr": "s:18SwiftPythonRuntime14WorkerResponseO"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Tuple",
+                        "printedName": "(callId: Swift.UInt64, channelID: Swift.UInt32)",
+                        "children": [
+                          {
+                            "kind": "TypeNominal",
+                            "name": "UInt64",
+                            "printedName": "Swift.UInt64",
+                            "usr": "s:s6UInt64V"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "UInt32",
+                            "printedName": "Swift.UInt32",
+                            "usr": "s:s6UInt32V"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Metatype",
+                    "printedName": "SwiftPythonRuntime.WorkerResponse.Type",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "WorkerResponse",
+                        "printedName": "SwiftPythonRuntime.WorkerResponse",
+                        "usr": "s:18SwiftPythonRuntime14WorkerResponseO"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "declKind": "EnumElement",
+            "usr": "s:18SwiftPythonRuntime14WorkerResponseO16callbackAsyncAckyACs6UInt64V_s6UInt32VtcACmF",
+            "mangledName": "$s18SwiftPythonRuntime14WorkerResponseO16callbackAsyncAckyACs6UInt64V_s6UInt32VtcACmF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "RawDocComment"
+            ]
+          },
+          {
+            "kind": "Var",
             "name": "callbackStreamNext",
             "printedName": "callbackStreamNext",
             "children": [
@@ -19589,6 +19733,13 @@
         "moduleName": "SwiftPythonRuntime"
       },
       {
+        "kind": "Import",
+        "name": "Synchronization",
+        "printedName": "Synchronization",
+        "declKind": "Import",
+        "moduleName": "SwiftPythonRuntime"
+      },
+      {
         "kind": "TypeDecl",
         "name": "OwnedPyHandle",
         "printedName": "OwnedPyHandle",
@@ -25834,6 +25985,274 @@
             "declKind": "Func",
             "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC28registerRawReentrantCallback4name7handlerAA0I12RegistrationCSS_10Foundation4DataVAK_AA06WorkerI7ContextVtYbKctYaKF",
             "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC28registerRawReentrantCallback4name7handlerAA0I12RegistrationCSS_10Foundation4DataVAK_AA06WorkerI7ContextVtYbKctYaKF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "AccessControl",
+              "DiscardableResult",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "registerRawAsyncCallback",
+            "printedName": "registerRawAsyncCallback(name:handler:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CallbackRegistration",
+                "printedName": "SwiftPythonRuntime.CallbackRegistration",
+                "usr": "s:18SwiftPythonRuntime20CallbackRegistrationC"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.Data) async throws -> Foundation.Data",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Data",
+                    "printedName": "Foundation.Data",
+                    "usr": "s:10Foundation4DataV"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Data",
+                    "printedName": "Foundation.Data",
+                    "usr": "s:10Foundation4DataV"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC24registerRawAsyncCallback4name7handlerAA0I12RegistrationCSS_10Foundation4DataVAKYaYbKctYaKF",
+            "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC24registerRawAsyncCallback4name7handlerAA0I12RegistrationCSS_10Foundation4DataVAKYaYbKctYaKF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "AccessControl",
+              "DiscardableResult",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "registerAsyncCallback",
+            "printedName": "registerAsyncCallback(name:callback:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CallbackRegistration",
+                "printedName": "SwiftPythonRuntime.CallbackRegistration",
+                "usr": "s:18SwiftPythonRuntime20CallbackRegistrationC"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "() async throws -> τ_0_0",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_0"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_xyYaYbKctYaKAA0B11ConvertibleRzlF",
+            "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_xyYaYbKctYaKAA0B11ConvertibleRzlF",
+            "moduleName": "SwiftPythonRuntime",
+            "genericSig": "<τ_0_0 where τ_0_0 : SwiftPythonRuntime.PythonConvertible>",
+            "sugared_genericSig": "<R where R : SwiftPythonRuntime.PythonConvertible>",
+            "declAttributes": [
+              "AccessControl",
+              "DiscardableResult",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "registerAsyncCallback",
+            "printedName": "registerAsyncCallback(name:callback:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CallbackRegistration",
+                "printedName": "SwiftPythonRuntime.CallbackRegistration",
+                "usr": "s:18SwiftPythonRuntime20CallbackRegistrationC"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(τ_0_0) async throws -> τ_0_1",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_1"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_0"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_q_xYaYbKctYaKAA0B11ConvertibleRzAaIR_r0_lF",
+            "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_q_xYaYbKctYaKAA0B11ConvertibleRzAaIR_r0_lF",
+            "moduleName": "SwiftPythonRuntime",
+            "genericSig": "<τ_0_0, τ_0_1 where τ_0_0 : SwiftPythonRuntime.PythonConvertible, τ_0_1 : SwiftPythonRuntime.PythonConvertible>",
+            "sugared_genericSig": "<T, R where T : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible>",
+            "declAttributes": [
+              "AccessControl",
+              "DiscardableResult",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "registerAsyncCallback",
+            "printedName": "registerAsyncCallback(name:callback:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CallbackRegistration",
+                "printedName": "SwiftPythonRuntime.CallbackRegistration",
+                "usr": "s:18SwiftPythonRuntime20CallbackRegistrationC"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(τ_0_0, τ_0_1) async throws -> τ_0_2",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "GenericTypeParam",
+                    "printedName": "τ_0_2"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Tuple",
+                    "printedName": "(τ_0_0, τ_0_1)",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "GenericTypeParam",
+                        "printedName": "τ_0_0"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "GenericTypeParam",
+                        "printedName": "τ_0_1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_q0_x_q_tYaYbKctYaKAA0B11ConvertibleRzAaIR_AaIR0_r1_lF",
+            "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_q0_x_q_tYaYbKctYaKAA0B11ConvertibleRzAaIR_AaIR0_r1_lF",
+            "moduleName": "SwiftPythonRuntime",
+            "genericSig": "<τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : SwiftPythonRuntime.PythonConvertible, τ_0_1 : SwiftPythonRuntime.PythonConvertible, τ_0_2 : SwiftPythonRuntime.PythonConvertible>",
+            "sugared_genericSig": "<T, U, R where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible>",
+            "declAttributes": [
+              "AccessControl",
+              "DiscardableResult",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "throwing": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "registerAsyncCallback",
+            "printedName": "registerAsyncCallback(name:callback:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "CallbackRegistration",
+                "printedName": "SwiftPythonRuntime.CallbackRegistration",
+                "usr": "s:18SwiftPythonRuntime20CallbackRegistrationC"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "([Any]) async throws -> Any",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Array",
+                    "printedName": "[Any]",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "ProtocolComposition",
+                        "printedName": "Any"
+                      }
+                    ],
+                    "usr": "s:Sa"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_ypSayypGYaYbKctYaKF",
+            "mangledName": "$s18SwiftPythonRuntime0B11ProcessPoolC21registerAsyncCallback4name8callbackAA0H12RegistrationCSS_ypSayypGYaYbKctYaKF",
             "moduleName": "SwiftPythonRuntime",
             "declAttributes": [
               "AccessControl",
@@ -64688,6 +65107,223 @@
           },
           {
             "kind": "Var",
+            "name": "asyncCallbackHandler",
+            "printedName": "asyncCallbackHandler",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "((Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data)?",
+                "children": [
+                  {
+                    "kind": "TypeFunc",
+                    "name": "Function",
+                    "printedName": "(Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Data",
+                        "printedName": "Foundation.Data",
+                        "usr": "s:10Foundation4DataV"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Tuple",
+                        "printedName": "(Swift.String, Foundation.Data, Swift.UInt32)",
+                        "children": [
+                          {
+                            "kind": "TypeNominal",
+                            "name": "String",
+                            "printedName": "Swift.String",
+                            "usr": "s:SS"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Data",
+                            "printedName": "Foundation.Data",
+                            "usr": "s:10Foundation4DataV"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "UInt32",
+                            "printedName": "Swift.UInt32",
+                            "usr": "s:s6UInt32V"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Var",
+            "usr": "s:18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvp",
+            "mangledName": "$s18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvp",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "HasInitialValue",
+              "Final",
+              "HasStorage",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "hasStorage": true,
+            "accessors": [
+              {
+                "kind": "Accessor",
+                "name": "Get",
+                "printedName": "Get()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Optional",
+                    "printedName": "((Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data)?",
+                    "children": [
+                      {
+                        "kind": "TypeFunc",
+                        "name": "Function",
+                        "printedName": "(Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data",
+                        "children": [
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Data",
+                            "printedName": "Foundation.Data",
+                            "usr": "s:10Foundation4DataV"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Tuple",
+                            "printedName": "(Swift.String, Foundation.Data, Swift.UInt32)",
+                            "children": [
+                              {
+                                "kind": "TypeNominal",
+                                "name": "String",
+                                "printedName": "Swift.String",
+                                "usr": "s:SS"
+                              },
+                              {
+                                "kind": "TypeNominal",
+                                "name": "Data",
+                                "printedName": "Foundation.Data",
+                                "usr": "s:10Foundation4DataV"
+                              },
+                              {
+                                "kind": "TypeNominal",
+                                "name": "UInt32",
+                                "printedName": "Swift.UInt32",
+                                "usr": "s:s6UInt32V"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "usr": "s:Sq"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvg",
+                "mangledName": "$s18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvg",
+                "moduleName": "SwiftPythonRuntime",
+                "implicit": true,
+                "declAttributes": [
+                  "Final"
+                ],
+                "accessorKind": "get"
+              },
+              {
+                "kind": "Accessor",
+                "name": "Set",
+                "printedName": "Set()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Optional",
+                    "printedName": "((Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data)?",
+                    "children": [
+                      {
+                        "kind": "TypeFunc",
+                        "name": "Function",
+                        "printedName": "(Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data",
+                        "children": [
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Data",
+                            "printedName": "Foundation.Data",
+                            "usr": "s:10Foundation4DataV"
+                          },
+                          {
+                            "kind": "TypeNominal",
+                            "name": "Tuple",
+                            "printedName": "(Swift.String, Foundation.Data, Swift.UInt32)",
+                            "children": [
+                              {
+                                "kind": "TypeNominal",
+                                "name": "String",
+                                "printedName": "Swift.String",
+                                "usr": "s:SS"
+                              },
+                              {
+                                "kind": "TypeNominal",
+                                "name": "Data",
+                                "printedName": "Foundation.Data",
+                                "usr": "s:10Foundation4DataV"
+                              },
+                              {
+                                "kind": "TypeNominal",
+                                "name": "UInt32",
+                                "printedName": "Swift.UInt32",
+                                "usr": "s:s6UInt32V"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ],
+                    "usr": "s:Sq"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvs",
+                "mangledName": "$s18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvs",
+                "moduleName": "SwiftPythonRuntime",
+                "implicit": true,
+                "declAttributes": [
+                  "Final"
+                ],
+                "accessorKind": "set"
+              },
+              {
+                "kind": "Accessor",
+                "name": "Modify",
+                "printedName": "Modify()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  }
+                ],
+                "declKind": "Accessor",
+                "usr": "s:18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvM",
+                "mangledName": "$s18SwiftPythonRuntime13WorkerProcessC20asyncCallbackHandler10Foundation4DataVSS_AGs6UInt32VtYaKcSgvM",
+                "moduleName": "SwiftPythonRuntime",
+                "implicit": true,
+                "declAttributes": [
+                  "Final"
+                ],
+                "accessorKind": "_modify"
+              }
+            ]
+          },
+          {
+            "kind": "Var",
             "name": "streamingCallbackHandler",
             "printedName": "streamingCallbackHandler",
             "children": [
@@ -79810,6 +80446,195 @@
       },
       {
         "kind": "TypeDecl",
+        "name": "PoolAsyncCallbackStore",
+        "printedName": "PoolAsyncCallbackStore",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "PoolAsyncCallbackStore",
+                "printedName": "SwiftPythonRuntime.PoolAsyncCallbackStore",
+                "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreC"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreCACycfc",
+            "mangledName": "$s18SwiftPythonRuntime22PoolAsyncCallbackStoreCACycfc",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "AccessControl"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "set",
+            "printedName": "set(name:handler:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.Data) async throws -> Foundation.Data",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Data",
+                    "printedName": "Foundation.Data",
+                    "usr": "s:10Foundation4DataV"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Data",
+                    "printedName": "Foundation.Data",
+                    "usr": "s:10Foundation4DataV"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreC3set4name7handlerySS_10Foundation4DataVAIYaYbKctF",
+            "mangledName": "$s18SwiftPythonRuntime22PoolAsyncCallbackStoreC3set4name7handlerySS_10Foundation4DataVAIYaYbKctF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "Final",
+              "AccessControl"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "get",
+            "printedName": "get(name:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "((Foundation.Data) async throws -> Foundation.Data)?",
+                "children": [
+                  {
+                    "kind": "TypeFunc",
+                    "name": "Function",
+                    "printedName": "(Foundation.Data) async throws -> Foundation.Data",
+                    "children": [
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Data",
+                        "printedName": "Foundation.Data",
+                        "usr": "s:10Foundation4DataV"
+                      },
+                      {
+                        "kind": "TypeNominal",
+                        "name": "Data",
+                        "printedName": "Foundation.Data",
+                        "usr": "s:10Foundation4DataV"
+                      }
+                    ]
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreC3get4name10Foundation4DataVAHYaYbKcSgSS_tF",
+            "mangledName": "$s18SwiftPythonRuntime22PoolAsyncCallbackStoreC3get4name10Foundation4DataVAHYaYbKcSgSS_tF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "Final",
+              "AccessControl"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "remove",
+            "printedName": "remove(name:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreC6remove4nameySS_tF",
+            "mangledName": "$s18SwiftPythonRuntime22PoolAsyncCallbackStoreC6remove4nameySS_tF",
+            "moduleName": "SwiftPythonRuntime",
+            "declAttributes": [
+              "Final",
+              "AccessControl"
+            ],
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "s:18SwiftPythonRuntime22PoolAsyncCallbackStoreC",
+        "mangledName": "$s18SwiftPythonRuntime22PoolAsyncCallbackStoreC",
+        "moduleName": "SwiftPythonRuntime",
+        "declAttributes": [
+          "Final",
+          "AccessControl",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Sendable",
+            "printedName": "Sendable",
+            "usr": "s:s8SendableP",
+            "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "SendableMetatype",
+            "printedName": "SendableMetatype",
+            "usr": "s:s16SendableMetatypeP",
+            "mangledName": "$ss16SendableMetatypeP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
         "name": "PoolStreamingCallbackStore",
         "printedName": "PoolStreamingCallbackStore",
         "children": [
@@ -94321,532 +95146,546 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 4603,
+      "offset": 4578,
       "length": 1,
-      "value": "4"
+      "value": "5"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "BooleanLiteral",
-      "offset": 7824,
+      "offset": 7799,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 9536,
+      "offset": 9511,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 9796,
+      "offset": 9771,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 10074,
+      "offset": 10049,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 10356,
+      "offset": 10331,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 10651,
+      "offset": 10626,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 10766,
+      "offset": 10741,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 10866,
+      "offset": 10841,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11037,
+      "offset": 11012,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11175,
+      "offset": 11150,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11283,
+      "offset": 11258,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11363,
+      "offset": 11338,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11510,
+      "offset": 11485,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11637,
+      "offset": 11612,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 11795,
+      "offset": 11770,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 13538,
+      "offset": 13513,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 13707,
+      "offset": 13682,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 13829,
+      "offset": 13804,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14017,
+      "offset": 13992,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14191,
+      "offset": 14166,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14331,
+      "offset": 14306,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14456,
+      "offset": 14431,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14602,
+      "offset": 14577,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 14873,
+      "offset": 14848,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 15125,
+      "offset": 15100,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 15374,
+      "offset": 15349,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 15782,
+      "offset": 15757,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 16774,
+      "offset": 16749,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 16878,
+      "offset": 16853,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17005,
+      "offset": 16980,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17404,
+      "offset": 17379,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17538,
+      "offset": 17513,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17667,
+      "offset": 17642,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17769,
+      "offset": 17744,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17888,
+      "offset": 17863,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 17973,
+      "offset": 17948,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 18124,
+      "offset": 18099,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 18244,
+      "offset": 18219,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 18927,
+      "offset": 18902,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 19177,
+      "offset": 19319,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 21718,
+      "offset": 19624,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 21823,
+      "offset": 19874,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 21968,
+      "offset": 22415,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 57288,
+      "offset": 22520,
+      "length": 1,
+      "value": "0"
+    },
+    {
+      "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
+      "kind": "IntegerLiteral",
+      "offset": 22665,
+      "length": 1,
+      "value": "0"
+    },
+    {
+      "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
+      "kind": "IntegerLiteral",
+      "offset": 60036,
       "length": 1,
       "value": "9"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 57415,
+      "offset": 60163,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 57441,
+      "offset": 60189,
       "length": 1,
       "value": "1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 57463,
+      "offset": 60211,
       "length": 1,
       "value": "2"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 87482,
+      "offset": 90715,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 87500,
+      "offset": 90733,
       "length": 1,
       "value": "1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 87521,
+      "offset": 90754,
       "length": 1,
       "value": "2"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 87543,
+      "offset": 90776,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90399,
+      "offset": 93632,
       "length": 3,
       "value": "2.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90445,
+      "offset": 93678,
       "length": 4,
       "value": "0.85"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90490,
+      "offset": 93723,
       "length": 4,
       "value": "0.95"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90591,
+      "offset": 93824,
       "length": 4,
       "value": "90.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90641,
+      "offset": 93874,
       "length": 4,
       "value": "60.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 90692,
+      "offset": 93925,
       "length": 4,
       "value": "30.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "BooleanLiteral",
-      "offset": 91450,
+      "offset": 94683,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 91898,
+      "offset": 95131,
       "length": 3,
       "value": "256"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 91904,
+      "offset": 95137,
       "length": 4,
       "value": "1024"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "IntegerLiteral",
-      "offset": 91911,
+      "offset": 95144,
       "length": 4,
       "value": "1024"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "FloatLiteral",
-      "offset": 91977,
+      "offset": 95210,
       "length": 3,
       "value": "2.0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92419,
+      "offset": 95652,
       "length": 9,
       "value": "\"float16\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92448,
+      "offset": 95681,
       "length": 9,
       "value": "\"float32\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92477,
+      "offset": 95710,
       "length": 9,
       "value": "\"float64\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92503,
+      "offset": 95736,
       "length": 6,
       "value": "\"int8\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92527,
+      "offset": 95760,
       "length": 7,
       "value": "\"int16\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92552,
+      "offset": 95785,
       "length": 7,
       "value": "\"int32\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92577,
+      "offset": 95810,
       "length": 7,
       "value": "\"int64\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92602,
+      "offset": 95835,
       "length": 7,
       "value": "\"uint8\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92628,
+      "offset": 95861,
       "length": 8,
       "value": "\"uint16\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92655,
+      "offset": 95888,
       "length": 8,
       "value": "\"uint32\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92682,
+      "offset": 95915,
       "length": 8,
       "value": "\"uint64\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/IPCProtocol.swift",
       "kind": "StringLiteral",
-      "offset": 92707,
+      "offset": 95940,
       "length": 6,
       "value": "\"bool\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/OwnedPyHandle.swift",
       "kind": "BooleanLiteral",
-      "offset": 3197,
+      "offset": 3187,
       "length": 5,
       "value": "false"
     },
@@ -95420,245 +96259,245 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 10473,
+      "offset": 10738,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 11580,
+      "offset": 11845,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 12796,
+      "offset": 13061,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 13062,
+      "offset": 13327,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 13128,
+      "offset": 13393,
       "length": 30,
       "value": "\"workerCount must be positive\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 13226,
+      "offset": 13491,
       "length": 1,
       "value": "1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 13287,
+      "offset": 13552,
       "length": 41,
       "value": "\"blasThreads must be >= 1 when specified\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "Dictionary",
-      "offset": 13919,
+      "offset": 14184,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 14043,
+      "offset": 14308,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 15148,
+      "offset": 15413,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 15187,
+      "offset": 15452,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 16104,
+      "offset": 16369,
       "length": 66,
       "value": "\"Failed to set resource limits on worker \""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 16157,
+      "offset": 16422,
       "length": 1,
       "value": "\": \""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 16169,
+      "offset": 16434,
       "length": 1,
       "value": "\"\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "Dictionary",
-      "offset": 17169,
+      "offset": 17434,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 18622,
+      "offset": 18887,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 18715,
+      "offset": 18980,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 18806,
+      "offset": 19071,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 19746,
+      "offset": 20011,
       "length": 4,
       "value": "true"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 19852,
+      "offset": 20117,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 20855,
+      "offset": 21120,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 21088,
+      "offset": 21353,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 21154,
+      "offset": 21419,
       "length": 30,
       "value": "\"workerCount must be positive\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 21280,
+      "offset": 21545,
       "length": 2,
       "value": "\"\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "Dictionary",
-      "offset": 21566,
+      "offset": 21831,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 21588,
+      "offset": 21853,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 22067,
+      "offset": 22332,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 22106,
+      "offset": 22371,
       "length": 1,
       "value": "0"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 22825,
+      "offset": 23090,
       "length": 66,
       "value": "\"Failed to set resource limits on worker \""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 22878,
+      "offset": 23143,
       "length": 1,
       "value": "\": \""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 22890,
+      "offset": 23155,
       "length": 1,
       "value": "\"\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "BooleanLiteral",
-      "offset": 24178,
+      "offset": 24443,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "IntegerLiteral",
-      "offset": 24254,
+      "offset": 24519,
       "length": 1,
       "value": "3"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "StringLiteral",
-      "offset": 27023,
+      "offset": 27288,
       "length": 2,
       "value": "\"\""
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/PythonProcessPool.swift",
       "kind": "Dictionary",
-      "offset": 27295,
+      "offset": 27560,
       "length": 3,
       "value": "[]"
     },
@@ -95756,21 +96595,21 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/Streaming.swift",
       "kind": "Array",
-      "offset": 4922,
+      "offset": 4926,
       "length": 2,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/Streaming.swift",
       "kind": "Dictionary",
-      "offset": 4972,
+      "offset": 4976,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/PythonProcessPool\/Streaming.swift",
       "kind": "Dictionary",
-      "offset": 5913,
+      "offset": 5921,
       "length": 3,
       "value": "[]"
     },
@@ -96946,7 +97785,7 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/VM\/SupervisorControlChannel.swift",
       "kind": "Array",
-      "offset": 22003,
+      "offset": 22302,
       "length": 2,
       "value": "[]"
     },
@@ -97744,56 +98583,56 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 11579,
+      "offset": 11913,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 12434,
+      "offset": 12768,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 12743,
+      "offset": 13077,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 13211,
+      "offset": 13545,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "BooleanLiteral",
-      "offset": 15231,
+      "offset": 15565,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "Dictionary",
-      "offset": 16203,
+      "offset": 16537,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 17294,
+      "offset": 17628,
       "length": 2,
       "value": "-1"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/ProcessPool\/WorkerProcess\/WorkerProcess.swift",
       "kind": "IntegerLiteral",
-      "offset": 17311,
+      "offset": 17645,
       "length": 1,
       "value": "0"
     },
@@ -98024,21 +98863,28 @@
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonCallback.swift",
       "kind": "BooleanLiteral",
-      "offset": 20623,
+      "offset": 20643,
       "length": 5,
       "value": "false"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonCallback.swift",
       "kind": "Dictionary",
-      "offset": 27866,
+      "offset": 27908,
       "length": 3,
       "value": "[]"
     },
     {
       "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonCallback.swift",
       "kind": "Dictionary",
-      "offset": 28939,
+      "offset": 28972,
+      "length": 3,
+      "value": "[]"
+    },
+    {
+      "filePath": "\/Users\/mikhutchinson\/CascadeProjects\/SwiftPython\/Sources\/SwiftPythonRuntime\/PythonCallback.swift",
+      "kind": "Dictionary",
+      "offset": 30033,
       "length": 3,
       "value": "[]"
     },

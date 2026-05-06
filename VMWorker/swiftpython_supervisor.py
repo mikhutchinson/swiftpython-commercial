@@ -326,7 +326,7 @@ class Supervisor:
         return {
             "auth_challenge": {
                 "nonce": self.auth_nonce,
-                "protocolVersion": 4,
+                "protocolVersion": 5,
                 "supervisorVersion": 2,
             }
         }
@@ -334,7 +334,7 @@ class Supervisor:
     def _auth_response(self, data: dict) -> dict:
         if not self.auth_secret:
             self.authenticated = True
-            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 4}}
+            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 5}}
 
         client_version = int(data.get("clientVersion", 0))
         supplied = data.get("hmac", "")
@@ -342,7 +342,7 @@ class Supervisor:
         expected = hmac.new(self.auth_secret, message, hashlib.sha256).hexdigest()
         if hmac.compare_digest(expected, supplied):
             self.authenticated = True
-            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 4}}
+            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 5}}
         return {"auth_failed": {"reason": "bad hmac"}}
 
     def _spawn_worker(self, data: dict) -> dict:
@@ -815,7 +815,7 @@ def main():
     else:
         # Listen on vsock for host connection.
         # The host uses VZVirtioSocketDevice.connect(toPort:) to reach us.
-        # Host-connects-to-guest pattern via VZVirtioSocketDevice.connect(toPort:).
+        # This is the proven pattern from sirius-agent.
         port = int(sys.argv[1]) if len(sys.argv) >= 2 else CONTROL_PORT
         server = socket.socket(AF_VSOCK, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

@@ -4,7 +4,7 @@
 Speaks the same wire protocol as the compiled SwiftPythonWorker binary, but runs
 natively inside a macOS guest VM. Communicates with the host via AF_VSOCK.
 
-Wire format (v3 — binary sidecar + channel IDs on every command/response):
+Wire format (v5 — binary sidecar + channel IDs on every command/response):
     ┌──────────────┬──────────────┬──────────────┬─────────────────┬──────────────────┐
     │ JSONLen (4B) │ BinLen (4B)  │ Type (1B)    │ JSON Payload    │ Binary Payload   │
     │ UInt32 LE    │ UInt32 LE    │ 0=Cmd 1=Resp │ Variable length │ Variable length  │
@@ -42,7 +42,7 @@ MSG_TYPE_SIDE = 2
 HOST_CID = 2  # vsock host CID
 
 MAX_PAYLOAD_BYTES = 16 * 1024 * 1024  # 16 MB default
-CURRENT_PROTOCOL_VERSION = 3
+CURRENT_PROTOCOL_VERSION = 5
 
 # ---------------------------------------------------------------------------
 # MessageFrame encoding / decoding
@@ -120,7 +120,7 @@ def extract_binary_from_response(resp_name: str, resp_data: dict) -> bytes:
         data = resp_data.get("_0", b"")
         resp_data["_0"] = ""
         return data if isinstance(data, bytes) else b""
-    if resp_name == "callbackInvocation":
+    if resp_name in ("callbackInvocation", "callbackAsyncInvocation"):
         data = resp_data.get("argsPickle", b"")
         resp_data["argsPickle"] = ""
         return data if isinstance(data, bytes) else b""
@@ -280,6 +280,8 @@ class Worker:
         self._next_call_id_lock = threading.Lock()
         self._callback_waiters: dict[int, "queue.Queue[tuple[str, dict, bytes]]"] = {}
         self._callback_waiters_lock = threading.Lock()
+        self._async_callback_waiters: dict[int, tuple["queue.Queue[tuple[str, dict, bytes]]", int]] = {}
+        self._async_callback_waiters_lock = threading.Lock()
         self._active_stream_iterators: dict[int, object] = {}
         self._active_stream_iterators_lock = threading.Lock()
         self._send_lock = threading.Lock()
@@ -455,6 +457,7 @@ class Worker:
         command_pool.shutdown(wait=False, cancel_futures=True)
         child_command_pool.shutdown(wait=False, cancel_futures=True)
         self._fail_all_callback_waiters(ConnectionError("worker shutdown"))
+        self._fail_all_async_callback_waiters(ConnectionError("worker shutdown"))
 
     def _handle_and_send(self, cmd_name: str, cmd_data: dict):
         channel_id = self._command_channel_id(cmd_name, cmd_data)
@@ -498,6 +501,20 @@ class Worker:
         with self._callback_waiters_lock:
             self._callback_waiters.pop(call_id, None)
 
+    def _register_async_callback_waiter(self, call_id: int, channel_id: int) -> "queue.Queue[tuple[str, dict, bytes]]":
+        waiter: "queue.Queue[tuple[str, dict, bytes]]" = queue.Queue()
+        with self._async_callback_waiters_lock:
+            self._async_callback_waiters[call_id] = (waiter, channel_id)
+        return waiter
+
+    def _async_callback_waiter(self, call_id: int) -> tuple["queue.Queue[tuple[str, dict, bytes]]", int] | None:
+        with self._async_callback_waiters_lock:
+            return self._async_callback_waiters.get(call_id)
+
+    def _unregister_async_callback_waiter(self, call_id: int):
+        with self._async_callback_waiters_lock:
+            self._async_callback_waiters.pop(call_id, None)
+
     def _route_callback_reply(self, cmd_name: str, cmd_data: dict, binary: bytes) -> bool:
         if cmd_name not in (
             "callbackResult", "callbackError", "callbackStreamChunk",
@@ -505,6 +522,12 @@ class Worker:
         ):
             return False
         call_id = int(cmd_data.get("callId", -1))
+        with self._async_callback_waiters_lock:
+            async_waiter = self._async_callback_waiters.get(call_id)
+        if async_waiter is not None:
+            async_waiter[0].put((cmd_name, cmd_data, binary))
+            return True
+
         with self._callback_waiters_lock:
             waiter = self._callback_waiters.get(call_id)
         if waiter is not None:
@@ -515,6 +538,13 @@ class Worker:
         with self._callback_waiters_lock:
             waiters = list(self._callback_waiters.values())
             self._callback_waiters.clear()
+        for waiter in waiters:
+            waiter.put(("__error__", {"message": str(error)}, b""))
+
+    def _fail_all_async_callback_waiters(self, error: Exception):
+        with self._async_callback_waiters_lock:
+            waiters = [entry[0] for entry in self._async_callback_waiters.values()]
+            self._async_callback_waiters.clear()
         for waiter in waiters:
             waiter.put(("__error__", {"message": str(error)}, b""))
 
@@ -908,6 +938,8 @@ class Worker:
     #
     # Python calls swift_bridge.call(name, *args) → worker sends
     # callbackInvocation → Swift runs handler → sends callbackResult back.
+    # Python calls swift_bridge.call_async(name, *args) → worker sends
+    # callbackAsyncInvocation → Swift runs handler → resolves a Future.
     # Nested commands from the Swift handler are dispatched inline.
     # -----------------------------------------------------------------------
 
@@ -934,6 +966,42 @@ class Worker:
 
         def call(name, *args, **kwargs):
             return worker_ref._execute_callback_via_ipc(name, list(args))
+
+        def call_async(name, *args, **kwargs):
+            import concurrent.futures
+
+            future = concurrent.futures.Future()
+            if kwargs:
+                future.set_exception(
+                    TypeError(
+                        "swift_bridge.call_async does not support keyword arguments for ProcessPool callbacks"
+                    )
+                )
+                return future
+
+            try:
+                call_id = worker_ref._start_async_callback_via_ipc(name, list(args))
+            except BaseException as exc:
+                future.set_exception(exc)
+                return future
+
+            def _wait_for_swift_callback():
+                try:
+                    result = worker_ref._wait_async_callback_via_ipc(call_id)
+                except BaseException as exc:
+                    if not future.cancelled():
+                        future.set_exception(exc)
+                else:
+                    if not future.cancelled():
+                        future.set_result(result)
+
+            thread = threading.Thread(
+                target=_wait_for_swift_callback,
+                name=f"swift_bridge.call_async({name})",
+                daemon=True,
+            )
+            thread.start()
+            return future
 
         def call_stream(name, *args):
             call_id = worker_ref._execute_callback_via_ipc("__swift_stream_init__", [name] + list(args))
@@ -964,6 +1032,7 @@ class Worker:
             return None
 
         mod.call = call
+        mod.call_async = call_async
         mod.call_stream = call_stream
         mod.is_registered = is_registered
         mod.registered_names = registered_names
@@ -1030,6 +1099,72 @@ class Worker:
             raise TimeoutError(f"Timed out waiting for callback result callId={call_id}")
         finally:
             self._unregister_callback_waiter(call_id)
+
+    def _start_async_callback_via_ipc(self, name: str, args: list) -> int:
+        """Send callbackAsyncInvocation to Swift and return a Future call id."""
+        call_id = self._next_callback_call_id()
+        channel_id = self._current_callback_channel_id()
+        self._register_async_callback_waiter(call_id, channel_id)
+
+        args_json = json.dumps(args, default=_json_default).encode("utf-8")
+        try:
+            self._send_response("callbackAsyncInvocation", {
+                "callId": call_id,
+                "name": name,
+                "argsPickle": "",
+            }, args_json, channel_id=channel_id)
+        except BaseException:
+            self._unregister_async_callback_waiter(call_id)
+            raise
+        return call_id
+
+    def _wait_async_callback_via_ipc(self, call_id: int):
+        """Wait for an async callback result without entering callback reentry routing."""
+        entry = self._async_callback_waiter(call_id)
+        if entry is None:
+            raise RuntimeError(f"No pending async callback callId={call_id}")
+        waiter, channel_id = entry
+
+        try:
+            while True:
+                cmd_name, cmd_data, binary = waiter.get(
+                    timeout=self.ipc_config.get("receiveTimeout", 30)
+                )
+
+                if cmd_name == "__error__":
+                    raise RuntimeError(cmd_data.get("message", "async callback waiter failed"))
+
+                if cmd_name == "callbackResult":
+                    result_call_id = cmd_data.get("callId", -1)
+                    if result_call_id != call_id:
+                        raise RuntimeError(
+                            f"Async callback callId mismatch: expected {call_id}, got {result_call_id}"
+                        )
+                    self._send_response("callbackAsyncAck", {"callId": call_id}, b"", channel_id=channel_id)
+                    result_pickle = cmd_data.get("pickle", b"")
+                    if isinstance(result_pickle, str):
+                        result_pickle = result_pickle.encode("utf-8")
+                    if not result_pickle:
+                        result_pickle = binary if binary else b"[null]"
+                    result_array = json.loads(result_pickle)
+                    return result_array[0] if isinstance(result_array, list) and result_array else result_array
+
+                if cmd_name == "callbackError":
+                    error_call_id = cmd_data.get("callId", -1)
+                    if error_call_id != call_id:
+                        raise RuntimeError(
+                            f"Async callback callId mismatch: expected {call_id}, got {error_call_id}"
+                        )
+                    self._send_response("callbackAsyncAck", {"callId": call_id}, b"", channel_id=channel_id)
+                    err_type = cmd_data.get("type", "RuntimeError")
+                    err_msg = cmd_data.get("message", "Unknown callback error")
+                    raise RuntimeError(f"[{err_type}] {err_msg}")
+
+                raise RuntimeError(f"Unexpected command during async callback: {cmd_name}")
+        except queue.Empty:
+            raise TimeoutError(f"Timed out waiting for async callback result callId={call_id}")
+        finally:
+            self._unregister_async_callback_waiter(call_id)
 
     def _execute_stream_next_via_ipc(self, call_id: int):
         channel_id = self._current_callback_channel_id()

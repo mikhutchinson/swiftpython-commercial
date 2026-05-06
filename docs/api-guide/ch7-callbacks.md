@@ -80,6 +80,33 @@ let registration = try await pool.registerRawCallback(name: "uppercase_json") {
 
 Raw reentrant callbacks receive `WorkerCallbackContext` as a second argument.
 
+## Async Callbacks
+
+Use async callbacks when the Swift handler needs to await host-side work while
+Python receives a `concurrent.futures.Future`.
+
+```swift
+let registration = try await pool.registerAsyncCallback(name: "approve") {
+    @Sendable (payload: String) async throws -> String in
+    try await permissionCoordinator.resolve(payload)
+}
+```
+
+Python side:
+
+```python
+import swift_bridge
+
+future = swift_bridge.call_async("approve", payload)
+raw = future.result(timeout=300)
+```
+
+Async callbacks are a ProcessPool protocol-v5 feature. `call_async` can also
+invoke sync callbacks and wrap their result in a Future. Calling an async
+callback through `swift_bridge.call(...)` fails with guidance to use
+`swift_bridge.call_async`; calling a streaming callback through `call_async`
+fails with guidance to use `swift_bridge.call_stream`.
+
 ## Streaming Callbacks
 
 Streaming callbacks let Swift provide an iterator to Python.
@@ -122,6 +149,7 @@ Inside worker Python code:
 import swift_bridge
 
 swift_bridge.call(name, *args, **kwargs)
+swift_bridge.call_async(name, *args, **kwargs)
 swift_bridge.call_stream(name, *args)
 swift_bridge.is_registered(name)
 swift_bridge.registered_names()
@@ -175,6 +203,9 @@ Explicit removal is also available:
 try await pool.unregisterCallback(name: "host_log")
 ```
 
+`unregisterCallback(name:)` removes sync, async, and streaming registrations for
+that name.
+
 ## Observability
 
 When a worker dies with callbacks in flight, `pool.events()` emits
@@ -201,5 +232,6 @@ never returned.
 | Callback stops working unexpectedly | Keep the returned `CallbackRegistration` alive |
 | Large payloads make callbacks slow | Pass handles, file paths, or shared memory instead |
 | Callback needs same-worker Python state | Use `registerReentrantCallback` |
+| Swift callback needs to await host work | Use `registerAsyncCallback` and `swift_bridge.call_async` |
 | Python iterator should stop when consumer leaves | Use bounded `StreamingCallbackIterator` and handle thrown cancellation |
 | Callback errors are hard to debug | Include stable callback names and log `.callbackOrphaned` events |

@@ -322,6 +322,8 @@ public enum WorkerResponse : Swift.Sendable, Swift.Codable {
   case streamChunk(streamChannelID: Swift.UInt32, Foundation.Data)
   case streamEnd(streamChannelID: Swift.UInt32)
   case callbackInvocation(callId: Swift.UInt64, name: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32 = 0)
+  case callbackAsyncInvocation(callId: Swift.UInt64, name: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32 = 0)
+  case callbackAsyncAck(callId: Swift.UInt64, channelID: Swift.UInt32 = 0)
   case callbackStreamNext(callId: Swift.UInt64, channelID: Swift.UInt32 = 0)
   case streamKeepalive(streamChannelID: Swift.UInt32, elapsedMs: Swift.UInt64)
   case streamProgress(streamChannelID: Swift.UInt32, elapsedMs: Swift.UInt64, hint: Swift.String?)
@@ -650,6 +652,16 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func registerRawCallback(name: Swift.String, handler: @escaping @Sendable (Foundation.Data) throws -> Foundation.Data) async throws -> SwiftPythonRuntime.CallbackRegistration
   @discardableResult
   public func registerRawReentrantCallback(name: Swift.String, handler: @escaping @Sendable (Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data) async throws -> SwiftPythonRuntime.CallbackRegistration
+  @discardableResult
+  public func registerRawAsyncCallback(name: Swift.String, handler: @escaping @Sendable (Foundation.Data) async throws -> Foundation.Data) async throws -> SwiftPythonRuntime.CallbackRegistration
+  @discardableResult
+  public func registerAsyncCallback<R>(name: Swift.String, callback: @escaping @Sendable () async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerAsyncCallback<T, R>(name: Swift.String, callback: @escaping @Sendable (T) async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerAsyncCallback<T, U, R>(name: Swift.String, callback: @escaping @Sendable (T, U) async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerAsyncCallback(name: Swift.String, callback: @escaping @Sendable ([Any]) async throws -> Any) async throws -> SwiftPythonRuntime.CallbackRegistration
   @discardableResult
   public func registerCallback<T, R>(name: Swift.String, callback: @escaping @Sendable (T) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
@@ -2052,6 +2064,7 @@ final public class WorkerProcess : @unchecked Swift.Sendable {
   }
   final public var lifecycleDelegate: (any SwiftPythonRuntime.WorkerLifecycleDelegate)?
   final public var callbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> Foundation.Data)?
+  final public var asyncCallbackHandler: ((Swift.String, Foundation.Data, Swift.UInt32) async throws -> Foundation.Data)?
   final public var streamingCallbackHandler: ((Swift.String, Foundation.Data, SwiftPythonRuntime.WorkerCallbackContext) throws -> SwiftPythonRuntime.StreamingCallbackIterator)?
   final public var onCallbackOrphaned: (@Sendable (_ callID: Swift.UInt64, _ name: Swift.String, _ kind: SwiftPythonRuntime.PoolEvent.CallbackKind, _ streamChannelID: Swift.UInt32?) -> Swift.Void)?
   public init(id: Swift.Int, socketDirectory: Swift.String = WorkerProcess.defaultSocketDirectory, ipcConfig: SwiftPythonRuntime.IPCConfiguration = .default, environmentOverrides: [Swift.String : Swift.String] = [:])
@@ -2554,6 +2567,14 @@ final public class PoolRawCallbackStore : @unchecked Swift.Sendable {
   public init()
   final public func set(name: Swift.String, handler: @escaping SwiftPythonRuntime.PoolRawCallbackStore.RawHandler)
   final public func get(name: Swift.String) -> SwiftPythonRuntime.PoolRawCallbackStore.RawHandler?
+  final public func remove(name: Swift.String)
+  @objc deinit
+}
+final public class PoolAsyncCallbackStore : @unchecked Swift.Sendable {
+  public typealias AsyncHandler = @Sendable (Foundation.Data) async throws -> Foundation.Data
+  public init()
+  final public func set(name: Swift.String, handler: @escaping SwiftPythonRuntime.PoolAsyncCallbackStore.AsyncHandler)
+  final public func get(name: Swift.String) -> SwiftPythonRuntime.PoolAsyncCallbackStore.AsyncHandler?
   final public func remove(name: Swift.String)
   @objc deinit
 }

@@ -7,7 +7,7 @@ with Swift Package Manager. The SwiftPython source code, generator pipeline, and
 implementation internals remain private. You do not need the private repository
 to build an app against this package.
 
-Current release: `0.4.0`
+Current release: `0.5.0`
 
 ## What Ships
 
@@ -43,7 +43,7 @@ brew install python@3.13
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.4.0"
+        from: "0.5.0"
     )
 ]
 ```
@@ -208,7 +208,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.4.0"
+    swiftpythonVersion: "0.5.0"
 )
 let image = try await builder.build()
 
@@ -238,7 +238,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 |-------|-----|
 | `Library not loaded: libpython3.13.dylib` | Set `PYTHONHOME`, `PATH`, and linker flags for the Python 3.13 runtime you ship |
 | `workerNotFound(searchedPaths:)` | Copy `SwiftPythonWorker` into the app or pass `workerExecutablePath:` |
-| `protocolError` mentioning protocol v4 | Runtime, worker, and VM scripts are not from the same release tag |
+| `protocolError` mentioning protocol v5 | Runtime, worker, and VM scripts are not from the same release tag |
 | Worker starts in Terminal but not Finder | Your app launch environment is missing Python paths |
 | Python package imports in app but not worker | Worker process sees a different Python environment; set app launch environment consistently |
 | `VMWorker scripts not found` | Deploy `VMWorker/` or set `SWIFTPYTHON_VM_WORKER_DIR` |
@@ -248,6 +248,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.0 | ProcessPool async callbacks: `registerAsyncCallback`, worker `swift_bridge.call_async`, protocol-v5 callback IPC, and matched VM/Sandbox worker parity |
 | 0.4.0 | SandboxPool and VM supervisor runtime: Ubuntu image builder, VM tenant pool, shell capture/stream/PTY, quota and policy controls, packaged `VMWorker/` scripts |
 | 0.3.0 | Multi-stream worker protocol and public streaming surface cleanup |
 | 0.2.1 | Public worker respawn API with force-kill path |
