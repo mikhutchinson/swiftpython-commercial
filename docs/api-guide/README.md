@@ -40,13 +40,15 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
+| Start from a complete macOS app | `Examples/IrisDemo` |
 
 ## Public Package Boundary
 
-This public repository is a commercial binary distribution. Use the documented
-runtime APIs to build your app-level integration. Do not depend on private source
-paths, private generated bindings, internal test fixtures, or implementation
-details from a SwiftPython source checkout.
+This public repository is the binary distribution for SwiftPython users on
+either the AGPL-3.0 path or the commercial-license path. Use the documented
+runtime APIs to build your app-level integration. Do not depend on private
+source paths, private generated bindings, internal test fixtures, or
+implementation details from a SwiftPython source checkout.
 
 When in doubt, treat the public Swift interface inside the XCFramework as the
 contract and keep your app code behind your own small facade.

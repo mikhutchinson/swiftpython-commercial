@@ -1,11 +1,13 @@
-# SwiftPython Commercial Runtime
+# SwiftPython Runtime Binary Distribution
 
-Public binary distribution for the SwiftPython commercial runtime on macOS.
+Public binary distribution for the SwiftPython runtime on macOS.
 
-This repository is intentionally public so licensed consumers can depend on it
-with Swift Package Manager. The SwiftPython source code, generator pipeline, and
-implementation internals remain private. You do not need the private repository
-to build an app against this package.
+This repository is intentionally public so SwiftPython users can depend on it
+with Swift Package Manager. SwiftPython is dual licensed: use the AGPL-3.0 path
+for AGPL-compliant open source applications, or a commercial license for
+proprietary/closed-source applications. The SwiftPython source code, generator
+pipeline, and implementation internals remain private. You do not need the
+private repository to build an app against this package.
 
 Current release: `0.5.0`
 
@@ -17,6 +19,7 @@ Current release: `0.5.0`
 | `SwiftPythonWorker` | Local worker sidecar for `PythonProcessPool` |
 | `VMWorker/` | Python supervisor and worker scripts for VM tenants |
 | `Entitlements/` | Hardened runtime, sandbox, and VM entitlement templates |
+| `Examples/IrisDemo/` | Complete macOS IRIS app built against the public runtime |
 | `docs/api-guide/` | Public API guide and integration recipes |
 
 Keep the XCFramework, worker binary, and `VMWorker/` scripts on the same tag.
@@ -95,6 +98,8 @@ try await withProcessPool(workers: 2) { pool in
 ## Public API Guide
 
 Start here: [docs/api-guide](docs/api-guide/).
+
+For a complete first app, see [Examples/IrisDemo](Examples/IrisDemo/).
 
 The guide covers:
 
@@ -257,4 +262,4 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 ## License
 
-Commercial license. See [LICENSE](LICENSE).
+Dual license: AGPL-3.0 or commercial. See [LICENSE](LICENSE).
