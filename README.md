@@ -23,6 +23,7 @@ Current release: `0.5.0`
 | `Examples/CoreRuntimeSmoke/` | Minimal CLI: in-process `Python.run` |
 | `Examples/ProcessPoolSmoke/` | Minimal CLI: `withProcessPool` + `invokeResult` |
 | `Examples/BridgingRing/` | Pool IPC tour: Swift↔Python callbacks, `WorkerCallbackContext`, `evalEvents` |
+| `Examples/SharedTensorPipeline/` | Headline demo: shared-memory arena + out-of-band streaming + concurrent IPC |
 | `docs/api-guide/` | Public API guide and integration recipes |
 
 Keep the XCFramework, worker binary, and `VMWorker/` scripts on the same tag.

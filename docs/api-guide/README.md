@@ -41,6 +41,7 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
 | Pool callbacks / reentrant / `evalEvents` in one runnable CLI | `Examples/BridgingRing` |
+| Shared-memory arena + out-of-band streaming in one demo | `Examples/SharedTensorPipeline` |
 | Smoke-test wiring (`Python.run`, process pool CLIs) | `Examples/CoreRuntimeSmoke`, `Examples/ProcessPoolSmoke` |
 | Start from a complete macOS app | `Examples/IrisDemo` |
 
