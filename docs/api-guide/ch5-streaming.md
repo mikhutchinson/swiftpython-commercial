@@ -217,6 +217,154 @@ let stream: CancellableStream<String> = try await worker.invokeStream(
 Worker contexts are useful when the stream depends on a handle or Python state
 that exists on a specific worker.
 
+## Out-of-Band Streaming
+
+`evalStream` / `invokeStream` / `methodStream` send each chunk over the
+worker's main IPC socket. For the duration of the stream, that socket is held
+by the streaming command — any other `eval` / `invoke` on the same worker has
+to wait its turn.
+
+When you need a long-lived stream that does *not* tie up the worker, use the
+out-of-band path. A Python generator runs on the worker's side-channel daemon
+thread and writes into a host-owned buffer; the host polls that buffer; the
+worker's main socket stays free for normal commands.
+
+There are two buffer types and matching entrypoints, picked by where the
+worker lives:
+
+| Worker backend | Buffer | Entrypoint | Transport |
+|---|---|---|---|
+| In-process (`SwiftPythonWorker`) | `SharedRingBuffer` | `startOutOfBandStream(generatorCode:worker:buffer:)` | POSIX shared memory |
+| VM tenant / cross-isolation | `SocketOOBStreamBuffer` | `startOutOfBandSocketStream(generatorCode:worker:capacity:)` | UDS (process backend) or vsock (VM backend) |
+
+The two share the same Swift consumer shape — `readAvailable() -> Data`,
+`signalAbort()`, `isWriterDone`, `isAborted` — so a polling loop written
+against one switches to the other by changing the buffer type. The socket
+entrypoint is marked deprecated in source because a future runtime will
+collapse both calls into a single transport-capability-selecting
+`startOutOfBandStream`; the underlying socket OOB capability ships today and
+is the documented path for VM tenants until that consolidation lands.
+
+### `SharedRingBuffer` (in-process backend)
+
+A single-producer (Python) / single-consumer (Swift) ring buffer backed by a
+fresh POSIX shm segment.
+
+| API | Purpose |
+|-----|---------|
+| `init(capacity:)` | Create a ring buffer with `capacity` bytes of data region (header is separate). Default capacity is 64 KiB. |
+| `shmName` | POSIX shm name. Pass to a Python writer to attach. |
+| `dataCapacity`, `totalSize` | Capacity (bytes) and segment size including header. |
+| `readAvailable()` | Returns all bytes written since the last call. Empty if nothing new. |
+| `signalAbort()` | Tells the writer to stop. The flag is checked between iterations. |
+| `isWriterDone` | `true` once the writer thread has exited (normal completion, abort, or exception). |
+| `isAborted` | `true` once `signalAbort()` has been called. |
+| `writePosition` | Monotonic byte count the writer has produced. |
+
+The segment is unlinked when `SharedRingBuffer` is deinitialized; the host
+owns the lifecycle.
+
+### `startOutOfBandStream`
+
+```swift
+try await pool.startOutOfBandStream(
+    generatorCode: "(json.dumps(frame) for frame in frames())",
+    worker: 0,
+    buffer: ring
+)
+```
+
+`generatorCode` must be a Python expression that evaluates to an iterable of
+`str` or `bytes`. It runs on the worker's side-channel daemon thread, so it
+can reference names you already imported into that worker's persistent
+namespace via regular `pool.eval`.
+
+The call ships the bootstrap via the **side channel**, never the main IPC
+socket — so a regular `pool.evalResult` on the same worker continues to
+complete in normal IPC round-trip time while the OOB writer is producing.
+
+Each yielded value is written into the ring buffer's circular data region;
+the writer updates the 8-byte `writePos` header last so the reader sees a
+consistent snapshot. If Python yields faster than Swift drains and laps the
+buffer, `readAvailable()` detects the overrun and skips forward to the
+earliest recoverable position.
+
+### `SocketOOBStreamBuffer` (cross-isolation / VM backend)
+
+POSIX shared memory cannot cross a VM boundary, so the VM backend (and the
+process backend when explicitly requested) uses a connected socket instead.
+The Python writer sends **length-prefixed** chunks:
+
+```
+[4-byte LE length][data bytes][4-byte LE length][data bytes]...
+```
+
+Done: Python closes its end → Swift's `recv` returns 0 → `isWriterDone` flips
+to `true`. Abort: `signalAbort()` calls `shutdown(SHUT_RDWR)` on the socket
+so the writer's next `sendall` raises `BrokenPipeError`.
+
+```swift
+// VM / cross-isolation worker
+let socketBuffer = try await pool.startOutOfBandSocketStream(
+    generatorCode: "(json.dumps(frame) for frame in frames())",
+    worker: 0,
+    capacity: 65_536
+)
+// Same consumer shape as SharedRingBuffer:
+while !socketBuffer.isWriterDone {
+    let chunk = socketBuffer.readAvailable()
+    if !chunk.isEmpty { handle(chunk) }
+    try await Task.sleep(nanoseconds: 10_000_000)
+}
+```
+
+`startOutOfBandSocketStream` selects the transport automatically: vsock
+inside a VM tenant (host connects via `Virtualization.framework`), UDS for
+the process backend. Either way the worker's main IPC socket is untouched,
+matching the `SharedRingBuffer` invariant.
+
+### Polling Pattern
+
+```swift
+let ring = try SharedRingBuffer(capacity: 64 * 1024)
+try await pool.startOutOfBandStream(
+    generatorCode: "telemetry(n=200)",
+    worker: 0,
+    buffer: ring
+)
+
+var lineBuffer = Data()
+while !ring.isWriterDone || !lineBuffer.isEmpty {
+    let chunk = ring.readAvailable()
+    if !chunk.isEmpty {
+        lineBuffer.append(chunk)
+        while let nl = lineBuffer.firstIndex(of: 0x0A) {
+            let line = Data(lineBuffer[..<nl])
+            lineBuffer.removeSubrange(...nl)
+            handle(line) // parse one framed message
+        }
+    }
+    try await Task.sleep(nanoseconds: 10_000_000) // ~10 ms
+}
+```
+
+To stop early, call `ring.signalAbort()`. The writer checks the flag between
+iterations and exits within a few milliseconds.
+
+### When to Reach for OOB Streaming vs `evalStream`
+
+| Need | Use |
+|------|-----|
+| Bounded iteration where the worker has nothing else to do | `evalStream` / `invokeStream` / `methodStream` |
+| Long-lived telemetry, log tail, or progress feed against an in-process worker | `startOutOfBandStream` + `SharedRingBuffer` |
+| Same, but the generator lives in a VM tenant (or you want a socket-based transport) | `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` |
+| Three independent flows on one worker (main commands + side namespace injection + long-running output stream) | Main IPC + `sideEval` + an OOB buffer of either kind |
+
+The
+[`Examples/SharedTensorPipeline`](../../Examples/SharedTensorPipeline/) demo
+exercises the full path end-to-end (shared-memory tensor + OOB telemetry +
+concurrent `evalResult` on the same worker, all measured).
+
 ## Common Pitfalls
 
 | Issue | Fix |
@@ -226,3 +374,5 @@ that exists on a specific worker.
 | Cancel does not stop a tight loop | Add `swift_bridge.check_cancel()` checkpoints or use forced respawn |
 | A stream returns huge objects | Yield smaller chunks or use shared memory handles |
 | UI updates arrive too fast | Coalesce stream events before publishing to the main actor |
+| `evalStream` blocks other work on the same worker | Move the long-lived producer to `startOutOfBandStream` |
+| OOB consumer never sees the last bytes | Drain `readAvailable()` once more after `isWriterDone` is `true` |

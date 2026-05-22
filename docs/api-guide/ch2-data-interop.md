@@ -151,6 +151,13 @@ buffer has not been released.
 For large numeric arrays that should stay out of pickle payloads, use the pool
 shared-memory helpers.
 
+`pool.createSharedTensor(shape:dtype:)` allocates a region in the pool's
+`SharedMemoryArena` (POSIX shm) and broadcast-attaches it to every commandable
+worker. The returned `PyHandle` carries `PyHandleSharedMemoryRef` metadata —
+`shmName`, `offset`, `size`, `shape`, `dtype` — that workers use to `mmap` the
+same bytes zero-copy. Pass the handle through `bindings:` to make it visible
+as a NumPy array inside any `eval` / `invoke`.
+
 ```swift
 let shared = try await pool.createSharedTensor(
     shape: [1024, 1024],
@@ -164,6 +171,28 @@ import numpy as np
 float(x.sum())
 """, bindings: ["x": shared])
 ```
+
+### Direct Host-Side Access with `withSharedBuffer`
+
+`writeToShared` / `readFromShared` are convenience wrappers that iterate
+element by element. For the truly zero-copy path — useful when the host is
+generating or consuming millions of elements — use `withSharedBuffer`:
+
+```swift
+try await pool.withSharedBuffer(shared, as: Double.self) { buf in
+    // buf is an UnsafeMutableBufferPointer<Double> aliased onto the mmap'd region.
+    // Stores commit directly to memory pages workers will read; no IPC, no copy.
+    for i in 0..<buf.count {
+        buf[i] = Double(i)
+    }
+}
+```
+
+`withSharedBuffer` validates that the Swift type matches the region's `dtype`
+and that the region size is a clean multiple of the element stride, then hands
+back an `UnsafeMutableBufferPointer<T>` aliased onto the mmap'd region. There
+is no Swift-side copy and no IPC traffic — the bytes you store land on the
+same memory pages that any worker resolves the binding to.
 
 You can also copy an existing worker object into shared memory:
 
@@ -181,6 +210,11 @@ let bytes: [Float] = try await pool.readFromShared(sharedArr, as: Float.self)
 Shared memory is a performance feature, not the default. Start with normal
 `PythonConvertible` arguments and handles, then move hot paths to shared memory
 after profiling.
+
+For a runnable end-to-end demo — Swift seeds an 8 MiB float64 region through
+`withSharedBuffer`, two workers reduce halves in parallel through `bindings:`,
+and Swift reads back zero-copy — see
+[`Examples/SharedTensorPipeline`](../../Examples/SharedTensorPipeline/).
 
 ## Capsules
 

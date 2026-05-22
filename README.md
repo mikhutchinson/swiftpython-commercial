@@ -105,6 +105,34 @@ Start here: [docs/api-guide](docs/api-guide/).
 
 For runnable samples, see [Examples](Examples/) (including [IrisDemo](Examples/IrisDemo/)).
 
+## How It Compares to Other Swift ↔ Python Options
+
+Most existing Swift ↔ Python bridges put CPython **in your app's address
+space**: one interpreter, one GIL, one crash domain. SwiftPython runs the
+same `Python.run` model in-process *and* a multi-process `PythonProcessPool`
+with a documented IPC protocol on top.
+
+| Axis | In-process bridge (e.g. PythonKit) | SwiftPython |
+|------|-----------------------------------|-------------|
+| Process model | Embeds `libpython` in your app | In-process `Python.run` **plus** `PythonProcessPool` worker processes |
+| Parallelism | Limited by a single GIL | One CPython + one GIL per worker; multiple workers run in parallel |
+| Crash isolation | Python crash takes down the host | Worker crashes are surfaced as Swift errors; respawn is built-in |
+| Native extensions (NumPy, Torch, …) | Yes, in the host process | Yes — in workers, where a crashing extension does not kill your app |
+| Shared-memory tensors across processes | N/A | `pool.createSharedTensor` + `withSharedBuffer` (typed Swift access into POSIX shm) |
+| Out-of-band streaming | N/A | `SharedRingBuffer` (POSIX shm) **or** `SocketOOBStreamBuffer` (UDS / vsock) — stream without holding the worker IPC socket, process-pool or VM tenant |
+| Python → Swift callbacks | N/A | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback`, `registerAsyncCallback` |
+| VM-isolated tenants | N/A | `SandboxPool` with Linux VM guests (`execShell`, `execShellPTY`) |
+
+This is a positioning summary, not a claim of feature parity in either
+direction; PythonKit-style in-process bridges remain a perfectly good fit when
+your workload is small, trusted, and never needs to leave the app process.
+SwiftPython is built for the cases where you want isolation, parallelism, or
+large shared buffers in addition to the in-process surface.
+
+For a single executable that exercises the shared-memory arena, out-of-band
+streaming, and concurrent IPC together, see
+[`Examples/SharedTensorPipeline`](Examples/SharedTensorPipeline/).
+
 The guide covers:
 
 - in-process `Python.run`,

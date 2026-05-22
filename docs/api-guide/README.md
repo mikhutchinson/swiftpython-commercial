@@ -36,6 +36,8 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | Keep work pinned to one worker | `pool.worker(index)` / `StreamOptions.pinned(worker:)` |
 | Stream a Python generator | `evalStream`, `invokeStream`, `methodStream` |
 | Stream values plus progress | `evalEvents`, `invokeEvents`, `methodEvents` |
+| Stream from a worker without holding its IPC socket | `startOutOfBandStream` + `SharedRingBuffer` (in-process), `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` (VM / socket-backed) |
+| Zero-copy tensor sharing across host and workers | `createSharedTensor`, `withSharedBuffer`, `copyToShared` |
 | Observe worker lifecycle | `pool.events()` |
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
