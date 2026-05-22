@@ -9,7 +9,7 @@ proprietary/closed-source applications. The SwiftPython source code, generator
 pipeline, and implementation internals remain private. You do not need the
 private repository to build an app against this package.
 
-Current release: `0.5.0`
+Current release: `0.5.1`
 
 ## What Ships
 
@@ -50,7 +50,7 @@ brew install python@3.13
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.0"
+        from: "0.5.1"
     )
 ]
 ```
@@ -245,7 +245,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.0"
+    swiftpythonVersion: "0.5.1"
 )
 let image = try await builder.build()
 
@@ -285,6 +285,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.1 | ProcessPool reliability patch: CI-exercised reentrant callback fast-fail, bounded per-stream timeout cleanup, typed oversized-command errors, and failed-init worker cleanup |
 | 0.5.0 | ProcessPool async callbacks: `registerAsyncCallback`, worker `swift_bridge.call_async`, protocol-v5 callback IPC, and matched VM/Sandbox worker parity |
 | 0.4.0 | SandboxPool and VM supervisor runtime: Ubuntu image builder, VM tenant pool, shell capture/stream/PTY, quota and policy controls, packaged `VMWorker/` scripts |
 | 0.3.0 | Multi-stream worker protocol and public streaming surface cleanup |

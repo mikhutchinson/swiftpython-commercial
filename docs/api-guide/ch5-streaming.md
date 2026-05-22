@@ -154,6 +154,11 @@ wedged worker so later work starts fresh.
 For long-running but healthy streams, prefer `StreamOptions.longRunning(timeout:)`
 or a custom timeout rather than disabling timeouts globally.
 
+Timeout cleanup is stream-scoped. When a stream times out, the runtime aborts
+that stream and drains stale frames through the stream's demux channel before
+returning, so a per-call timeout override does not fall through to the
+pool-wide receive timeout.
+
 ## Progress Events
 
 Use `swift_bridge.progress` in Python to report semantic progress.

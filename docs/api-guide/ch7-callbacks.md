@@ -65,6 +65,13 @@ let registration = try await pool.registerReentrantCallback(name: "objective") {
 Reentrant callbacks avoid deadlocks by routing nested work through the worker's
 callback-safe path.
 
+Do not call `WorkerProcess.sendCommand()` directly from a callback handler for
+the same worker. That callback-stack reentry is rejected immediately as
+`PythonWorkerError.reentrantCallback`; use `WorkerCallbackContext` for nested
+same-worker work. The guard is scoped to callback-stack reentry, so unrelated
+top-level commands to the same worker may still proceed while a callback is
+active.
+
 ## Raw Callbacks
 
 Use raw callbacks when your Python side already serializes data.
