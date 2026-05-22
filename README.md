@@ -20,6 +20,9 @@ Current release: `0.5.0`
 | `VMWorker/` | Python supervisor and worker scripts for VM tenants |
 | `Entitlements/` | Hardened runtime, sandbox, and VM entitlement templates |
 | `Examples/IrisDemo/` | Complete macOS IRIS app built against the public runtime |
+| `Examples/CoreRuntimeSmoke/` | Minimal CLI: in-process `Python.run` |
+| `Examples/ProcessPoolSmoke/` | Minimal CLI: `withProcessPool` + `invokeResult` |
+| `Examples/BridgingRing/` | Pool IPC tour: Swift↔Python callbacks, `WorkerCallbackContext`, `evalEvents` |
 | `docs/api-guide/` | Public API guide and integration recipes |
 
 Keep the XCFramework, worker binary, and `VMWorker/` scripts on the same tag.
@@ -99,7 +102,7 @@ try await withProcessPool(workers: 2) { pool in
 
 Start here: [docs/api-guide](docs/api-guide/).
 
-For a complete first app, see [Examples/IrisDemo](Examples/IrisDemo/).
+For runnable samples, see [Examples](Examples/) (including [IrisDemo](Examples/IrisDemo/)).
 
 The guide covers:
 

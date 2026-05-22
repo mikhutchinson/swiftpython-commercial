@@ -40,6 +40,8 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
+| Pool callbacks / reentrant / `evalEvents` in one runnable CLI | `Examples/BridgingRing` |
+| Smoke-test wiring (`Python.run`, process pool CLIs) | `Examples/CoreRuntimeSmoke`, `Examples/ProcessPoolSmoke` |
 | Start from a complete macOS app | `Examples/IrisDemo` |
 
 ## Public Package Boundary
