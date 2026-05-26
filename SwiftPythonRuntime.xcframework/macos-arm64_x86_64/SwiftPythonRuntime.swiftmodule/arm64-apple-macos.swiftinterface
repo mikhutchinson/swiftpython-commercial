@@ -1428,6 +1428,7 @@ public enum SandboxError : Swift.Error, Swift.Sendable {
   case execOutputLimitExceeded(observed: Swift.Int, limit: Swift.Int, partialOutput: Foundation.Data)
   case sudoDisabled(Swift.String)
   case tenantQuotaExceeded(SwiftPythonRuntime.QuotaResource, limit: Swift.UInt64, observed: Swift.UInt64)
+  case tenantAlreadyActive(tenantID: SwiftPythonRuntime.SandboxTenantID, pid: Swift.Int32, lockFile: Swift.String)
   case networkEgressDenied
   case guestPanicked(tenantID: SwiftPythonRuntime.SandboxTenantID, kmsgTail: Swift.String)
   case guestUnreachable(tenantID: SwiftPythonRuntime.SandboxTenantID, lastSeenMsAgo: Swift.UInt64)
@@ -1698,6 +1699,9 @@ final public class SharedRingBuffer : @unchecked Swift.Sendable {
   final public var isAborted: Swift.Bool {
     get
   }
+  final public var writerFailed: Swift.Bool {
+    get
+  }
   final public var writePosition: Swift.UInt64 {
     get
   }
@@ -1877,7 +1881,7 @@ final public class VMPoolBootstrapper : @unchecked Swift.Sendable {
   final public func respawnWorker(id: Swift.Int) async throws -> (mainFD: Swift.Int32, sideFD: Swift.Int32, pid: _DarwinFoundation2.pid_t)
   final public func allocateOOBPort() -> Swift.UInt32
   final public func acceptOOBConnection(on port: Swift.UInt32, timeout: Foundation.TimeInterval = 10.0) async throws -> Swift.Int32
-  final public func pingSupervisor() -> Swift.Bool
+  final public func pingSupervisor(timeout: Foundation.TimeInterval? = nil) -> Swift.Bool
   final public func shutdown(saveState: Swift.Bool = true) async throws
   final public func execShellCapture(command: Swift.String, stdin: Foundation.Data?, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32? = nil) async throws -> SwiftPythonRuntime.SandboxShellResult
   final public func execShellStream(command: Swift.String, timeout: Foundation.TimeInterval, maxOutputBytes: Swift.Int, traceID: Foundation.UUID?, channelID: Swift.UInt32? = nil) async throws -> SwiftPythonRuntime.SandboxExecSession

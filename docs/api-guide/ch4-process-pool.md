@@ -307,6 +307,6 @@ teardown.
 | Worker cannot start in packaged app | Copy and re-sign `SwiftPythonWorker` inside `Contents/MacOS` |
 | Calls fail after worker respawn | Recreate worker-owned objects; old handles are stale |
 | Large results hit payload limits | Return a handle or use shared memory instead of pickling the full object |
-| Oversized command fails as protocol corruption | Update to 0.5.1 or newer; channel-0 decode failures now route to the sole waiter and surface the typed payload error |
+| Oversized command fails as protocol corruption | Update to 0.5.2 or newer; channel-0 decode failures route to the sole waiter and surface the typed payload error |
 | UI blocks waiting for a pool call | Keep pool use behind an actor/task and update UI from the main actor |
 | Multiple tenants need isolation | Use `SandboxPool` instead of a shared process pool |
