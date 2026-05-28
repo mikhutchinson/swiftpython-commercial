@@ -7,11 +7,15 @@ module.
 
 ## Run
 
-From this directory (with Python 3.13 available via the same linker path as other examples):
+From this directory:
 
 ```bash
 swift run
 ```
+
+The manifest auto-detects Homebrew's Apple Silicon and Intel Python 3.13
+prefixes. For custom Python layouts, set `PYTHON_HOME`, `PYTHONHOME`, or
+`SWIFTPYTHON_PYTHON_LIB_DIR`.
 
 ## What it proves
 

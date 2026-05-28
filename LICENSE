@@ -7,14 +7,38 @@ artifacts, documentation, and integration templates. The
 SwiftPython source code, build system, generator pipeline, private tests, and
 implementation internals are not licensed by this repository.
 
-SwiftPython is dual licensed. You may use SwiftPython under either:
+SwiftPython is available under these licensing paths. You may use SwiftPython
+under any one valid path:
 
 1. the GNU Affero General Public License v3.0 (AGPL-3.0), for applications and
    services that comply with the AGPL; or
-2. a written SwiftPython Commercial license, for proprietary or closed-source
+2. the Small Organization Commercial Grant below, for proprietary or
+   closed-source applications and services built by qualifying small
+   organizations; or
+3. a written SwiftPython Commercial license, for proprietary or closed-source
    applications that do not use the AGPL path.
 
-Permission is granted to users operating under either valid licensing path to
+The AGPL-3.0 text is available from the Free Software Foundation at
+https://www.gnu.org/licenses/agpl-3.0.html.
+
+Small Organization Commercial Grant:
+
+If you are an individual or an organization with fewer than 10 total employees
+and contractors, counted across your company, parent companies, subsidiaries,
+and other controlled affiliates, you may use the materials in this repository
+in proprietary or closed-source applications and services without a separate
+written commercial license, subject to the restrictions below.
+
+This grant ends when you no longer qualify as a small organization. You may
+continue using and distributing existing SwiftPython-based applications for up
+to 90 days after crossing the threshold solely to transition to a written
+commercial license or another valid licensing path.
+
+This grant does not permit selling, sublicensing, hosting, or redistributing
+SwiftPython itself as a standalone runtime, SDK, developer tool, hosted bridge,
+or substantially similar competing product.
+
+Permission is granted to users operating under any valid licensing path to
 use the materials in this repository, including:
 
 1. downloading and pinning this package with Swift Package Manager;
@@ -27,7 +51,8 @@ use the materials in this repository, including:
 Restrictions:
 
 1. You may not sell, sublicense, or redistribute the binary artifacts except as
-   embedded in an AGPL-compliant application, embedded in a commercially
+   embedded in an AGPL-compliant application, embedded in an application covered
+   by the Small Organization Commercial Grant, embedded in a commercially
    licensed application, or as otherwise allowed by a written commercial
    agreement with Dr. Mikholae Hutchinson.
 2. You may not reverse engineer, decompile, disassemble, or otherwise attempt to
@@ -42,7 +67,8 @@ Restrictions:
 
 Public viewing of this repository and its documentation is permitted. Production
 use of the binary artifacts requires either compliance with SwiftPython's
-AGPL-3.0 license terms or a valid SwiftPython Commercial license.
+AGPL-3.0 license terms, qualification under the Small Organization Commercial
+Grant, or a valid SwiftPython Commercial license.
 
 Third-party software, Python packages, and Apple platform components remain
 subject to their own licenses.

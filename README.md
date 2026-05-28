@@ -3,13 +3,29 @@
 Public binary distribution for the SwiftPython runtime on macOS.
 
 This repository is intentionally public so SwiftPython users can depend on it
-with Swift Package Manager. SwiftPython is dual licensed: use the AGPL-3.0 path
-for AGPL-compliant open source applications, or a commercial license for
-proprietary/closed-source applications. The SwiftPython source code, generator
-pipeline, and implementation internals remain private. You do not need the
-private repository to build an app against this package.
+with Swift Package Manager. SwiftPython is available under three paths:
+AGPL-3.0 for AGPL-compliant open source applications, a free Small Organization
+Commercial Grant for individuals and organizations with fewer than 10 total
+employees and contractors, or a written commercial license for larger
+proprietary/closed-source use. The SwiftPython source code, generator pipeline,
+and implementation internals remain private. You do not need the private
+repository to build an app against this package.
 
-Current release: `0.5.2`
+Current release: `0.5.3`
+
+Product page: [Best Byte AI](https://bestbyteai.com/)
+
+## Licensing at a Glance
+
+| Use case | Path |
+|----------|------|
+| AGPL-compliant open source app or service | AGPL-3.0 |
+| Individual or organization under 10 total employees/contractors | Free Small Organization Commercial Grant |
+| Organization with 10 or more total employees/contractors | Written SwiftPython Commercial license |
+
+The small-organization threshold counts parent companies, subsidiaries, and
+controlled affiliates. This table is only a summary; see [LICENSE](LICENSE)
+for the exact terms.
 
 ## What Ships
 
@@ -25,9 +41,22 @@ Current release: `0.5.2`
 | `Examples/BridgingRing/` | Pool IPC tour: Swift↔Python callbacks, `WorkerCallbackContext`, `evalEvents` |
 | `Examples/SharedTensorPipeline/` | Headline demo: shared-memory arena + out-of-band streaming + concurrent IPC |
 | `docs/api-guide/` | Public API guide and integration recipes |
+| `scripts/consumer_path_smoke.sh` | Verifies a separate Swift package can consume this checkout by local path |
 
 Keep the XCFramework, worker binary, and `VMWorker/` scripts on the same tag.
 Do not mix artifacts from different releases.
+
+## Distribution Modes
+
+Use Swift Package Manager, a tagged source archive, or a complete
+`SwiftPythonCommercial-<version>.zip` release asset when available. Those
+include the package manifest, worker sidecar, `VMWorker/` scripts, entitlements,
+examples, and docs.
+
+`SwiftPythonRuntime.xcframework.zip` is the runtime binary artifact only. It is
+not a complete installable distribution by itself for `PythonProcessPool`,
+SandboxPool, or the examples because those also need the matched worker and
+support files from the same release tag.
 
 ## Requirements
 
@@ -35,13 +64,17 @@ Do not mix artifacts from different releases.
 - Swift 6.0+
 - Python 3.13, Homebrew recommended for development
 - Xcode command line tools
-- Apple Silicon Mac for the VM/SandboxPool path
+- Apple Silicon Mac for the shipped `SwiftPythonWorker` sidecar and VM/SandboxPool path
 
 For Python 3.13 via Homebrew:
 
 ```bash
 brew install python@3.13
 ```
+
+The package and examples auto-detect Homebrew's Apple Silicon and Intel
+prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
+`PYTHON_HOME`, or `PYTHONHOME` before building.
 
 ## Add the Package
 
@@ -50,7 +83,7 @@ brew install python@3.13
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.2"
+        from: "0.5.3"
     )
 ]
 ```
@@ -104,6 +137,27 @@ try await withProcessPool(workers: 2) { pool in
 Start here: [docs/api-guide](docs/api-guide/).
 
 For runnable samples, see [Examples](Examples/) (including [IrisDemo](Examples/IrisDemo/)).
+The examples resolve this checkout by local path by default; no package URL or
+version environment variables are needed when running them from a clone.
+
+First-run smoke from a local checkout:
+
+```bash
+swift build
+swift test
+swift run swiftpython-smoke
+swift run --package-path Examples/CoreRuntimeSmoke
+swift run --package-path Examples/ProcessPoolSmoke
+swift run --package-path Examples/BridgingRing
+swift run -c release --package-path Examples/SharedTensorPipeline
+scripts/consumer_path_smoke.sh
+```
+
+The root package includes a small `swiftpython-smoke` executable only to make
+first contact obvious. The richer examples live under `Examples/`.
+`scripts/consumer_path_smoke.sh` creates a temporary external Swift package,
+depends on this checkout by path, and verifies both `Python.run` and
+`withProcessPool`.
 
 ## How It Compares to Other Swift ↔ Python Options
 
@@ -245,7 +299,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.2"
+    swiftpythonVersion: "0.5.3"
 )
 let image = try await builder.build()
 
@@ -276,6 +330,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 | `Library not loaded: libpython3.13.dylib` | Set `PYTHONHOME`, `PATH`, and linker flags for the Python 3.13 runtime you ship |
 | `workerNotFound(searchedPaths:)` | Copy `SwiftPythonWorker` into the app or pass `workerExecutablePath:` |
 | `protocolError` mentioning protocol v5 | Runtime, worker, and VM scripts are not from the same release tag |
+| `Bad CPU type in executable` launching `SwiftPythonWorker` | Use Apple Silicon for the shipped sidecar, or build and ship your own matching worker for Intel |
 | Worker starts in Terminal but not Finder | Your app launch environment is missing Python paths |
 | Python package imports in app but not worker | Worker process sees a different Python environment; set app launch environment consistently |
 | `VMWorker scripts not found` | Deploy `VMWorker/` or set `SWIFTPYTHON_VM_WORKER_DIR` |
@@ -285,6 +340,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.3 | Public distribution polish: local-clone example resolution, first-run smoke target, consumer path dependency smoke, free Small Organization Commercial Grant, full distribution release zip, cleaned XCFramework metadata, and matched worker discovery from SwiftPM workspaces |
 | 0.5.2 | Runtime reliability patch: callback registration ownership, bounded stream demux backpressure, OOB writer failure signaling, VM health ping timeouts, SandboxPool active tenant locks, and release artifact checksum/upload generation |
 | 0.5.1 | ProcessPool reliability patch: CI-exercised reentrant callback fast-fail, bounded per-stream timeout cleanup, typed oversized-command errors, and failed-init worker cleanup |
 | 0.5.0 | ProcessPool async callbacks: `registerAsyncCallback`, worker `swift_bridge.call_async`, protocol-v5 callback IPC, and matched VM/Sandbox worker parity |
@@ -296,4 +352,5 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 ## License
 
-Dual license: AGPL-3.0 or commercial. See [LICENSE](LICENSE).
+License: AGPL-3.0, free Small Organization Commercial Grant, or written
+commercial license. See [LICENSE](LICENSE).

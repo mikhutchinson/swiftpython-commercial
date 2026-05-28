@@ -279,6 +279,10 @@ For `.app` bundles, copy `SwiftPythonWorker` into
 `YourApp.app/Contents/MacOS/` and re-sign it with the provided entitlement
 template. The root README has the app bundle and signing commands.
 
+The current public sidecar is built for Apple Silicon. If you need Intel Mac
+worker execution, build and ship a matching `SwiftPythonWorker` for that
+architecture with the same runtime release.
+
 Do not mix worker binaries from older tags with a newer XCFramework. Protocol
 mismatches fail fast as `PythonWorkerError.protocolError`.
 
@@ -305,6 +309,7 @@ teardown.
 | Issue | Fix |
 |-------|-----|
 | Worker cannot start in packaged app | Copy and re-sign `SwiftPythonWorker` inside `Contents/MacOS` |
+| `Bad CPU type in executable` launching the worker | Use Apple Silicon for the shipped sidecar, or ship a matching Intel worker |
 | Calls fail after worker respawn | Recreate worker-owned objects; old handles are stale |
 | Large results hit payload limits | Return a handle or use shared memory instead of pickling the full object |
 | Oversized command fails as protocol corruption | Update to 0.5.2 or newer; channel-0 decode failures route to the sole waiter and surface the typed payload error |

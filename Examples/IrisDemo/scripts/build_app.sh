@@ -39,10 +39,16 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
 cp "$BIN_DIR/IrisDemo" "$APP_DIR/Contents/MacOS/$APP_NAME"
 
-RESOURCE_BUNDLE="$(find "$BIN_DIR" -maxdepth 1 -type d -name '*.resources' | head -1 || true)"
-if [ -n "$RESOURCE_BUNDLE" ]; then
+FOUND_RESOURCE_BUNDLE=0
+while IFS= read -r -d '' RESOURCE_BUNDLE; do
+    FOUND_RESOURCE_BUNDLE=1
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
     cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/MacOS/"
+done < <(find "$BIN_DIR" -maxdepth 1 -type d \( -name '*.resources' -o -name '*.bundle' \) -print0)
+
+if [ "$FOUND_RESOURCE_BUNDLE" -eq 0 ]; then
+    echo "SwiftPM resource bundle not found in $BIN_DIR" >&2
+    exit 1
 fi
 
 if [ -f "$REPO_DIR/SwiftPythonWorker" ]; then

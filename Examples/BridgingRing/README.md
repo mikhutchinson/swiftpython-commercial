@@ -16,19 +16,20 @@ Showcase for **SwiftPython process-pool features** that classic in-process bridg
 
 ## Run
 
-Use **`SwiftPythonWorker`** from **this checkout or release tarball** (same pairing
-as the XCFramework dependency), never a stray path you assume on disk:
+From the repository root:
 
 ```bash
-# From distro root — replace with your clone path deliberately as needed:
-SWIFTPYTHON_WORKER_PATH="$PWD/SwiftPythonWorker" swift run --package-path Examples/BridgingRing
+swift run --package-path Examples/BridgingRing
 ```
 
-Or from **`Examples/BridgingRing`**:
+Or from this package directory:
 
 ```bash
-SWIFTPYTHON_WORKER_PATH="$PWD/../../SwiftPythonWorker" swift run
+swift run
 ```
+
+The runtime discovers the `SwiftPythonWorker` from this same checkout. For your
+own app, ship the worker and XCFramework from the same release tag.
 
 ## Expected output
 

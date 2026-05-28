@@ -5,24 +5,21 @@ workers running CPython—the same shape as the second README smoke test (`math.
 
 ## Run
 
-Use the **`SwiftPythonWorker`** that ships next to **`SwiftPythonRuntime.xcframework`**
-in this **same `swiftpython-commercial` distro** — not binaries from unrelated
-directories.
-
-Either run from the **repository root**:
+From the repository root:
 
 ```bash
-SWIFTPYTHON_WORKER_PATH="$PWD/SwiftPythonWorker" swift run --package-path Examples/ProcessPoolSmoke
+swift run --package-path Examples/ProcessPoolSmoke
 ```
 
-or `cd Examples/ProcessPoolSmoke` then:
+Or from this package directory:
 
 ```bash
-SWIFTPYTHON_WORKER_PATH="$PWD/../../SwiftPythonWorker" swift run
+swift run
 ```
 
-Without that, the runtime still looks for `SwiftPythonWorker` next to your built
-binary or on `PATH`; see the [root README](../../README.md#app-bundle-layout).
+The runtime discovers the `SwiftPythonWorker` from this same checkout. For your
+own app, ship the worker and XCFramework from the same release tag; see the
+[root README](../../README.md#app-bundle-layout).
 
 ## What it proves
 

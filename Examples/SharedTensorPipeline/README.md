@@ -19,12 +19,10 @@ probes confirm the IPC socket isn't blocked.
 
 ## Run
 
-From the distribution root (worker resolves to the sibling `SwiftPythonWorker`):
+From the distribution root:
 
 ```bash
-SWIFTPYTHON_WORKER_PATH="$PWD/SwiftPythonWorker" \
-  swift run -c release \
-  --package-path Examples/SharedTensorPipeline
+swift run -c release --package-path Examples/SharedTensorPipeline
 ```
 
 `-c release` matters for step 2 — debug builds bounds-check every element of
@@ -34,8 +32,11 @@ the 1 Mi double write and bury the real bandwidth. Release exposes the actual
 From inside the package directory:
 
 ```bash
-SWIFTPYTHON_WORKER_PATH="$PWD/../../SwiftPythonWorker" swift run -c release
+swift run -c release
 ```
+
+The runtime discovers the `SwiftPythonWorker` from this same checkout. For your
+own app, ship the worker and XCFramework from the same release tag.
 
 ## Pipeline (six numbered stages)
 
