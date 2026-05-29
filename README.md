@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.3`
+Current release: `0.5.4`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.3"
+        from: "0.5.4"
     )
 ]
 ```
@@ -299,7 +299,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.3"
+    swiftpythonVersion: "0.5.4"
 )
 let image = try await builder.build()
 
@@ -340,6 +340,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.4 | Oversized-payload channel recovery: send-side payload caps and parent-side frame draining keep IPC channels usable after typed payload-too-large failures |
 | 0.5.3 | Public distribution polish: local-clone example resolution, first-run smoke target, consumer path dependency smoke, free Small Organization Commercial Grant, full distribution release zip, cleaned XCFramework metadata, and matched worker discovery from SwiftPM workspaces |
 | 0.5.2 | Runtime reliability patch: callback registration ownership, bounded stream demux backpressure, OOB writer failure signaling, VM health ping timeouts, SandboxPool active tenant locks, and release artifact checksum/upload generation |
 | 0.5.1 | ProcessPool reliability patch: CI-exercised reentrant callback fast-fail, bounded per-stream timeout cleanup, typed oversized-command errors, and failed-init worker cleanup |
