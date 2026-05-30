@@ -661,11 +661,19 @@ extension SwiftPythonRuntime.PythonProcessPool {
   @discardableResult
   public func registerAsyncCallback<T, U, R>(name: Swift.String, callback: @escaping @Sendable (T, U) async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
+  public func registerAsyncCallback<T, U, V, R>(name: Swift.String, callback: @escaping @Sendable (T, U, V) async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerAsyncCallback<T, U, V, W, R>(name: Swift.String, callback: @escaping @Sendable (T, U, V, W) async throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, W : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
   public func registerAsyncCallback(name: Swift.String, callback: @escaping @Sendable ([Any]) async throws -> Any) async throws -> SwiftPythonRuntime.CallbackRegistration
   @discardableResult
   public func registerCallback<T, R>(name: Swift.String, callback: @escaping @Sendable (T) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
   public func registerCallback<T, U, R>(name: Swift.String, callback: @escaping @Sendable (T, U) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerCallback<T, U, V, R>(name: Swift.String, callback: @escaping @Sendable (T, U, V) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerCallback<T, U, V, W, R>(name: Swift.String, callback: @escaping @Sendable (T, U, V, W) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, W : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
   public func registerCallback(name: Swift.String, callback: @escaping @Sendable ([Any]) throws -> Any) async throws -> SwiftPythonRuntime.CallbackRegistration
   @discardableResult
@@ -674,6 +682,10 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func registerReentrantCallback<T, R>(name: Swift.String, callback: @escaping @Sendable (SwiftPythonRuntime.WorkerCallbackContext, T) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
   public func registerReentrantCallback<T, U, R>(name: Swift.String, callback: @escaping @Sendable (SwiftPythonRuntime.WorkerCallbackContext, T, U) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerReentrantCallback<T, U, V, R>(name: Swift.String, callback: @escaping @Sendable (SwiftPythonRuntime.WorkerCallbackContext, T, U, V) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
+  @discardableResult
+  public func registerReentrantCallback<T, U, V, W, R>(name: Swift.String, callback: @escaping @Sendable (SwiftPythonRuntime.WorkerCallbackContext, T, U, V, W) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where T : SwiftPythonRuntime.PythonConvertible, U : SwiftPythonRuntime.PythonConvertible, V : SwiftPythonRuntime.PythonConvertible, W : SwiftPythonRuntime.PythonConvertible, R : SwiftPythonRuntime.PythonConvertible
   @discardableResult
   public func registerReentrantCallback<R>(name: Swift.String, callback: @escaping @Sendable (SwiftPythonRuntime.WorkerCallbackContext) throws -> R) async throws -> SwiftPythonRuntime.CallbackRegistration where R : SwiftPythonRuntime.PythonConvertible
   @discardableResult

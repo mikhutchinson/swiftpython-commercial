@@ -25,8 +25,11 @@ swift_bridge.call("add", 3, 7)
 Keep `registration` alive for as long as Python should be able to call it.
 `CallbackRegistration` unregisters when it is deallocated.
 
-Typed callback overloads support one-argument and two-argument forms. There is
-also a raw `[Any]` form for dynamic argument lists:
+Typed callback overloads support one through four arguments. Async callbacks
+also include a zero-argument typed overload, and reentrant callbacks support
+`WorkerCallbackContext` plus zero through four arguments. Use a single
+payload/envelope value beyond four fields, or the raw `[Any]` form for dynamic
+argument lists:
 
 ```swift
 let anyArgs = try await pool.registerCallback(name: "describe") {
