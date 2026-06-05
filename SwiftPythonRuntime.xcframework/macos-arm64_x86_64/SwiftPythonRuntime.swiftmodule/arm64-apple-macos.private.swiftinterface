@@ -476,19 +476,21 @@ public struct ResourceSnapshot : Swift.Sendable {
   public let systemMemoryPressure: Swift.Double
   public let freeMemoryBytes: Swift.UInt64
   public let thermalLevel: SwiftPythonRuntime.ThermalLevel
+  public let systemCPUFraction: Swift.Double
   public let workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats]
-  public init(timestamp: _Concurrency.ContinuousClock.Instant, systemMemoryPressure: Swift.Double, freeMemoryBytes: Swift.UInt64, thermalLevel: SwiftPythonRuntime.ThermalLevel, workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats])
+  public init(timestamp: _Concurrency.ContinuousClock.Instant, systemMemoryPressure: Swift.Double, freeMemoryBytes: Swift.UInt64, thermalLevel: SwiftPythonRuntime.ThermalLevel, workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats], systemCPUFraction: Swift.Double = 0.0)
 }
 public struct ResourceMonitorConfig : Swift.Sendable {
   public var sampleInterval: Foundation.TimeInterval
   public var memoryPressureThrottle: Swift.Double
   public var memoryPressureReject: Swift.Double
   public var thermalThrottleLevel: SwiftPythonRuntime.ThermalLevel
+  public var systemCPUThrottle: Swift.Double
   public var workerCPUThrottlePercent: Swift.Double
   public var idleShutdownTimeout: Foundation.TimeInterval
   public var spawnPressureTimeout: Foundation.TimeInterval
   public var enabled: Swift.Bool
-  public init(sampleInterval: Foundation.TimeInterval = 2.0, memoryPressureThrottle: Swift.Double = 0.85, memoryPressureReject: Swift.Double = 0.95, thermalThrottleLevel: SwiftPythonRuntime.ThermalLevel = .fair, workerCPUThrottlePercent: Swift.Double = 90.0, idleShutdownTimeout: Foundation.TimeInterval = 60.0, spawnPressureTimeout: Foundation.TimeInterval = 30.0, enabled: Swift.Bool? = nil)
+  public init(sampleInterval: Foundation.TimeInterval = 2.0, memoryPressureThrottle: Swift.Double = 0.85, memoryPressureReject: Swift.Double = 0.95, thermalThrottleLevel: SwiftPythonRuntime.ThermalLevel = .fair, systemCPUThrottle: Swift.Double = 0.85, workerCPUThrottlePercent: Swift.Double = 90.0, idleShutdownTimeout: Foundation.TimeInterval = 60.0, spawnPressureTimeout: Foundation.TimeInterval = 30.0, enabled: Swift.Bool? = nil)
   public static let `default`: SwiftPythonRuntime.ResourceMonitorConfig
   public static let disabled: SwiftPythonRuntime.ResourceMonitorConfig
 }
