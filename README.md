@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.8`
+Current release: `0.5.9`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.8"
+        from: "0.5.9"
     )
 ]
 ```
@@ -299,7 +299,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.8"
+    swiftpythonVersion: "0.5.9"
 )
 let image = try await builder.build()
 
@@ -340,6 +340,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.9 | macOS spawn admission: worker startup now allows normal reclaimable-memory states such as 69% pressure with about 1.8 GiB available, while still rejecting genuinely scarce memory and hard thermal pressure |
 | 0.5.8 | Host resource-pressure gating: ProcessPool now throttles on aggregate host CPU pressure, gates cold worker spawn before selection, marks initial workers idle for shedding, and avoids Python `resource_tracker` warnings for Swift-owned OOB shared memory |
 | 0.5.6 | Shutdown-safe stream recovery: active value/event streams and manual respawn skip worker repair after pool drain or shutdown |
 | 0.5.5 | Typed ProcessPool callback overloads through four arguments across sync, async, and reentrant APIs |

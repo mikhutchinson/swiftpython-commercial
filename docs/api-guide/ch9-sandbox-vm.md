@@ -5,7 +5,7 @@ runtime. Use it when you need stronger isolation than a local process pool:
 tenant-specific dependencies, shell tools, untrusted jobs, per-tenant secrets,
 or Linux-only packages.
 
-The v0.5.8 commercial package ships the three required pieces together:
+The v0.5.9 commercial package ships the three required pieces together:
 
 - `SwiftPythonRuntime.xcframework`
 - `SwiftPythonWorker`
@@ -23,7 +23,7 @@ let imagesDir = "\(NSHomeDirectory())/Library/Application Support/MyApp/Images"
 
 let builder = UbuntuImageBuilder(
     outputDir: imagesDir,
-    swiftpythonVersion: "0.5.8",
+    swiftpythonVersion: "0.5.9",
     cpuCount: 2,
     memoryMB: 2048,
     diskSizeMB: 8192
@@ -41,7 +41,7 @@ If your app ships a prebuilt image, verify it before use:
 ```swift
 let manifest = try SandboxImageVerifier.verify(
     diskPath: baseImagePath,
-    minimumSwiftPythonVersion: "0.5.8"
+    minimumSwiftPythonVersion: "0.5.9"
 )
 
 print(manifest.sha256)
