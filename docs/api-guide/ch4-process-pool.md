@@ -217,6 +217,90 @@ Event cases cover worker spawn/respawn/death, worker state changes,
 quarantine, idle shedding, pool state changes, drain completion, resource
 pressure, orphaned callbacks, and dropped subscriber events.
 
+## Structured Telemetry
+
+Use `pool.telemetry(bufferSize:)` when the host needs authoritative worker
+diagnostics instead of reconstructing lifecycle boundaries around each call.
+Telemetry is optional and low overhead; if nobody subscribes, the pool does not
+build per-command event payloads.
+
+```swift
+let telemetryTask = Task {
+    for await event in pool.telemetry() {
+        switch event {
+        case .commandEnded(let command):
+            if case .failure(let diagnostic)? = command.outcome {
+                logger.error("""
+                span=\(command.spanID) surface=\(command.descriptor.surface.rawValue) \
+                worker=\(command.worker.workerID) pid=\(command.worker.pid) \
+                classification=\(diagnostic.classification.rawValue) \
+                noTraceback=\(diagnostic.noPythonTracebackCaptured)
+                """)
+            }
+        case .respawn(let respawn):
+            logger.warning("""
+            worker \(respawn.workerID) respawned \
+            oldPID=\(respawn.oldPID) newPID=\(respawn.newPID) \
+            reason=\(String(describing: respawn.reason)) \
+            crashEvidence=\(respawn.crashEvidenceExists)
+            """)
+        case .poolStateChanged(let state) where state.to == .shutdown:
+            return
+        default:
+            break
+        }
+    }
+}
+
+let hostContext = ProcessPoolTelemetryContext(
+    traceID: "session-42",
+    metadata: [
+        "active_turn_id": "turn-7",
+        "app_lifecycle_state": "switching",
+        "host_command_name": "summarize"
+    ]
+)
+
+let summary: String = try await pool.invokeResult(
+    module: "summarizer",
+    function: "run",
+    args: [.python("document-id-123")],
+    telemetry: hostContext
+)
+
+telemetryTask.cancel()
+```
+
+For broader scopes, wrap work in `ProcessPoolTelemetry.withContext(...)`.
+Explicit `telemetry:` arguments win over task-local context.
+
+```swift
+try await ProcessPoolTelemetry.withContext(hostContext) {
+    _ = try await pool.eval("import numpy as np")
+    _ = try await pool.invoke(module: "numpy", function: "arange", args: [.python(10)])
+}
+```
+
+Telemetry events include:
+
+| Event | Carries |
+|-------|---------|
+| `.commandStarted` / `.commandEnded` / `.commandRejected` | Span id, descriptor, worker id, PID, generation, channel, timestamps, duration, outcome |
+| `.callback` | Registration, invocation, timeout, orphan, unregister, callback kind, duration, inherited context |
+| `.stream` | Stream id, channel, active/first chunk/last chunk/timeout/cancel/termination state |
+| `.sideChannel` | Submitted, accepted, unavailable, or timeout/no-response side-channel state |
+| `.respawn` | Reason, old/new PID, generation, causing span, and whether crash evidence exists |
+| `.poolStateChanged` / `.workerStateChanged` | Running, draining, shutting down, shutdown, degraded/quarantined worker states where available |
+
+`ProcessPoolErrorDiagnostic` classifies failures from runtime state, not log
+strings. Python exceptions include type, message, and traceback when the worker
+captured one. Timeout, no-response, transport, supervisor, and crash evidence
+events set `noPythonTracebackCaptured` explicitly when no traceback exists.
+
+Telemetry deliberately omits command payloads, prompts, callback arguments,
+tool output, and arbitrary Python values. Host metadata is echoed as opaque
+strings only; SwiftPython does not interpret it.
+
 ## Backpressure
 
 ```swift

@@ -17,7 +17,7 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | 1 - Core Runtime | [ch1-core-runtime.md](ch1-core-runtime.md) | In-process `Python.run`, dynamic Python objects, errors, context managers |
 | 2 - Data Interop | [ch2-data-interop.md](ch2-data-interop.md) | Swift/Python conversion, remote arguments, buffers, shared tensors |
 | 3 - Concurrency & Handles | [ch3-concurrency-handles.md](ch3-concurrency-handles.md) | GIL rules, `PyHandle`, `OwnedPyHandle`, handle lifetime |
-| 4 - ProcessPool | [ch4-process-pool.md](ch4-process-pool.md) | Multi-process workers, lifecycle, events, resource limits |
+| 4 - ProcessPool | [ch4-process-pool.md](ch4-process-pool.md) | Multi-process workers, lifecycle, telemetry, events, resource limits |
 | 5 - Streaming | [ch5-streaming.md](ch5-streaming.md) | Python generators, cancellation, progress events, long-running streams |
 | 6 - DAG Orchestration | [ch6-dag.md](ch6-dag.md) | Dependency-aware parallel jobs over a pool |
 | 7 - Callbacks | [ch7-callbacks.md](ch7-callbacks.md) | Python calling Swift functions, reentrant work, streaming callbacks |
@@ -34,6 +34,7 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | Hold a remote worker object with automatic cleanup | `OwnedPyHandle` |
 | Run CPU-bound Python in parallel | `PythonProcessPool` |
 | Keep work pinned to one worker | `pool.worker(index)` / `StreamOptions.pinned(worker:)` |
+| Trace command, callback, stream, side-channel, and respawn lifecycle | `pool.telemetry()` + `ProcessPoolTelemetryContext` |
 | Stream a Python generator | `evalStream`, `invokeStream`, `methodStream` |
 | Stream values plus progress | `evalEvents`, `invokeEvents`, `methodEvents` |
 | Stream from a worker without holding its IPC socket | `startOutOfBandStream` + `SharedRingBuffer` (in-process), `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` (VM / socket-backed) |

@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.10`
+Current release: `0.5.12`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.10"
+        from: "0.5.12"
     )
 ]
 ```
@@ -175,6 +175,7 @@ with a documented IPC protocol on top.
 | Shared-memory tensors across processes | N/A | `pool.createSharedTensor` + `withSharedBuffer` (typed Swift access into POSIX shm) |
 | Out-of-band streaming | N/A | `SharedRingBuffer` (POSIX shm) **or** `SocketOOBStreamBuffer` (UDS / vsock) — stream without holding the worker IPC socket, process-pool or VM tenant |
 | Python → Swift callbacks | N/A | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback`, `registerAsyncCallback` |
+| Worker telemetry | Manual host logging | Structured `ProcessPoolTelemetryEvent` stream with command spans, worker identity, callback/stream state, respawn evidence, Python exception metadata, and host correlation context |
 | VM-isolated tenants | N/A | `SandboxPool` with Linux VM guests (`execShell`, `execShellPTY`) |
 
 This is a positioning summary, not a claim of feature parity in either
@@ -193,6 +194,7 @@ The guide covers:
 - Swift/Python conversion and buffers,
 - `PyHandle` and `OwnedPyHandle`,
 - `PythonProcessPool`,
+- structured ProcessPool telemetry,
 - streaming values and progress,
 - DAG orchestration,
 - Python-to-Swift callbacks,
@@ -299,7 +301,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.10"
+    swiftpythonVersion: "0.5.12"
 )
 let image = try await builder.build()
 
@@ -340,6 +342,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.12 | Structured ProcessPool telemetry/tracing: command spans, worker PID/generation, host correlation context, callback/stream/side-channel state, respawn evidence, timeout/no-response classification, and redaction-safe Python exception diagnostics |
 | 0.5.10 | Respawn recovery: default per-worker respawn budget is 9, repeated identical-error recovery is capped at 3 SHA-256-matched attempts, and forced cleanup interrupts blocked host sockets so a forced recycle cannot hang behind its own reader/writer |
 | 0.5.9 | macOS spawn admission: worker startup now allows normal reclaimable-memory states such as 69% pressure with about 1.8 GiB available, while still rejecting genuinely scarce memory and hard thermal pressure |
 | 0.5.8 | Host resource-pressure gating: ProcessPool now throttles on aggregate host CPU pressure, gates cold worker spawn before selection, marks initial workers idle for shedding, and avoids Python `resource_tracker` warnings for Swift-owned OOB shared memory |
