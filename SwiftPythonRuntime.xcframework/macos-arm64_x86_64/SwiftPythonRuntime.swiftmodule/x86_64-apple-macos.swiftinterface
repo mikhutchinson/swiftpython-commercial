@@ -675,7 +675,7 @@ public enum ProcessPoolTelemetry {
   public static var context: SwiftPythonRuntime.ProcessPoolTelemetryContext {
     get
   }
-  public static func withContext<T>(_ context: SwiftPythonRuntime.ProcessPoolTelemetryContext, operation: () async throws -> T) async rethrows -> T
+  public static func withContext<T>(_ context: SwiftPythonRuntime.ProcessPoolTelemetryContext, operation: @Sendable () async throws -> T) async rethrows -> T
 }
 public struct ProcessPoolWorkerIdentity : Swift.Sendable, Swift.Equatable {
   public let workerID: Swift.Int
