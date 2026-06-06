@@ -574,6 +574,8 @@ public enum PoolEvent : Swift.Sendable {
   }
   public enum DeathReason : Swift.Sendable, Swift.Equatable {
     case respawnBudgetExhausted(attempts: Swift.Int)
+    case respawnBudgetExhaustedForError(attempts: Swift.Int, errorSHA256: Swift.String)
+    case respawnIdenticalErrorBudgetExhausted(errorSHA256: Swift.String, attempts: Swift.Int)
     case vmUnhealthy
     case respawnFailed(message: Swift.String)
     public static func == (a: SwiftPythonRuntime.PoolEvent.DeathReason, b: SwiftPythonRuntime.PoolEvent.DeathReason) -> Swift.Bool
@@ -874,14 +876,18 @@ extension SwiftPythonRuntime.PythonProcessPool {
     get
   }
   final public let maxRespawns: Swift.Int
+  final public let maxIdenticalErrorRespawns: Swift.Int
+  public var respawnBudget: SwiftPythonRuntime.RespawnBudget {
+    get
+  }
   public var vmDisplayRef: SwiftPythonRuntime.VMDisplayRef? {
     get async
   }
-  public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3) async throws
-  public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
-  public init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
-  public init(workers workerCount: Swift.Int, transport: any SwiftPythonRuntime.WorkerTransport, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
-  public convenience init(workers workerCount: Swift.Int, backend: SwiftPythonRuntime.PythonProcessPool.WorkerBackend, fallbackToProcess: Swift.Bool = false, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
+  public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns) async throws
+  public convenience init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
+  public init(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
+  public init(workers workerCount: Swift.Int, transport: any SwiftPythonRuntime.WorkerTransport, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
+  public convenience init(workers workerCount: Swift.Int, backend: SwiftPythonRuntime.PythonProcessPool.WorkerBackend, fallbackToProcess: Swift.Bool = false, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
   public static func recommended(for workload: SwiftPythonRuntime.WorkloadType) -> Swift.Int
   @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
@@ -1158,7 +1164,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
         return try await withTemporaryHandle(handle, body)
     }
 }
-public func withProcessPool<T>(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = 3, blasThreads: Swift.Int? = nil, _ body: @Sendable (SwiftPythonRuntime.PythonProcessPool) async throws -> T) async throws -> T where T : Swift.Sendable
+public func withProcessPool<T>(workers workerCount: Swift.Int, sharedMemory: SwiftPythonRuntime.SharedMemoryConfig = .default, workerExecutablePath: Swift.String? = nil, ipc: SwiftPythonRuntime.IPCConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, blasThreads: Swift.Int? = nil, _ body: @Sendable (SwiftPythonRuntime.PythonProcessPool) async throws -> T) async throws -> T where T : Swift.Sendable
 @frozen public enum RemotePythonValue : Swift.Sendable {
   case python(any SwiftPythonRuntime.PythonConvertible)
   case handle(SwiftPythonRuntime.PyHandle)
@@ -1250,6 +1256,15 @@ internal func remoteKwargsDictionary(from pairs: [SwiftPythonRuntime.RemoteKwarg
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
     get
   }
+}
+public struct RespawnBudget : Swift.Sendable, Swift.Codable, Swift.Equatable {
+  public var maxTotalRespawns: Swift.Int
+  public var maxIdenticalErrorRespawns: Swift.Int
+  public init(maxTotalRespawns: Swift.Int = 9, maxIdenticalErrorRespawns: Swift.Int = 3)
+  public static let `default`: SwiftPythonRuntime.RespawnBudget
+  public static func == (a: SwiftPythonRuntime.RespawnBudget, b: SwiftPythonRuntime.RespawnBudget) -> Swift.Bool
+  public func encode(to encoder: any Swift.Encoder) throws
+  public init(from decoder: any Swift.Decoder) throws
 }
 public enum SandboxExecStream : Swift.String, Swift.Sendable, Swift.Codable, Swift.Hashable {
   case stdout
