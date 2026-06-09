@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.13`
+Current release: `0.5.14`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.13"
+        from: "0.5.14"
     )
 ]
 ```
@@ -301,7 +301,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.13"
+    swiftpythonVersion: "0.5.14"
 )
 let image = try await builder.build()
 
@@ -342,6 +342,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.14 | Busy-worker-safe idle shedding: `shedIdleWorkers(force:)` never shuts down a worker with an active command/stream response channel or an unanswered worker→host callback, so critical-pressure force sheds cannot fail a live stream with a spurious "Worker N is not responding", orphan in-flight callbacks, or trigger an immediate self-defeating respawn |
 | 0.5.13 | Structured ProcessPool telemetry/tracing: command spans, worker PID/generation, host correlation context, callback/stream/side-channel state, respawn evidence, timeout/no-response classification, redaction-safe Python exception diagnostics, and Swift 6 main-actor-safe `ProcessPoolTelemetry.withContext` |
 | 0.5.12 | Superseded by 0.5.13; initial telemetry release needed the Swift 6 `withContext` sendability correction for main-actor consumer entry points |
 | 0.5.10 | Respawn recovery: default per-worker respawn budget is 9, repeated identical-error recovery is capped at 3 SHA-256-matched attempts, and forced cleanup interrupts blocked host sockets so a forced recycle cannot hang behind its own reader/writer |
