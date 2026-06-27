@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The app loads libpython + native wheel .so files (numpy/scipy/sklearn).
+         Hardened runtime blocks loading unsigned/other-team libraries without this. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Allows the app to set PYTHONHOME / PYTHONPATH for the bundled interpreter
+         before spawning the worker sidecar. -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+</dict>
+</plist>
