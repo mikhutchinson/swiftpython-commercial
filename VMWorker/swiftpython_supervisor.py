@@ -17,6 +17,12 @@ Control channel protocol (JSON over length-prefixed frames, same header as Messa
     Request:  {"status": {}}
     Response: {"status": {"workers": {0: {"pid": 12345, "alive": true}, ...}}}
 
+    Request:  {"idle_status": {}}
+    Response: {"idle_status": {"idle": true, "workers": 0, "execs": 0}}
+
+    Request:  {"rotate_auth_secret": {"secretBase64": "..."}}
+    Response: {"auth_rotated": {"supervisorVersion": 2, "protocolVersion": 5}}
+
     Request:  {"shutdown": {}}
     Response: {"shutting_down": {}}
 """
@@ -104,14 +110,23 @@ def send_response(sock: socket.socket, response: dict):
 
 
 class Supervisor:
-    def __init__(self, control_sock: socket.socket, poweroff_on_disconnect: bool = True):
+    def __init__(
+        self,
+        control_sock: socket.socket,
+        poweroff_on_disconnect: bool = True,
+        auth_secret: bytes | None = None,
+    ):
         self.control_sock = control_sock
         self.workers: dict[int, subprocess.Popen] = {}
         self.execs: dict[int, dict] = {}
         self.execs_lock = threading.Lock()
         self.send_lock = threading.Lock()
         self.worker_cgroups: dict[int, str] = {}
-        self.auth_secret = os.environ.get("SWIFTPYTHON_SUPERVISOR_SECRET", "").encode("utf-8")
+        self.auth_secret = (
+            auth_secret
+            if auth_secret is not None
+            else os.environ.get("SWIFTPYTHON_SUPERVISOR_SECRET", "").encode("utf-8")
+        )
         self.auth_nonce = os.urandom(32).hex()
         self.authenticated = not bool(self.auth_secret)
         self.poweroff_on_disconnect = poweroff_on_disconnect
@@ -122,12 +137,13 @@ class Supervisor:
         self.exec_user = "user"
         self.exec_home = "/home/user"
         self.running = True
+        self.relisten_on_disconnect = False
 
     def _send_response(self, response: dict):
         with self.send_lock:
             send_response(self.control_sock, response)
 
-    def run(self):
+    def run(self) -> bool:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, self._handle_termination_signal)
         signal.signal(signal.SIGINT, self._handle_termination_signal)
@@ -139,6 +155,10 @@ class Supervisor:
                 response = self._handle_command(cmd)
                 if response is not None:
                     self._send_response(response)
+                if self.relisten_on_disconnect:
+                    print("[supervisor] Snapshot prep complete, returning to listen",
+                          file=sys.stderr, flush=True)
+                    break
             except ConnectionError:
                 print("[supervisor] Control channel closed, shutting down", file=sys.stderr, flush=True)
                 if self.poweroff_on_disconnect:
@@ -151,7 +171,10 @@ class Supervisor:
                 except Exception:
                     break
 
+        if self.relisten_on_disconnect:
+            return True
         self._shutdown_all()
+        return False
 
     def _handle_command(self, cmd: dict) -> dict:
         cmd_name = next(iter(cmd))
@@ -192,6 +215,12 @@ class Supervisor:
             return self._exec_signal(cmd_data)
         if cmd_name == "status":
             return self._get_status()
+        if cmd_name == "idle_status":
+            return self._idle_status()
+        if cmd_name == "rotate_auth_secret":
+            return self._rotate_auth_secret(cmd_data)
+        if cmd_name == "prepare_snapshot":
+            return self._prepare_snapshot()
         if cmd_name == "shutdown":
             self.running = False
             return {"shutting_down": {}}
@@ -345,6 +374,19 @@ class Supervisor:
             return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 5}}
         return {"auth_failed": {"reason": "bad hmac"}}
 
+    def _rotate_auth_secret(self, data: dict) -> dict:
+        encoded = data.get("secretBase64", "")
+        try:
+            new_secret = base64.b64decode(encoded, validate=True)
+        except Exception:
+            return {"error": {"message": "rotate_auth_secret requires valid base64 secret"}}
+        if not new_secret:
+            return {"error": {"message": "rotate_auth_secret requires a non-empty secret"}}
+        self.auth_secret = new_secret
+        self.auth_nonce = os.urandom(32).hex()
+        self.authenticated = False
+        return {"auth_rotated": {"supervisorVersion": 2, "protocolVersion": 5}}
+
     def _spawn_worker(self, data: dict) -> dict:
         worker_id = data["id"]
         vsock_port = data["port"]
@@ -443,6 +485,43 @@ class Supervisor:
                 if entry["proc"].poll() is None
             }
         return {"status": {"workers": workers_status, "execs": exec_status}}
+
+    def _idle_status(self) -> dict:
+        live_workers = 0
+        for proc in self.workers.values():
+            if proc.poll() is None:
+                live_workers += 1
+        with self.execs_lock:
+            live_execs = sum(1 for entry in self.execs.values() if entry["proc"].poll() is None)
+        return {
+            "idle_status": {
+                "idle": live_workers == 0 and live_execs == 0,
+                "workers": live_workers,
+                "execs": live_execs,
+            }
+        }
+
+    def _prepare_snapshot(self) -> dict:
+        idle = self._idle_status()["idle_status"]
+        if not idle["idle"]:
+            return {
+                "error": {
+                    "message": (
+                        f"Snapshot requires idle supervisor: "
+                        f"workers={idle['workers']} execs={idle['execs']}"
+                    )
+                }
+            }
+        self.poweroff_on_disconnect = False
+        self.relisten_on_disconnect = True
+        return {
+            "snapshot_ready": {
+                "workers": idle["workers"],
+                "execs": idle["execs"],
+                "supervisorVersion": 2,
+                "protocolVersion": 5,
+            }
+        }
 
     def _send_exec_chunk(self, channel_id: int, stream: str, data: bytes):
         if not data:
@@ -696,6 +775,8 @@ class Supervisor:
 
     def _exec_stdin(self, data: dict) -> dict:
         channel_id = int(data["channelID"])
+        payload = base64.b64decode(data.get("bytes", "")) if data.get("bytes") else b""
+        eof = bool(data.get("eof", False))
         deadline = time.monotonic() + 1.0
         entry = None
         while time.monotonic() < deadline:
@@ -705,8 +786,9 @@ class Supervisor:
                 break
             time.sleep(0.01)
         if not entry:
+            if eof and not payload:
+                return {"exec_stdin_ack": {"channelID": channel_id}}
             return {"exec_error": {"channelID": channel_id, "code": "internalError", "message": "stdin unavailable"}}
-        payload = base64.b64decode(data.get("bytes", "")) if data.get("bytes") else b""
         if entry.get("pty") and entry.get("master_fd") is not None:
             if payload:
                 os.write(entry["master_fd"], payload)
@@ -718,7 +800,7 @@ class Supervisor:
         if payload:
             stdin.write(payload)
             stdin.flush()
-        if data.get("eof", False):
+        if eof:
             stdin.close()
         return {"exec_stdin_ack": {"channelID": channel_id}}
 
@@ -809,9 +891,30 @@ def main():
 
     if len(sys.argv) >= 3 and sys.argv[1] == "--uds":
         # UDS mode for local testing: --uds <socket_path>
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.connect(sys.argv[2])
-        poweroff_on_disconnect = False
+        auth_secret = os.environ.get("SWIFTPYTHON_SUPERVISOR_SECRET", "").encode("utf-8")
+        try:
+            while True:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect(sys.argv[2])
+                supervisor = Supervisor(
+                    sock,
+                    poweroff_on_disconnect=False,
+                    auth_secret=auth_secret,
+                )
+                try:
+                    relisten = supervisor.run()
+                except KeyboardInterrupt:
+                    relisten = False
+                finally:
+                    auth_secret = supervisor.auth_secret
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+                if not relisten:
+                    break
+        finally:
+            os._exit(0)
     else:
         # Listen on vsock for host connection.
         # The host uses VZVirtioSocketDevice.connect(toPort:) to reach us.
@@ -823,20 +926,32 @@ def main():
         server.listen(1)
         print(f"[supervisor] Listening on vsock port {port}",
               file=sys.stderr, flush=True)
-        sock, _ = server.accept()
-        server.close()
-        print(f"[supervisor] Host connected on vsock port {port}",
-              file=sys.stderr, flush=True)
-        poweroff_on_disconnect = True
-
-    supervisor = Supervisor(sock, poweroff_on_disconnect=poweroff_on_disconnect)
-    try:
-        supervisor.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sock.close()
-        os._exit(0)
+        auth_secret = os.environ.get("SWIFTPYTHON_SUPERVISOR_SECRET", "").encode("utf-8")
+        try:
+            while True:
+                sock, _ = server.accept()
+                print(f"[supervisor] Host connected on vsock port {port}",
+                      file=sys.stderr, flush=True)
+                supervisor = Supervisor(
+                    sock,
+                    poweroff_on_disconnect=True,
+                    auth_secret=auth_secret,
+                )
+                try:
+                    relisten = supervisor.run()
+                except KeyboardInterrupt:
+                    relisten = False
+                finally:
+                    auth_secret = supervisor.auth_secret
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+                if not relisten:
+                    break
+        finally:
+            server.close()
+            os._exit(0)
 
 
 if __name__ == "__main__":
