@@ -573,6 +573,7 @@ public enum PoolEvent : Swift.Sendable {
     case streamNoResponse
     case streamTransportFailure
     case streamWedged
+    case streamCancellationEscalated
     case explicit
     case userInitiated
     case vmSupervisor
@@ -810,6 +811,7 @@ public enum ProcessPoolStreamState : Swift.String, Swift.Sendable, Swift.Equatab
   case firstChunk
   case lastChunk
   case cancellationRequested
+  case cancellationAcknowledged
   case timeoutNoResponse
   case terminated
   case failed
@@ -2795,7 +2797,8 @@ extension SwiftPythonRuntime.WorkerProcess {
   final public func allocateStreamChannelID() -> Swift.UInt32
   final public func sendStreamCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil, channelCapacity: Swift.Int? = nil, onChunk: (Foundation.Data) -> Swift.Void) throws
   final public func sendCommand(_ command: SwiftPythonRuntime.WorkerCommand, timeout: Foundation.TimeInterval? = nil) throws -> SwiftPythonRuntime.WorkerResponse
-  final public func cancelStream(channelID: Swift.UInt32)
+  @discardableResult
+  final public func cancelStream(channelID: Swift.UInt32) -> Swift.Bool
 }
 extension SwiftPythonRuntime.WorkerProcess {
   public static func findWorkerExecutable() throws -> Swift.String

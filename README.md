@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.15`
+Current release: `0.5.16`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.15"
+        from: "0.5.16"
     )
 ]
 ```
