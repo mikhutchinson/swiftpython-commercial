@@ -301,7 +301,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.15"
+    swiftpythonVersion: "0.5.16"
 )
 let image = try await builder.build()
 
@@ -342,6 +342,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.16 | Consumer stream cancellation starts its containment deadline before sending `streamCancel`, reports worker acknowledgement, preserves PID/generation on cooperative Stop, and classifies last-resort replacement as `streamCancellationEscalated` instead of `streamWedged` |
 | 0.5.15 | Bounded-stream-channel overflow now reports `streamChannelOverflow` instead of a confusing pool-admission `.backpressure`; Linux IPC logging now respects `SWIFTPYTHON_IPC_LOG` instead of printing every message unconditionally; snapshot restore-secret hashing no longer touches disk on non-CryptoKit platforms |
 | 0.5.14 | Busy-worker-safe idle shedding: `shedIdleWorkers(force:)` never shuts down a worker with an active command/stream response channel or an unanswered worker→host callback, so critical-pressure force sheds cannot fail a live stream with a spurious "Worker N is not responding", orphan in-flight callbacks, or trigger an immediate self-defeating respawn |
 | 0.5.13 | Structured ProcessPool telemetry/tracing: command spans, worker PID/generation, host correlation context, callback/stream/side-channel state, respawn evidence, timeout/no-response classification, redaction-safe Python exception diagnostics, and Swift 6 main-actor-safe `ProcessPoolTelemetry.withContext` |
