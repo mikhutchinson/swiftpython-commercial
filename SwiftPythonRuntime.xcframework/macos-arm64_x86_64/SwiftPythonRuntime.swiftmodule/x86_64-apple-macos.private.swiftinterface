@@ -546,6 +546,7 @@ public enum PoolEvent : Swift.Sendable {
   case workerQuarantined(workerID: Swift.Int, until: Foundation.Date)
   case workerQuarantineExpired(workerID: Swift.Int)
   case workerIdleShed(workerID: Swift.Int)
+  case idleShedCompleted(workerIDs: [Swift.Int], cause: SwiftPythonRuntime.PoolEvent.IdleShedCause)
   case workerCountIncreased(addedWorkerIDs: [Swift.Int], newWorkerCount: Swift.Int)
   case poolStateChanged(from: SwiftPythonRuntime.PythonProcessPool.State, to: SwiftPythonRuntime.PythonProcessPool.State)
   case drainCompleted(durationMs: Swift.UInt64)
@@ -600,6 +601,11 @@ public enum PoolEvent : Swift.Sendable {
     public var hashValue: Swift.Int {
       get
     }
+  }
+  public enum IdleShedCause : Swift.Sendable {
+    case explicit(force: Swift.Bool)
+    case resourceMonitor(snapshot: SwiftPythonRuntime.ResourceSnapshot, force: Swift.Bool)
+    case systemMemoryPressure(level: SwiftPythonRuntime.PoolEvent.MemoryPressureLevel, force: Swift.Bool)
   }
 }
 extension SwiftPythonRuntime.PoolEvent : Swift.Equatable {
