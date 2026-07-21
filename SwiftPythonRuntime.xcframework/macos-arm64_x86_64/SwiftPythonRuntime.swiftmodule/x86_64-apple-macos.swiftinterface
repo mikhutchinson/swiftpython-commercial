@@ -2779,6 +2779,7 @@ extension SwiftPythonRuntime.WorkerProcess {
   internal enum TrackedCallbackKind {
     case excluded
     case regular
+    case async
     case streamingInit
     @usableFromInline
     internal static func == (a: SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind, b: SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind) -> Swift.Bool
@@ -2791,7 +2792,7 @@ extension SwiftPythonRuntime.WorkerProcess {
     }
   }
   @usableFromInline
-  @inline(__always) final internal func recordCallbackStart(callID: Swift.UInt64, wireName: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32) -> SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind
+  @inline(__always) final internal func recordCallbackStart(callID: Swift.UInt64, wireName: Swift.String, argsPickle: Foundation.Data, channelID: Swift.UInt32, isAsync: Swift.Bool = false) -> SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind
   @usableFromInline
   @inline(__always) final internal func recordCallbackReplySent(callID: Swift.UInt64, kind: SwiftPythonRuntime.WorkerProcess.TrackedCallbackKind, channelID: Swift.UInt32, diagnostic: SwiftPythonRuntime.ProcessPoolErrorDiagnostic? = nil)
   @usableFromInline

@@ -11,7 +11,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.17`
+Current release: `0.5.18`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -83,7 +83,7 @@ prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.17"
+        from: "0.5.18"
     )
 ]
 ```
@@ -301,7 +301,7 @@ Build or locate a prepared Ubuntu image, then create a pool:
 ```swift
 let builder = UbuntuImageBuilder(
     outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.17"
+    swiftpythonVersion: "0.5.18"
 )
 let image = try await builder.build()
 
@@ -342,6 +342,7 @@ lifetime, shell streaming, PTY sessions, events, and VM configuration.
 
 | Version | Notes |
 |---------|-------|
+| 0.5.18 | Async ProcessPool callbacks remain busy through the worker's explicit result acknowledgement, preventing automatic resource-pressure shedding from discarding a callback-returned Future after its originating command returns; executable examples now fail nonzero on reported failures, and timing-sensitive runtime tests use observable barriers instead of fixed sleeps |
 | 0.5.17 | Successful idle-shed actions now emit an unconditional `idleShedCompleted(workerIDs:cause:)` lifecycle event after the existing per-worker events; the structured cause distinguishes explicit calls, periodic resource-monitor snapshots, and Darwin system-memory-pressure transitions without enabling high-frequency sample broadcasting |
 | 0.5.16 | Consumer stream cancellation starts its containment deadline before sending `streamCancel`, reports worker acknowledgement, preserves PID/generation on cooperative Stop, and classifies last-resort replacement as `streamCancellationEscalated` instead of `streamWedged` |
 | 0.5.15 | Bounded-stream-channel overflow now reports `streamChannelOverflow` instead of a confusing pool-admission `.backpressure`; Linux IPC logging now respects `SWIFTPYTHON_IPC_LOG` instead of printing every message unconditionally; snapshot restore-secret hashing no longer touches disk on non-CryptoKit platforms |
