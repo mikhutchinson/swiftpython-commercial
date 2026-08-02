@@ -4,7 +4,7 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.3`
+Current release: `0.6.0-duplex.4`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -39,7 +39,7 @@ same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The complete `SwiftPythonCommercial-0.6.0-duplex.3.zip` asset contains this
+The complete `SwiftPythonCommercial-0.6.0-duplex.4.zip` asset contains this
 public checkout. The four XCFramework zips are individual binary-target
 assets. `manifest.json` is a separate asset and attests all four zips, the
 worker, all five VM helpers, the complete distribution, and the same-version VM
@@ -67,7 +67,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.3"
+        exact: "0.6.0-duplex.4"
     )
 ]
 ```
@@ -200,7 +200,7 @@ See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
 
 ## VM and Sandbox
 
-`0.6.0-duplex.3` includes the isolated Sandbox surface. Its certified gate uses
+`0.6.0-duplex.4` includes the isolated Sandbox surface. Its certified gate uses
 the same source revision for:
 
 - all four XCFrameworks and the local sidecar;
@@ -290,7 +290,7 @@ swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
 swift run --package-path Examples/DuplexSession
-scripts/audit_release_surface.sh 0.6.0-duplex.3
+scripts/audit_release_surface.sh 0.6.0-duplex.4
 scripts/consumer_path_smoke.sh
 ```
 
@@ -328,6 +328,14 @@ preserved rather than collapsed to `0.6.0`.
 | SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
 
 ## Release notes
+
+### 0.6.0-duplex.4
+
+- Added equality-only worker lifetime tokens for generation-safe consumer state
+  without exposing generation counters.
+- Added provider-neutral exact sandbox policy, sanitized lifecycle and failure
+  diagnostics, explicit activity-stream loss, and confirmed termination.
+- Preserved the code-only private Engine boundary introduced in `.3`.
 
 ### 0.6.0-duplex.3
 
