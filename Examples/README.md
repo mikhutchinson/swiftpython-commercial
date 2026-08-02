@@ -9,6 +9,7 @@ Runnable samples that complement [docs/api-guide](../docs/api-guide/).
 | [ProcessPoolSmoke](ProcessPoolSmoke/) | Minimal CLI: `withProcessPool`, `invokeResult`, `math.sqrt` |
 | [BridgingRing](BridgingRing/) | Showcase: callbacks + **`WorkerCallbackContext` reentrant** Python↔Swift + **`evalEvents`** generator/progress streams over the pool IPC |
 | [SharedTensorPipeline](SharedTensorPipeline/) | **Headline demo.** Pool-arena POSIX shared memory (`createSharedTensor` + `withSharedBuffer`) and out-of-band streaming (`SharedRingBuffer` + `startOutOfBandStream`) wired together with a liveness proof on the same worker. |
+| [DuplexSession](DuplexSession/) | Worker-v6 frame loopback plus a fragmented logical message larger than the physical-frame ceiling |
 
 Dependencies resolve the parent checkout by path, so these examples work from a
 normal local clone or release folder even if the directory is renamed. For a
@@ -25,6 +26,7 @@ swift run --package-path Examples/CoreRuntimeSmoke
 swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
+swift run --package-path Examples/DuplexSession
 scripts/consumer_path_smoke.sh
 ```
 
@@ -41,7 +43,9 @@ release tag and copy/re-sign the worker into your app bundle.
 
 The consumer smoke script creates a temporary external Swift package and depends
 on this checkout by local path. It catches package-name and worker-discovery
-regressions that do not show up when running examples from inside the repo.
+regressions that do not show up when running examples from inside the repo. In
+the final sandbox/VM release mode it also notarizes a virtualization-entitled
+app and runs the full public tenant workload through 20 positive warm restores.
 
 The example manifests auto-detect Homebrew's Apple Silicon and Intel Python
 3.13 prefixes. For custom Python layouts, set `PYTHON_HOME`, `PYTHONHOME`, or

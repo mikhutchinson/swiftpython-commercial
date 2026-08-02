@@ -5,13 +5,22 @@ runtime. Use it when you need stronger isolation than a local process pool:
 tenant-specific dependencies, shell tools, untrusted jobs, per-tenant secrets,
 or Linux-only packages.
 
-The v0.5.14 commercial package ships the three required pieces together:
+The `0.6.0-duplex.2` commercial release certifies this surface with one
+same-version source revision. Keep all of these pieces together:
 
-- `SwiftPythonRuntime.xcframework`
-- `SwiftPythonWorker`
-- `VMWorker/swiftpython_supervisor.py` and `VMWorker/swiftpython_worker.py`
+- `SwiftPythonRuntime.xcframework` and the matched local sidecar
+- `VMWorker/_swiftpython_wire.py`
+- `VMWorker/_swiftpython_duplex.py`
+- `VMWorker/swiftpython_protocol.py`
+- `VMWorker/swiftpython_supervisor.py`
+- `VMWorker/swiftpython_worker.py`
+- a base image whose manifest attests the exact five helper hashes
+- a verified warm snapshot created from that image
 
-Keep these artifacts on the same tag.
+The worker protocol (v6), supervisor protocol (v3), duplex media protocol, and
+feature-helper schemas version independently. The live guest `describe`
+response owns supervisor command vocabulary; do not infer it from a host-side
+list or source text.
 
 ## Build or Locate a Base Image
 
@@ -23,7 +32,7 @@ let imagesDir = "\(NSHomeDirectory())/Library/Application Support/MyApp/Images"
 
 let builder = UbuntuImageBuilder(
     outputDir: imagesDir,
-    swiftpythonVersion: "0.5.14",
+    swiftpythonVersion: "0.6.0-duplex.2",
     cpuCount: 2,
     memoryMB: 2048,
     diskSizeMB: 8192
@@ -41,7 +50,7 @@ If your app ships a prebuilt image, verify it before use:
 ```swift
 let manifest = try SandboxImageVerifier.verify(
     diskPath: baseImagePath,
-    minimumSwiftPythonVersion: "0.5.14"
+    minimumSwiftPythonVersion: "0.6.0-duplex.2"
 )
 
 print(manifest.sha256)
@@ -56,9 +65,11 @@ let sandbox = try await SandboxPool(
     baseImagePath: baseImagePath,
     cloneDir: cloneDir,
     config: SandboxPoolConfig(
+        minimumSwiftPythonVersion: "0.6.0-duplex.2",
         idleEvictionTimeout: 300,
         workersPerTenant: 1,
-        verifyImageManifest: true
+        verifyImageManifest: true,
+        snapshotValidationMode: .cryptographic
     )
 )
 ```
@@ -193,6 +204,58 @@ try await sandbox.release(tenant)
 
 Use this when you want the normal `PythonProcessPool` API but with VM isolation.
 
+The tenant ProcessPool also exposes frame and logical-message duplex over
+authenticated vsock. It does not advertise the local
+`DuplexPayloadRoute.sharedArena`; an `.arenaIngress` requirement therefore
+fails before handler setup. Use bounded inline logical-message chunks for VM
+duplex and inspect the live capability snapshot for the physical-frame and
+logical-message limits.
+
+## Warm snapshots
+
+A snapshot bundle contains its cloned disk, NVRAM, machine identifier, saved
+machine state, copied base-image manifest, and snapshot manifest. The manifest
+binds release/supervisor/worker versions, every asset hash, topology and policy
+fingerprints, host OS, and a salted restore-secret identifier. The restore
+secret itself is external and must remain mode `0600`.
+
+Create and verify snapshots with the signed release tool:
+
+```bash
+swift run swift-python-build sandbox snapshot create \
+  --image /path/to/base-ubuntu.img \
+  --output /path/to/release.swiftpython-snapshot \
+  --generate-restore-secret
+
+swift run swift-python-build sandbox snapshot verify \
+  --snapshot /path/to/release.swiftpython-snapshot \
+  --image /path/to/base-ubuntu.img \
+  --restore-secret-file /path/to/release.restore-secret
+```
+
+Select restore explicitly for a tenant:
+
+```swift
+let tenant = try await sandbox.acquire(
+    tenantID: tenantID,
+    vmConfig: VMConfiguration(
+        bootStrategy: .snapshotRestore(
+            snapshotPath: "/path/to/release.swiftpython-snapshot"
+        ),
+        snapshotRestoreAuthSecret: restoreSecret
+    )
+)
+```
+
+The general runtime can report a failed restore and fall back to cold boot.
+Release certification is stricter: repeated warm gates require
+`snapshotRestoreSucceeded` and `VMManager.bootMode == .warm`; any restore
+failure, dropped event, timeout, or cold fallback fails the gate. Post-restore
+proof includes worker calls, callbacks, shared memory, shell capture/streaming,
+PTY input/resize, and the same fragmented duplex workload used on cold vsock.
+Active/opening duplex sessions are not snapshot-resumable and must make
+snapshot preparation fail.
+
 ## Events
 
 ```swift
@@ -258,14 +321,17 @@ access only for tenants that require it.
 - Keep `guestSudoMode` at `.none` for untrusted work.
 - Use read-only mounts for host data by default.
 - Enforce output caps with `ExecStreamOptions.maxOutputBytes`.
-- Keep runtime, worker, VM scripts, and base image version aligned.
+- Keep runtime, local worker, all five VM helpers, base image, and snapshot
+  aligned to the exact release.
 
 ## Common Pitfalls
 
 | Issue | Fix |
 |-------|-----|
 | `VMWorker` scripts not found | Deploy `VMWorker/` with the app or set `SWIFTPYTHON_VM_WORKER_DIR` |
-| Image verification fails | Rebuild the base image with the current commercial tag |
+| Image verification fails | Rebuild the base image with all five helpers from the current commercial tag |
+| Warm restore reports success after cold fallback | Treat it as a failed release gate; require the positive warm event and `bootMode == .warm` |
+| `.arenaIngress` fails in a VM session | Expected: the owned shared-arena payload route is local UDS only |
 | Command floods output | Lower `maxOutputBytes` and consume stream chunks promptly |
 | Tenant keeps stale state | Use per-user tenant IDs or `forceStop`/`drainAndReplace` on logout |
 | Need a normal Python API inside isolation | Use `tenant.processPool` |

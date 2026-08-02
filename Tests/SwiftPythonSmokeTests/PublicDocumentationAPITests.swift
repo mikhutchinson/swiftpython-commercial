@@ -1,0 +1,161 @@
+import Foundation
+import SwiftPythonAudioInterop
+import SwiftPythonMetalInterop
+import SwiftPythonRuntime
+import XCTest
+
+/// Compile-time and value-shape coverage for public names used throughout
+/// README.md and docs/api-guide. Runtime consumer behavior is exercised by the
+/// standalone examples and scripts/consumer_path_smoke.sh.
+final class PublicDocumentationAPITests: XCTestCase {
+    func testDocumentedConfigurationShapes() throws {
+        let audio = try DuplexAudioFormat(
+            sampleRate: 24_000,
+            channels: 1,
+            sampleType: .signedInteger16,
+            interleaving: .interleaved
+        )
+        XCTAssertEqual(audio.bytesPerFrame, 2)
+
+        var requirements = DuplexSessionRequirements.messages
+        requirements.minimumLogicalMessageBytes = 10 * 1_024 * 1_024
+        var duplex = DuplexOptions.default
+        duplex.requirements = requirements
+        duplex.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
+            slotCount: 4,
+            slotCapacity: 16 * 1_024 * 1_024,
+            maximumOutstandingReferencedBytes: 32 * 1_024 * 1_024
+        )
+        XCTAssertTrue(duplex.requirements.requiredFeatures.contains(.messagesV1))
+
+        let sandbox = SandboxPoolConfig(
+            minimumSwiftPythonVersion: "0.6.0-duplex.2",
+            verifyImageManifest: true,
+            workersPerTenant: 1,
+            snapshotValidationMode: .cryptographic
+        )
+        XCTAssertEqual(sandbox.snapshotValidationMode, .cryptographic)
+
+        let vm = VMConfiguration(
+            guestOS: .ubuntu24,
+            bootStrategy: .snapshotRestore(
+                snapshotPath: "/tmp/documentation.swiftpython-snapshot"
+            ),
+            cpuCount: 2,
+            memoryMB: 2_048,
+            allowNetworkEgress: false,
+            guestSudoMode: .none
+        )
+        XCTAssertEqual(vm.guestOS, .ubuntu24)
+
+        let ledger = DuplexCopyLedger()
+        ledger.record(
+            DuplexCopyLedgerEntry(
+                segment: "documentation-compile",
+                route: .ownedSharedCopy(reason: .explicitOwnedStorage),
+                status: .boundedCPUCopy,
+                logicalBytes: 16,
+                copiedBytes: 16
+            )
+        )
+        XCTAssertEqual(ledger.snapshot.copiedBytes, 16)
+    }
+
+    /// Never invoked. Keeping the calls in a type-checked function makes stale
+    /// documentation entrypoint names fail the public binary-package test.
+    private func compileDocumentedEntryPoints(
+        pool: PythonProcessPool,
+        sandbox: SandboxPool,
+        tenant: SandboxTenant,
+        session: PythonDuplexSession,
+        shared: PyHandle,
+        model: OwnedPyHandle
+    ) async throws {
+        let _: Double = try await pool.invokeResult(
+            module: "math",
+            function: "sqrt",
+            args: [.python(144.0)]
+        )
+        let _: Double = try await pool.methodResult(
+            handle: model,
+            name: "score"
+        )
+        _ = try await pool.evalResult(
+            "float(x.sum())",
+            bindings: ["x": shared]
+        ) as Double
+        try await pool.respawnWorker(
+            0,
+            reason: .userInitiated,
+            force: true
+        )
+        _ = try await pool.addWorkers(1)
+
+        let stream: CancellableStream<Int> = try await pool.evalStream(
+            "range(10)",
+            options: .longRunning(timeout: 1_800)
+        )
+        _ = stream
+
+        let ring = try SharedRingBuffer(capacity: 64 * 1_024)
+        try await pool.startOutOfBandStream(
+            generatorCode: "(b'x' for _ in range(1))",
+            worker: 0,
+            buffer: ring
+        )
+        _ = try await pool.startOutOfBandSocketStream(
+            generatorCode: "(b'x' for _ in range(1))",
+            worker: 0,
+            capacity: 64 * 1_024
+        )
+
+        let callback = try await pool.registerCallback(name: "docs_add") {
+            @Sendable (a: Int, b: Int) -> Int in a + b
+        }
+        try await pool.unregisterCallback(name: callback.name)
+
+        let dag = ProcessPoolDAG<String, Int>(nodes: [
+            .init(id: "value") { context in
+                try await context.worker.evalResult("42")
+            },
+        ])
+        _ = try await pool.run(dag, maxParallelism: 1)
+
+        _ = try await sandbox.execShell(
+            tenantID: tenant.id,
+            "python3 --version",
+            options: ExecStreamOptions(timeout: 60)
+        )
+        _ = try await sandbox.execShellStream(
+            tenantID: tenant.id,
+            "python3 train.py"
+        )
+        _ = try await sandbox.execShellPTY(
+            tenantID: tenant.id,
+            "bash",
+            options: ExecPTYOptions(
+                initialSize: TerminalSize(columns: 120, rows: 32)
+            )
+        )
+
+        try await session.input.send(
+            DuplexInputFrame(
+                payload: Data("hello".utf8),
+                flags: [.independent]
+            )
+        )
+        try await session.input.sendMessage(
+            Data("message".utf8),
+            format: DuplexFormat("application/octet-stream")
+        )
+        let lease = try await session.input.acquireSharedBuffer(
+            byteCount: 4_096,
+            alignment: .page
+        )
+        try await session.input.sendMessage(lease)
+        _ = try await session.interrupt(reason: .inputActivity)
+        try await session.acknowledgeOutput(
+            consumedThrough: DuplexPosition(sequence: 1, byteOffset: 16)
+        )
+    }
+}

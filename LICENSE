@@ -42,7 +42,9 @@ Permission is granted to users operating under any valid licensing path to
 use the materials in this repository, including:
 
 1. downloading and pinning this package with Swift Package Manager;
-2. linking applications against SwiftPythonRuntime.xcframework;
+2. linking applications against SwiftPythonRuntime.xcframework and the
+   optional SwiftPythonAudioInterop.xcframework and
+   SwiftPythonMetalInterop.xcframework adapters;
 3. bundling SwiftPythonWorker with covered applications;
 4. deploying the VMWorker scripts with covered applications or tenant images;
 5. copying and adapting the entitlement templates for covered applications;
@@ -79,4 +81,4 @@ FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
 HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM USE OF
 THE MATERIALS, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE.
 
-For licensing inquiries: admin@swiftpython.dev
+For licensing inquiries: licensing@swiftpython.dev

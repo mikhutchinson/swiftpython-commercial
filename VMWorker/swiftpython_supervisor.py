@@ -1,30 +1,18 @@
 #!/usr/bin/env python3
-"""SwiftPython VM Supervisor — Manages worker processes inside the macOS guest VM.
+"""SwiftPython VM Supervisor — Manages worker processes inside the guest VM.
 
-Runs as a LaunchAgent inside the VM. Connects to the host via AF_VSOCK on port 0
-(control channel) and spawns/kills Python worker processes on command.
+Runs as a system service inside the VM. Accepts a host connection on AF_VSOCK
+and spawns/kills Python worker processes on command. Frames are JSON over the
+same 9-byte length-prefixed header as MessageFrame.
 
-Control channel protocol (JSON over length-prefixed frames, same header as MessageFrame):
-    Request:  {"spawn": {"id": 0, "port": 1, "ipcConfig": {...}}}
-    Response: {"spawned": {"id": 0, "pid": 12345}}
+The control vocabulary is **not** documented here. Commands are registered with
+``@command`` and frames with ``swiftpython_protocol.frame``; the ``describe``
+command answers with both registries serialised, and the host derives its
+routing from that response at connect time. A prose table in this docstring
+would be a third copy of the contract and would rot — the previous one did,
+omitting nine of the commands it purported to list.
 
-    Request:  {"kill": {"id": 0}}
-    Response: {"killed": {"id": 0}}
-
-    Request:  {"abort": {"id": 0}}
-    Response: {"aborted": {"id": 0}}
-
-    Request:  {"status": {}}
-    Response: {"status": {"workers": {0: {"pid": 12345, "alive": true}, ...}}}
-
-    Request:  {"idle_status": {}}
-    Response: {"idle_status": {"idle": true, "workers": 0, "execs": 0}}
-
-    Request:  {"rotate_auth_secret": {"secretBase64": "..."}}
-    Response: {"auth_rotated": {"supervisorVersion": 2, "protocolVersion": 5}}
-
-    Request:  {"shutdown": {}}
-    Response: {"shutting_down": {}}
+To see the vocabulary of a running guest, send ``{"describe": {}}``.
 """
 
 import json
@@ -46,6 +34,83 @@ import time
 import pty
 import fcntl
 import termios
+
+# The supervisor is installed as a bare executable (`/usr/local/bin/
+# swiftpython-supervisor`) next to its protocol module. Python already puts the
+# script's directory on `sys.path`, but resolve it explicitly so a symlinked or
+# renamed install still finds the module.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from swiftpython_protocol import (  # noqa: E402
+    ABORTED,
+    AUTH_CHALLENGE,
+    AUTH_FAILED,
+    AUTH_OK,
+    AUTH_ROTATED,
+    CONFIGURED,
+    DESCRIBED,
+    ERROR,
+    EXEC_ERROR,
+    EXEC_RESULT,
+    EXEC_SIGNAL_ACK,
+    EXEC_STARTED,
+    EXEC_STDERR,
+    EXEC_STDIN_ACK,
+    EXEC_STDOUT,
+    EXEC_TIMEOUT,
+    IDLE_STATUS,
+    KILLED,
+    SHUTTING_DOWN,
+    SNAPSHOT_READY,
+    SPAWNED,
+    STATUS,
+    SUPERVISOR_PROTOCOL_VERSION,
+    WORKER_PROTOCOL_VERSION,
+    ExecErrorCode,
+    QuotaResource,
+    command,
+    command_spec,
+    declaration,
+    observed_undeclared_keys,
+    registered_commands,
+)
+from _swiftpython_duplex import capability_declaration as duplex_capability_declaration  # noqa: E402
+from _swiftpython_wire import CURRENT_PROTOCOL_VERSION  # noqa: E402
+
+
+def _guest_artifact_sha256() -> dict[str, str]:
+    """Hash the exact five guest files beside this running supervisor."""
+    directory = os.path.dirname(os.path.abspath(__file__))
+    candidates = {
+        "swiftpython_protocol.py": ("swiftpython_protocol.py",),
+        "_swiftpython_wire.py": ("_swiftpython_wire.py",),
+        "_swiftpython_duplex.py": ("_swiftpython_duplex.py",),
+        "swiftpython_supervisor.py": (
+            os.path.basename(os.path.abspath(__file__)),
+            "swiftpython_supervisor.py",
+        ),
+        "swiftpython_worker.py": ("swiftpython-worker", "swiftpython_worker.py"),
+    }
+    hashes: dict[str, str] = {}
+    for logical_name, filenames in candidates.items():
+        path = next(
+            (
+                os.path.join(directory, filename)
+                for filename in filenames
+                if os.path.isfile(os.path.join(directory, filename))
+            ),
+            None,
+        )
+        if path is None:
+            raise FileNotFoundError(
+                f"guest artifact {logical_name} is missing beside supervisor"
+            )
+        digest = hashlib.sha256()
+        with open(path, "rb") as artifact:
+            for chunk in iter(lambda: artifact.read(1024 * 1024), b""):
+                digest.update(chunk)
+        hashes[logical_name] = digest.hexdigest()
+    return hashes
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -167,7 +232,7 @@ class Supervisor:
             except Exception as e:
                 print(f"[supervisor] Error: {e}", file=sys.stderr, flush=True)
                 try:
-                    self._send_response({"error": {"message": str(e)}})
+                    self._send_response(ERROR(message=str(e)))
                 except Exception:
                     break
 
@@ -176,68 +241,99 @@ class Supervisor:
         self._shutdown_all()
         return False
 
-    def _handle_command(self, cmd: dict) -> dict:
+    @classmethod
+    def _command_dispatch(cls) -> dict[str, str]:
+        """Map command name -> handler attribute, built from the registrations.
+
+        Derived by scanning for the marker `@command` leaves on each method, so
+        a handler that is registered but unreachable, or reachable but
+        unregistered, cannot exist.
+        """
+        table = cls.__dict__.get("_dispatch_cache")
+        if table is None:
+            table = {}
+            for attr_name in dir(cls):
+                attr = getattr(cls, attr_name, None)
+                registered = getattr(attr, "_swiftpython_command", None)
+                if registered is not None:
+                    table[registered] = attr_name
+            missing = {spec.name for spec in registered_commands()} - set(table)
+            if missing:
+                raise RuntimeError(f"Commands registered without a handler: {sorted(missing)}")
+            cls._dispatch_cache = table
+        return table
+
+    def _handle_command(self, cmd: dict) -> dict | None:
         cmd_name = next(iter(cmd))
         cmd_data = cmd[cmd_name]
 
-        if cmd_name == "auth_challenge":
-            return self._auth_challenge(cmd_data)
-        if cmd_name == "auth_response":
-            return self._auth_response(cmd_data)
-        if not self.authenticated:
-            if isinstance(cmd_data, dict) and "channelID" in cmd_data and cmd_name.startswith("exec"):
-                return {
-                    "exec_error": {
-                        "channelID": int(cmd_data["channelID"]),
-                        "code": "internalError",
-                        "message": "not authenticated",
-                    }
-            }
-            return {"auth_failed": {"reason": "not authenticated"}}
+        spec = command_spec(cmd_name)
+        if spec is None:
+            return ERROR(message=f"Unknown command: {cmd_name}")
 
-        if cmd_name == "configure":
-            return self._configure(cmd_data)
-        if cmd_name == "spawn":
-            return self._spawn_worker(cmd_data)
-        if cmd_name == "kill":
-            return self._kill_worker(cmd_data)
-        if cmd_name == "abort":
-            return self._abort_worker(cmd_data)
-        if cmd_name in ("exec", "exec_stream"):
-            threading.Thread(target=self._run_exec, args=(cmd_data, False), daemon=True).start()
-            return None
-        if cmd_name == "exec_pty":
-            threading.Thread(target=self._run_exec, args=(cmd_data, True), daemon=True).start()
-            return None
-        if cmd_name == "exec_stdin":
-            return self._exec_stdin(cmd_data)
-        if cmd_name == "exec_signal":
-            return self._exec_signal(cmd_data)
-        if cmd_name == "status":
-            return self._get_status()
-        if cmd_name == "idle_status":
-            return self._idle_status()
-        if cmd_name == "rotate_auth_secret":
-            return self._rotate_auth_secret(cmd_data)
-        if cmd_name == "prepare_snapshot":
-            return self._prepare_snapshot()
-        if cmd_name == "shutdown":
-            self.running = False
-            return {"shutting_down": {}}
+        if spec.requires_auth and not self.authenticated:
+            if spec.channel_keyed and isinstance(cmd_data, dict) and "channelID" in cmd_data:
+                return EXEC_ERROR(
+                    channelID=int(cmd_data["channelID"]),
+                    code=ExecErrorCode.INTERNAL_ERROR.value,
+                    message="not authenticated",
+                )
+            return AUTH_FAILED(reason="not authenticated")
 
-        return {"error": {"message": f"Unknown command: {cmd_name}"}}
+        handler = getattr(self, self._command_dispatch()[cmd_name])
+        return handler(cmd_data)
 
+    @command("describe")
+    def _describe(self, data: dict) -> dict:
+        """Answer with the live registries.
+
+        The response is built by iterating the registries in
+        `swiftpython_protocol`. Adding a frame there makes it appear here
+        without this method changing — that property is the whole point, and a
+        literal name anywhere in this method would defeat it.
+        """
+        emits = data.get("emits") if isinstance(data, dict) else None
+        self._report_host_emit_skew(emits or [])
+        return DESCRIBED(
+            **declaration(
+                worker_capabilities=duplex_capability_declaration(
+                    CURRENT_PROTOCOL_VERSION,
+                    "duplex.vsock.v1",
+                ),
+                guest_artifact_sha256=_guest_artifact_sha256(),
+            )
+        )
+
+    def _report_host_emit_skew(self, host_emits: list) -> None:
+        """Log the guest's view of the skew the host reports from its side.
+
+        Gives `describe`'s `emits` field a consumer. Without one it would be a
+        payload travelling the wire that nothing reads — the precise defect this
+        handshake exists to remove, and the shape the old `supervisorVersion`
+        had. It lands in the guest's own stderr, which is often the only log
+        readable when a VM will not come up.
+        """
+        unsupported = sorted(set(host_emits) - {spec.name for spec in registered_commands()})
+        if unsupported:
+            print(
+                "[supervisor] host may emit commands this guest does not serve: "
+                + ", ".join(unsupported),
+                file=sys.stderr,
+                flush=True,
+            )
+
+    @command("configure")
     def _configure(self, data: dict) -> dict:
         sudo_mode = str(data.get("guestSudoMode", "none"))
         if sudo_mode not in ("none", "interactive", "nopasswd"):
-            return {"error": {"message": f"Invalid guestSudoMode: {sudo_mode}"}}
+            return ERROR(message=f"Invalid guestSudoMode: {sudo_mode}")
 
         cpu_quota = int(data.get("cpuQuotaPercent", 100))
         max_open = int(data.get("maxOpenFilesPerProcess", 1024))
         if cpu_quota < 0 or cpu_quota > 100:
-            return {"error": {"message": "cpuQuotaPercent must be between 0 and 100"}}
+            return ERROR(message="cpuQuotaPercent must be between 0 and 100")
         if max_open <= 0:
-            return {"error": {"message": "maxOpenFilesPerProcess must be positive"}}
+            return ERROR(message="maxOpenFilesPerProcess must be positive")
 
         self.guest_sudo_mode = sudo_mode
         self.cpu_quota_percent = cpu_quota
@@ -251,16 +347,14 @@ class Supervisor:
         try:
             self._apply_sudo_policy()
         except Exception as exc:
-            return {"error": {"message": f"Failed to apply sudo policy: {exc}"}}
+            return ERROR(message=f"Failed to apply sudo policy: {exc}")
 
-        return {
-            "configured": {
-                "guestSudoMode": self.guest_sudo_mode,
-                "cpuQuotaPercent": self.cpu_quota_percent,
-                "maxOpenFilesPerProcess": self.max_open_files,
-                "execUser": self.exec_user,
-            }
-        }
+        return CONFIGURED(
+            guestSudoMode=self.guest_sudo_mode,
+            cpuQuotaPercent=self.cpu_quota_percent,
+            maxOpenFilesPerProcess=self.max_open_files,
+            execUser=self.exec_user,
+        )
 
     def _apply_sudo_policy(self):
         sudoers_path = "/etc/sudoers.d/swiftpython-user"
@@ -351,19 +445,15 @@ class Supervisor:
             self._demote_to_exec_user()
         return preexec
 
+    @command("auth_challenge", requires_auth=False)
     def _auth_challenge(self, data: dict) -> dict:
-        return {
-            "auth_challenge": {
-                "nonce": self.auth_nonce,
-                "protocolVersion": 5,
-                "supervisorVersion": 2,
-            }
-        }
+        return AUTH_CHALLENGE(nonce=self.auth_nonce)
 
+    @command("auth_response", requires_auth=False)
     def _auth_response(self, data: dict) -> dict:
         if not self.auth_secret:
             self.authenticated = True
-            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 5}}
+            return AUTH_OK()
 
         client_version = int(data.get("clientVersion", 0))
         supplied = data.get("hmac", "")
@@ -371,22 +461,24 @@ class Supervisor:
         expected = hmac.new(self.auth_secret, message, hashlib.sha256).hexdigest()
         if hmac.compare_digest(expected, supplied):
             self.authenticated = True
-            return {"auth_ok": {"supervisorVersion": 2, "protocolVersion": 5}}
-        return {"auth_failed": {"reason": "bad hmac"}}
+            return AUTH_OK()
+        return AUTH_FAILED(reason="bad hmac")
 
+    @command("rotate_auth_secret")
     def _rotate_auth_secret(self, data: dict) -> dict:
         encoded = data.get("secretBase64", "")
         try:
             new_secret = base64.b64decode(encoded, validate=True)
         except Exception:
-            return {"error": {"message": "rotate_auth_secret requires valid base64 secret"}}
+            return ERROR(message="rotate_auth_secret requires valid base64 secret")
         if not new_secret:
-            return {"error": {"message": "rotate_auth_secret requires a non-empty secret"}}
+            return ERROR(message="rotate_auth_secret requires a non-empty secret")
         self.auth_secret = new_secret
         self.auth_nonce = os.urandom(32).hex()
         self.authenticated = False
-        return {"auth_rotated": {"supervisorVersion": 2, "protocolVersion": 5}}
+        return AUTH_ROTATED()
 
+    @command("spawn", open_fields=("ipcConfig",))
     def _spawn_worker(self, data: dict) -> dict:
         worker_id = data["id"]
         vsock_port = data["port"]
@@ -397,7 +489,7 @@ class Supervisor:
         if worker_id in self.workers:
             proc = self.workers[worker_id]
             if proc.poll() is None:
-                return {"error": {"message": f"Worker {worker_id} already running (pid {proc.pid})"}}
+                return ERROR(message=f"Worker {worker_id} already running (pid {proc.pid})")
             del self.workers[worker_id]
             self._remove_cgroup(self.worker_cgroups.pop(worker_id, None))
 
@@ -424,28 +516,29 @@ class Supervisor:
             )
         except Exception as exc:
             self._remove_cgroup(cgroup_path)
-            error = {"message": f"Failed to spawn worker {worker_id}: {exc}"}
+            error: dict = {"message": f"Failed to spawn worker {worker_id}: {exc}"}
             if self.cpu_quota_percent < 100:
                 error.update({
-                    "code": "quotaExceeded",
-                    "resource": "cpu",
+                    "code": ExecErrorCode.QUOTA_EXCEEDED.value,
+                    "resource": QuotaResource.CPU.value,
                     "limit": self.cpu_quota_percent,
                     "observed": 100,
                 })
-            return {"error": error}
+            return ERROR(**error)
         self.workers[worker_id] = proc
         if cgroup_path:
             self.worker_cgroups[worker_id] = cgroup_path
         port_info = f"main={vsock_port}" + (f" side={side_port}" if side_port else "")
         print(f"[supervisor] Spawned worker {worker_id} (pid {proc.pid}) on vsock {port_info}",
               file=sys.stderr, flush=True)
-        return {"spawned": {"id": worker_id, "pid": proc.pid}}
+        return SPAWNED(id=worker_id, pid=proc.pid)
 
+    @command("kill")
     def _kill_worker(self, data: dict) -> dict:
         worker_id = data["id"]
         proc = self.workers.get(worker_id)
         if proc is None:
-            return {"error": {"message": f"Worker {worker_id} not found"}}
+            return ERROR(message=f"Worker {worker_id} not found")
 
         if proc.poll() is None:
             proc.terminate()
@@ -458,20 +551,22 @@ class Supervisor:
         del self.workers[worker_id]
         self._remove_cgroup(self.worker_cgroups.pop(worker_id, None))
         print(f"[supervisor] Killed worker {worker_id}", file=sys.stderr, flush=True)
-        return {"killed": {"id": worker_id}}
+        return KILLED(id=worker_id)
 
+    @command("abort")
     def _abort_worker(self, data: dict) -> dict:
         worker_id = data["id"]
         proc = self.workers.get(worker_id)
         if proc is None:
-            return {"error": {"message": f"Worker {worker_id} not found"}}
+            return ERROR(message=f"Worker {worker_id} not found")
         if proc.poll() is not None:
-            return {"error": {"message": f"Worker {worker_id} already exited"}}
+            return ERROR(message=f"Worker {worker_id} already exited")
 
         os.kill(proc.pid, signal.SIGUSR1)
-        return {"aborted": {"id": worker_id}}
+        return ABORTED(id=worker_id)
 
-    def _get_status(self) -> dict:
+    @command("status")
+    def _get_status(self, data: dict) -> dict:
         workers_status = {}
         for wid, proc in self.workers.items():
             workers_status[str(wid)] = {
@@ -484,75 +579,77 @@ class Supervisor:
                 for cid, entry in self.execs.items()
                 if entry["proc"].poll() is None
             }
-        return {"status": {"workers": workers_status, "execs": exec_status}}
+        return STATUS(workers=workers_status, execs=exec_status)
 
-    def _idle_status(self) -> dict:
+    @command("idle_status")
+    def _idle_status(self, data: dict | None = None) -> dict:
         live_workers = 0
         for proc in self.workers.values():
             if proc.poll() is None:
                 live_workers += 1
         with self.execs_lock:
             live_execs = sum(1 for entry in self.execs.values() if entry["proc"].poll() is None)
-        return {
-            "idle_status": {
-                "idle": live_workers == 0 and live_execs == 0,
-                "workers": live_workers,
-                "execs": live_execs,
-            }
+        payload = {
+            "idle": live_workers == 0 and live_execs == 0,
+            "workers": live_workers,
+            "execs": live_execs,
         }
+        # Open-region backstop: keys emitted outside the declaration on paths
+        # that actually executed. Absent when nothing was observed, so a healthy
+        # guest reports nothing rather than an empty reassurance.
+        undeclared = observed_undeclared_keys()
+        if undeclared:
+            payload["observedUndeclaredKeys"] = undeclared
+        return IDLE_STATUS(**payload)
 
-    def _prepare_snapshot(self) -> dict:
+    @command("prepare_snapshot")
+    def _prepare_snapshot(self, data: dict | None = None) -> dict:
         idle = self._idle_status()["idle_status"]
         if not idle["idle"]:
-            return {
-                "error": {
-                    "message": (
-                        f"Snapshot requires idle supervisor: "
-                        f"workers={idle['workers']} execs={idle['execs']}"
-                    )
-                }
-            }
+            return ERROR(
+                message=(
+                    f"Snapshot requires idle supervisor: "
+                    f"workers={idle['workers']} execs={idle['execs']}"
+                )
+            )
         self.poweroff_on_disconnect = False
         self.relisten_on_disconnect = True
-        return {
-            "snapshot_ready": {
-                "workers": idle["workers"],
-                "execs": idle["execs"],
-                "supervisorVersion": 2,
-                "protocolVersion": 5,
-            }
-        }
+        return SNAPSHOT_READY(workers=idle["workers"], execs=idle["execs"])
 
     def _send_exec_chunk(self, channel_id: int, stream: str, data: bytes):
         if not data:
             return
-        key = "exec_stdout" if stream == "stdout" else "exec_stderr"
-        self._send_response({
-            key: {
-                "channelID": channel_id,
-                "bytes": base64.b64encode(data).decode("ascii"),
-            }
-        })
+        constructor = EXEC_STDOUT if stream == "stdout" else EXEC_STDERR
+        self._send_response(constructor(
+            channelID=channel_id,
+            bytes=base64.b64encode(data).decode("ascii"),
+        ))
 
     def _send_exec_result(self, channel_id: int, proc: subprocess.Popen, started: float, truncated: bool = False):
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        self._send_response({
-            "exec_result": {
-                "channelID": channel_id,
-                "exitCode": int(proc.returncode if proc.returncode is not None else -1),
-                "elapsedMs": elapsed_ms,
-                "truncated": truncated,
-            }
-        })
+        self._send_response(EXEC_RESULT(
+            channelID=channel_id,
+            exitCode=int(proc.returncode if proc.returncode is not None else -1),
+            elapsedMs=elapsed_ms,
+            truncated=truncated,
+        ))
 
-    def _send_exec_error(self, channel_id: int, code: str, message: str, **extra):
-        payload = {
-            "channelID": channel_id,
-            "code": code,
-            "message": message,
-        }
-        payload.update(extra)
-        self._send_response({"exec_error": payload})
+    def _send_exec_error(self, channel_id: int, code: ExecErrorCode, message: str, **extra):
+        self._send_response(EXEC_ERROR(
+            channelID=channel_id,
+            code=code.value,
+            message=message,
+            **extra,
+        ))
+
+    def _send_output_limit_exceeded(self, channel_id: int, observed: int, limit: int):
+        self._send_exec_error(
+            channel_id,
+            ExecErrorCode.RESOURCE_ERROR,
+            "execOutputLimitExceeded",
+            observed=observed,
+            limit=limit,
+        )
 
     def _kill_exec_process(self, proc: subprocess.Popen):
         if proc.poll() is not None:
@@ -584,6 +681,24 @@ class Supervisor:
         packed = struct.pack("HHHH", rows, cols, xpixels, ypixels)
         fcntl.ioctl(fd, termios.TIOCSWINSZ, packed)
 
+    @command("exec", replies_on_channel=True, channel_keyed=True)
+    def _exec(self, data: dict) -> None:
+        self._start_exec(data, use_pty=False)
+        return None
+
+    @command("exec_stream", replies_on_channel=True, channel_keyed=True)
+    def _exec_stream(self, data: dict) -> None:
+        self._start_exec(data, use_pty=False)
+        return None
+
+    @command("exec_pty", replies_on_channel=True, channel_keyed=True)
+    def _exec_pty(self, data: dict) -> None:
+        self._start_exec(data, use_pty=True)
+        return None
+
+    def _start_exec(self, data: dict, use_pty: bool):
+        threading.Thread(target=self._run_exec, args=(data, use_pty), daemon=True).start()
+
     def _run_exec(self, data: dict, use_pty: bool):
         channel_id = int(data["channelID"])
         command = data["command"]
@@ -599,13 +714,7 @@ class Supervisor:
 
         try:
             if self.guest_sudo_mode == "none" and self._command_uses_sudo(command):
-                self._send_response({
-                    "exec_error": {
-                        "channelID": channel_id,
-                        "code": "sudoDisabled",
-                        "message": command,
-                    }
-                })
+                self._send_exec_error(channel_id, ExecErrorCode.SUDO_DISABLED, command)
                 return
 
             cgroup_path = self._create_cpu_cgroup(f"exec-{channel_id}")
@@ -659,7 +768,7 @@ class Supervisor:
                     "master_fd": master_fd,
                     "stdin": proc.stdin if not use_pty else None,
                 }
-            self._send_response({"exec_started": {"channelID": channel_id}})
+            self._send_response(EXEC_STARTED(channelID=channel_id))
 
             observed = 0
             deadline = started + timeout
@@ -667,7 +776,7 @@ class Supervisor:
                 if time.monotonic() > deadline:
                     self._kill_exec_process(proc)
                     elapsed_ms = int((time.monotonic() - started) * 1000)
-                    self._send_response({"exec_timeout": {"channelID": channel_id, "elapsedMs": elapsed_ms}})
+                    self._send_response(EXEC_TIMEOUT(channelID=channel_id, elapsedMs=elapsed_ms))
                     return
 
                 events = selector.select(timeout=0.05)
@@ -688,15 +797,7 @@ class Supervisor:
                     observed += len(chunk)
                     if observed > max_output:
                         self._kill_exec_process(proc)
-                        self._send_response({
-                            "exec_error": {
-                                "channelID": channel_id,
-                                "code": "resourceError",
-                                "message": "execOutputLimitExceeded",
-                                "observed": observed,
-                                "limit": max_output,
-                            }
-                        })
+                        self._send_output_limit_exceeded(channel_id, observed, max_output)
                         return
                     self._send_exec_chunk(channel_id, stream, chunk)
 
@@ -718,15 +819,7 @@ class Supervisor:
                             observed += len(chunk)
                             if observed > max_output:
                                 self._kill_exec_process(proc)
-                                self._send_response({
-                                    "exec_error": {
-                                        "channelID": channel_id,
-                                        "code": "resourceError",
-                                        "message": "execOutputLimitExceeded",
-                                        "observed": observed,
-                                        "limit": max_output,
-                                    }
-                                })
+                                self._send_output_limit_exceeded(channel_id, observed, max_output)
                                 return
                             self._send_exec_chunk(channel_id, stream, chunk)
                         try:
@@ -744,23 +837,23 @@ class Supervisor:
             if "cgroup" in message or "cpuQuotaPercent" in message:
                 self._send_exec_error(
                     channel_id,
-                    "quotaExceeded",
+                    ExecErrorCode.QUOTA_EXCEEDED,
                     "cpuQuotaUnavailable",
-                    resource="cpu",
+                    resource=QuotaResource.CPU.value,
                     limit=self.cpu_quota_percent,
                     observed=100,
                 )
             elif "RLIMIT_NOFILE" in message or "setrlimit" in message:
                 self._send_exec_error(
                     channel_id,
-                    "quotaExceeded",
+                    ExecErrorCode.QUOTA_EXCEEDED,
                     "openFileQuotaUnavailable",
-                    resource="openFiles",
+                    resource=QuotaResource.OPEN_FILES.value,
                     limit=self.max_open_files,
                     observed=self.max_open_files,
                 )
             else:
-                self._send_exec_error(channel_id, "internalError", message)
+                self._send_exec_error(channel_id, ExecErrorCode.INTERNAL_ERROR, message)
         finally:
             with self.execs_lock:
                 self.execs.pop(channel_id, None)
@@ -773,6 +866,7 @@ class Supervisor:
                 except OSError:
                     pass
 
+    @command("exec_stdin", channel_keyed=True)
     def _exec_stdin(self, data: dict) -> dict:
         channel_id = int(data["channelID"])
         payload = base64.b64decode(data.get("bytes", "")) if data.get("bytes") else b""
@@ -787,22 +881,35 @@ class Supervisor:
             time.sleep(0.01)
         if not entry:
             if eof and not payload:
-                return {"exec_stdin_ack": {"channelID": channel_id}}
-            return {"exec_error": {"channelID": channel_id, "code": "internalError", "message": "stdin unavailable"}}
+                return EXEC_STDIN_ACK(channelID=channel_id)
+            return self._stdin_unavailable(channel_id)
         if entry.get("pty") and entry.get("master_fd") is not None:
             if payload:
                 os.write(entry["master_fd"], payload)
-            return {"exec_stdin_ack": {"channelID": channel_id}}
+            return EXEC_STDIN_ACK(channelID=channel_id)
 
         stdin = entry.get("stdin")
         if stdin is None:
-            return {"exec_error": {"channelID": channel_id, "code": "internalError", "message": "stdin unavailable"}}
+            return self._stdin_unavailable(channel_id)
         if payload:
             stdin.write(payload)
             stdin.flush()
         if eof:
             stdin.close()
-        return {"exec_stdin_ack": {"channelID": channel_id}}
+        return EXEC_STDIN_ACK(channelID=channel_id)
+
+    def _stdin_unavailable(self, channel_id: int) -> dict:
+        """The exec this stdin write targets is gone.
+
+        Declared droppable via `EXEC_ERROR.droppable_codes` so the host can
+        discard it quietly when the channel has already been torn down, instead
+        of recognising it by matching this message's English text.
+        """
+        return EXEC_ERROR(
+            channelID=channel_id,
+            code=ExecErrorCode.INTERNAL_ERROR.value,
+            message="stdin unavailable",
+        )
 
     def _poweroff_after_parent_disconnect(self):
         time.sleep(self.parent_disconnect_timeout)
@@ -843,12 +950,17 @@ class Supervisor:
                 except Exception:
                     pass
 
+    @command("exec_signal", channel_keyed=True)
     def _exec_signal(self, data: dict) -> dict:
         channel_id = int(data["channelID"])
         with self.execs_lock:
             entry = self.execs.get(channel_id)
         if not entry:
-            return {"exec_error": {"channelID": channel_id, "code": "internalError", "message": "exec channel not found"}}
+            return EXEC_ERROR(
+                channelID=channel_id,
+                code=ExecErrorCode.INTERNAL_ERROR.value,
+                message="exec channel not found",
+            )
         if data.get("terminalSize") and entry.get("master_fd") is not None:
             self._set_winsize(entry["master_fd"], data["terminalSize"])
         signal_number = int(data.get("signal", 0))
@@ -857,7 +969,12 @@ class Supervisor:
                 os.killpg(entry["proc"].pid, signal_number)
             except ProcessLookupError:
                 pass
-        return {"exec_signal_ack": {"channelID": channel_id}}
+        return EXEC_SIGNAL_ACK(channelID=channel_id)
+
+    @command("shutdown")
+    def _shutdown(self, data: dict) -> dict:
+        self.running = False
+        return SHUTTING_DOWN()
 
     def _shutdown_all(self):
         with self.execs_lock:
@@ -879,6 +996,14 @@ class Supervisor:
             self._remove_cgroup(self.worker_cgroups.pop(wid, None))
         self.workers.clear()
         print("[supervisor] All workers terminated", file=sys.stderr, flush=True)
+
+
+# Resolve the dispatch table at import so a command registered without a
+# handler stops the guest at startup, with a traceback in the supervisor's own
+# log. Left to the first command it would be raised inside the run loop's
+# catch-all, which answers the host with a generic `error` frame and leaves a
+# silently degraded supervisor running for the life of the connection.
+Supervisor._command_dispatch()
 
 
 # ---------------------------------------------------------------------------

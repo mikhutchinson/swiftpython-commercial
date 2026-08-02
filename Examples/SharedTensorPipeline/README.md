@@ -62,8 +62,8 @@ try await pool.withSharedBuffer(shared, as: Double.self) { buf in
 `withSharedBuffer` validates the dtype/size/Swift type and hands back a typed
 `UnsafeMutableBufferPointer` straight into the mmap'd region. There's no copy,
 no socket round-trip, no pickle: those Swift stores commit to memory pages the
-workers will read in the next step. Release builds sustain ~100 GiB/s on Apple
-silicon.
+workers will read in the next step. Reported throughput is an observation from
+the current machine and build, not a portable performance guarantee.
 
 ### 3. Two workers reduce disjoint halves in parallel
 
@@ -93,7 +93,9 @@ try await pool.startOutOfBandStream(
 )
 ```
 
-`startOutOfBandStream` runs the generator on a daemon thread inside worker 0
+`startOutOfBandStream` is a synchronous method isolated to the pool actor, so
+consumer code uses `try await` to enter that actor. It runs the generator on a
+daemon thread inside worker 0
 through the **side channel** (separate UDS socket). Each yielded `str` is
 UTF-8 encoded and `memcpy`'d into the ring buffer's circular data region; a
 monotonically increasing `writePos` header is updated last (8-byte aligned
@@ -111,16 +113,17 @@ let result: Int = try await pool.evalResult(
     "sum(range(\(probe * 1000)))", worker: 0, timeout: 2.0)
 ```
 
-The probes complete in <1.5 ms each because they go through the normal IPC
-socket — which is free. If you tried the same with `evalStream` instead of OOB,
-each probe would block until the stream finished.
+The probes complete while the OOB writer is still active because they go
+through the normal IPC socket, which remains free. The sample run below was
+under 1.5 ms per probe; that latency is a machine observation, not a portable
+budget. With `evalStream` instead of OOB, each probe would wait behind the
+stream on that worker's main command channel.
 
 The drain task verifies all `80` telemetry frames arrived in order and prints
 their `elapsed_ms` (measured by the Python generator from its own
-`time.monotonic()` baseline). After the writer flips `isWriterDone`, the demo
-unregisters the segment from Python's `multiprocessing.resource_tracker` so
-worker shutdown doesn't print a spurious "leaked shared_memory" warning —
-`SharedRingBuffer.deinit` is what actually unlinks the POSIX segment.
+`time.monotonic()` baseline). The runtime attaches without transferring
+resource-tracker ownership; `SharedRingBuffer.deinit` remains responsible for
+unlinking the POSIX segment.
 
 ### 6. Zero-copy readback through Swift's mmap view
 

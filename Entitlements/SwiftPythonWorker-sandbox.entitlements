@@ -3,15 +3,10 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Hardened runtime exceptions for Python interop -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
-    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-    <true/>
-    <!-- App Sandbox inheritance for Mac App Store distribution.
+    <!-- App Sandbox inheritance for sandboxed parent distribution.
          ONLY use this file when the PARENT app is sandboxed.
+         Apple requires an inherited command-line helper to carry only
+         app-sandbox and inherit. Declare all capabilities on the parent.
          If the parent is NOT sandboxed, the worker gets a default
          restrictive sandbox that blocks Python file access.
          The worker binary must have an embedded CFBundleIdentifier

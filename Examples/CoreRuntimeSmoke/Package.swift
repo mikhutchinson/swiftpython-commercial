@@ -3,18 +3,55 @@ import Foundation
 import PackageDescription
 
 private func parseSemVer(_ raw: String) -> Version? {
-    let core = raw
-        .split(separator: "-", maxSplits: 1, omittingEmptySubsequences: true)
-        .first
-        .map(String.init) ?? raw
-    let parts = core.split(separator: ".", omittingEmptySubsequences: false)
-    guard parts.count == 3,
-          let major = Int(parts[0]),
-          let minor = Int(parts[1]),
-          let patch = Int(parts[2]) else {
+    let buildSplit = raw.split(
+        separator: "+",
+        maxSplits: 1,
+        omittingEmptySubsequences: false
+    )
+    guard buildSplit.count <= 2 else { return nil }
+
+    let releaseAndPrerelease = buildSplit[0].split(
+        separator: "-",
+        maxSplits: 1,
+        omittingEmptySubsequences: false
+    )
+    let core = releaseAndPrerelease[0].split(
+        separator: ".",
+        omittingEmptySubsequences: false
+    )
+    guard core.count == 3,
+          let major = Int(core[0]),
+          let minor = Int(core[1]),
+          let patch = Int(core[2]),
+          major >= 0,
+          minor >= 0,
+          patch >= 0 else {
         return nil
     }
-    return Version(major, minor, patch)
+
+    let prerelease = releaseAndPrerelease.count == 2
+        ? releaseAndPrerelease[1].split(
+            separator: ".",
+            omittingEmptySubsequences: false
+        ).map(String.init)
+        : []
+    let build = buildSplit.count == 2
+        ? buildSplit[1].split(
+            separator: ".",
+            omittingEmptySubsequences: false
+        ).map(String.init)
+        : []
+    guard prerelease.allSatisfy({ !$0.isEmpty }),
+          build.allSatisfy({ !$0.isEmpty }) else {
+        return nil
+    }
+    return Version(
+        major,
+        minor,
+        patch,
+        prereleaseIdentifiers: prerelease,
+        buildMetadataIdentifiers: build
+    )
 }
 
 private let swiftPythonPackageName = "swiftpython-commercial"
@@ -45,7 +82,9 @@ private func makeSwiftPythonDependencyConfig(defaultPath: String = "../..") -> S
         .trimmingCharacters(in: .whitespacesAndNewlines),
        !versionRaw.isEmpty {
         guard let version = parseSemVer(versionRaw) else {
-            fatalError("SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION must be semantic version MAJOR.MINOR.PATCH")
+            fatalError(
+                "SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION must be semantic version MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]"
+            )
         }
         return SwiftPythonDependencyConfig(
             dependency: .package(url: url, exact: version),

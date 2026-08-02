@@ -1,146 +1,278 @@
-# SwiftPython Runtime Binary Distribution
+# SwiftPython Commercial Distribution
 
-Public binary distribution for the SwiftPython runtime on macOS.
+Binary distribution of SwiftPython for macOS applications that need in-process
+Python, isolated worker processes, long-lived full-duplex sessions, or
+Virtualization.framework-backed Linux tenants.
 
-This repository is intentionally public so SwiftPython users can depend on it
-with Swift Package Manager. SwiftPython is available under three paths:
-AGPL-3.0 for AGPL-compliant open source applications, a free Small Organization
-Commercial Grant for individuals and organizations with fewer than 10 total
-employees and contractors, or a written commercial license for larger
-proprietary/closed-source use. The SwiftPython source code, generator pipeline,
-and implementation internals remain private. You do not need the private
-repository to build an app against this package.
-
-Current release: `0.5.18`
+Current release: `0.6.0-duplex.2`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
-## Licensing at a Glance
+## License
 
-| Use case | Path |
-|----------|------|
-| AGPL-compliant open source app or service | AGPL-3.0 |
-| Individual or organization under 10 total employees/contractors | Free Small Organization Commercial Grant |
-| Organization with 10 or more total employees/contractors | Written SwiftPython Commercial license |
+Use this package under one of:
 
-The small-organization threshold counts parent companies, subsidiaries, and
-controlled affiliates. This table is only a summary; see [LICENSE](LICENSE)
-for the exact terms.
+- AGPL-3.0;
+- the free Small Organization Commercial Grant in [LICENSE](LICENSE); or
+- a written commercial license.
 
-## What Ships
+Read [LICENSE](LICENSE) before distributing an application.
 
-| Artifact | Purpose |
-|----------|---------|
-| `SwiftPythonRuntime.xcframework` | Swift runtime API and binary library |
-| `SwiftPythonWorker` | Local worker sidecar for `PythonProcessPool` |
-| `VMWorker/` | Python supervisor and worker scripts for VM tenants |
-| `Entitlements/` | Hardened runtime, sandbox, and VM entitlement templates |
-| `Examples/IrisDemo/` | Complete macOS IRIS app built against the public runtime |
-| `Examples/CoreRuntimeSmoke/` | Minimal CLI: in-process `Python.run` |
-| `Examples/ProcessPoolSmoke/` | Minimal CLI: `withProcessPool` + `invokeResult` |
-| `Examples/BridgingRing/` | Pool IPC tour: Swift↔Python callbacks, `WorkerCallbackContext`, `evalEvents` |
-| `Examples/SharedTensorPipeline/` | Headline demo: shared-memory arena + out-of-band streaming + concurrent IPC |
-| `docs/api-guide/` | Public API guide and integration recipes |
-| `scripts/consumer_path_smoke.sh` | Verifies a separate Swift package can consume this checkout by local path |
+## Release contents
 
-Keep the XCFramework, worker binary, and `VMWorker/` scripts on the same tag.
-Do not mix artifacts from different releases.
+| Path or release asset | Purpose |
+|---|---|
+| `SwiftPythonRuntime.xcframework` | Core in-process, ProcessPool, streaming, duplex, and VM/Sandbox API |
+| `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
+| `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
+| `SwiftPythonWorker` | Matched arm64 local ProcessPool sidecar |
+| `VMWorker/` | Matched five-file generated protocol/helper/supervisor/worker set |
+| `Entitlements/` | Parent, worker, inherited-sandbox worker, and virtualization templates |
+| `Examples/` | Standalone packages compiled against this public distribution |
+| `docs/api-guide/` | Public API and deployment guide |
+| `manifest.json` release asset | Version, source revision, protocols, byte sizes, and SHA-256 records |
 
-## Distribution Modes
+The three XCFrameworks are universal macOS binaries. The prebuilt
+`SwiftPythonWorker` sidecar is arm64; an Intel ProcessPool deployment needs a
+same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
+release version. Worker wire v6 is not compatible with the published v0.5
+worker wire v5.
 
-Use Swift Package Manager, a tagged source archive, or a complete
-`SwiftPythonCommercial-<version>.zip` release asset when available. Those
-include the package manifest, worker sidecar, `VMWorker/` scripts, entitlements,
-examples, and docs.
-
-`SwiftPythonRuntime.xcframework.zip` is the runtime binary artifact only. It is
-not a complete installable distribution by itself for `PythonProcessPool`,
-SandboxPool, or the examples because those also need the matched worker and
-support files from the same release tag.
+The complete `SwiftPythonCommercial-0.6.0-duplex.2.zip` asset contains this
+public checkout. The three XCFramework zips are individual binary-target
+assets. `manifest.json` is a separate asset and attests all three zips, the
+worker, all five VM helpers, the complete distribution, and the same-version VM
+image used for the certified VM gate.
 
 ## Requirements
 
-- macOS 15.0+
-- Swift 6.0+
-- Python 3.13, Homebrew recommended for development
-- Xcode command line tools
-- Apple Silicon Mac for the shipped `SwiftPythonWorker` sidecar and VM/SandboxPool path
+- macOS 15 or newer
+- Swift 6 / Xcode command-line tools
+- Python 3.13 and development libraries
+- Apple Silicon for the shipped ProcessPool sidecar
+- Virtualization.framework entitlement and Apple Silicon for VM/Sandbox use
 
-For Python 3.13 via Homebrew:
+The package linker settings discover Homebrew Python 3.13 on Apple Silicon or
+Intel. Set `SWIFTPYTHON_PYTHON_LIB_DIR`, `PYTHON_HOME`, or `PYTHONHOME`
+for a custom layout. A distributable sandboxed app must bundle Python; Finder
+and Dock launches do not inherit shell environment variables.
 
-```bash
-brew install python@3.13
-```
+## Swift Package Manager
 
-The package and examples auto-detect Homebrew's Apple Silicon and Intel
-prefixes. For custom Python layouts, set `SWIFTPYTHON_PYTHON_LIB_DIR`,
-`PYTHON_HOME`, or `PYTHONHOME` before building.
-
-## Add the Package
+Pin the prerelease exactly:
 
 ```swift
 // Package.swift
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        from: "0.5.18"
+        exact: "0.6.0-duplex.2"
     )
 ]
 ```
 
+Choose only the products the application uses:
+
 ```swift
-.target(
-    name: "YourAppCore",
-    dependencies: [
-        .product(name: "SwiftPythonRuntime", package: "swiftpython-commercial")
-    ],
-    linkerSettings: [
-        .unsafeFlags([
-            "-L/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib",
-            "-lpython3.13"
-        ])
-    ]
+.product(
+    name: "SwiftPythonRuntime",
+    package: "swiftpython-commercial"
+)
+.product(
+    name: "SwiftPythonAudioInterop",
+    package: "swiftpython-commercial"
+)
+.product(
+    name: "SwiftPythonMetalInterop",
+    package: "swiftpython-commercial"
 )
 ```
 
-Import the runtime:
+`SwiftPythonAudioInterop` and `SwiftPythonMetalInterop` are independent
+optional products. A core-only consumer does not link AVFAudio or Metal through
+those adapters.
+
+## In-process and ProcessPool smoke
 
 ```swift
 import SwiftPythonRuntime
-```
 
-## Smoke Test
-
-```swift
 let version: String = try await Python.run {
     try String(pythonObject: Python.sys.version)
 }
 
-print(version)
-```
-
-For worker execution:
-
-```swift
 try await withProcessPool(workers: 2) { pool in
     let value: Double = try await pool.invokeResult(
         module: "math",
         function: "sqrt",
         args: [.python(144.0)]
     )
-    print(value)
+    print(version, value)
 }
 ```
 
-## Public API Guide
+For an app bundle, copy `SwiftPythonWorker` into
+`Contents/MacOS/SwiftPythonWorker`, then sign nested code before the outer
+app. Worker discovery also accepts `SWIFTPYTHON_WORKER_PATH` or the explicit
+`workerExecutablePath:` initializer argument.
 
-Start here: [docs/api-guide](docs/api-guide/).
+## App Bundle Layout
 
-For runnable samples, see [Examples](Examples/) (including [IrisDemo](Examples/IrisDemo/)).
-The examples resolve this checkout by local path by default; no package URL or
-version environment variables are needed when running them from a clone.
+```text
+YourApp.app/
+  Contents/
+    Frameworks/
+      Python.framework/        # required for self-contained/sandboxed apps
+    MacOS/
+      YourApp
+      SwiftPythonWorker
+    Info.plist
+```
 
-First-run smoke from a local checkout:
+The worker and host must load the same bundled Python when the app cannot rely
+on Homebrew. Copying a sidecar is not a signing or notarization step; use the
+distribution-specific rules below.
+
+## Full-duplex sessions
+
+`PythonDuplexSession` pins one worker ID and generation while input, output,
+semantic control, and interruption progress independently. It never migrates or
+replays after worker replacement.
+
+```swift
+let session = try await pool.openDuplexSession(
+    handler: .eval(
+        code: """
+        from swift_duplex import InputFrame
+        def run(session):
+            session.ready()
+            for event in session.iter_input():
+                if isinstance(event, InputFrame):
+                    session.output.send(
+                        bytes(event.buffer),
+                        processed_input_through=event.sequence,
+                    )
+            session.output.finish()
+        """,
+        entrypoint: "run"
+    )
+)
+
+do {
+    try await session.input.send(
+        DuplexInputFrame(payload: Data("hello".utf8))
+    )
+    try await session.input.finish()
+    for try await frame in session.output {
+        consume(frame.buffer)
+        try await session.acknowledgeOutput(
+            consumedThrough: DuplexPosition(
+                sequence: frame.position.sequence,
+                byteOffset: frame.buffer.count
+            )
+        )
+    }
+    _ = try await session.result()
+    await session.close()
+} catch {
+    await session.cancel(reason: .user)
+    await session.close()
+    throw error
+}
+```
+
+Frame-only sessions require `.frames`. Bounded logical-message fragmentation
+requires `.messages`. The local fixed-pool shared-ingress route requires
+`.arenaIngress` and a `DuplexSharedBufferPoolConfiguration`; VM/vsock uses
+inline logical-message chunks and does not advertise local arena ingress.
+Capability requirements are rechecked atomically against the exact generation
+reserved for open.
+
+See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
+[DuplexSession example](Examples/DuplexSession/).
+
+## VM and Sandbox
+
+`0.6.0-duplex.2` includes the VM/Sandbox release slice. Its certified gate uses
+the same source revision for:
+
+- all three XCFrameworks and the local sidecar;
+- `_swiftpython_wire.py`, `_swiftpython_duplex.py`,
+  `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and
+  `swiftpython_worker.py`;
+- the attested Ubuntu base image and warm snapshot;
+- cold and warm vsock duplex/message workloads.
+
+The release manifest identifies the verified image and records the exact guest
+helper hashes. Image/snapshot verification must reject a hash, version,
+protocol, supervisor, configuration, or restore-secret mismatch; a warm gate
+must not silently fall back to cold boot.
+
+Deploy the five-file `VMWorker/` directory together and point custom layouts
+at it with:
+
+```bash
+SWIFTPYTHON_VM_WORKER_DIR=/absolute/path/to/VMWorker
+```
+
+See [Chapter 9](docs/api-guide/ch9-sandbox-vm.md) for image, snapshot, tenant,
+shell/PTY, and VM ProcessPool usage.
+
+## Audio and Metal
+
+```swift
+import SwiftPythonAudioInterop
+import SwiftPythonMetalInterop
+```
+
+`DuplexAudioFormat` validates PCM shape before capture/playback.
+`DuplexAudioCapture` and `DuplexAudioPlayback` keep AVAudio callbacks
+realtime-only; async pumps own session interaction.
+
+`DuplexSharedBufferLease.makeMetalBufferLease` maps a page-aligned local arena
+slot to an `MTLBuffer` without copying those arena pages. Registered command
+buffers and access completion hold the exact generation until safe reuse.
+`DuplexCopyLedger` records actual zero-copy, bounded CPU-copy, or kernel-copy
+routes. It does not turn capture-source, IOSurface, socket, or VM routes into a
+blanket zero-copy claim.
+
+See [Chapter 11](docs/api-guide/ch11-apple-interop.md).
+
+## App Sandbox and signing
+
+Select worker entitlements from the parent app's sandbox state, not from the
+certificate class:
+
+| Parent | Worker template |
+|---|---|
+| Non-sandbox, any signing identity | `SwiftPythonWorker.entitlements` |
+| Sandboxed, Apple Development or Developer ID | `SwiftPythonWorker-sandbox.entitlements` |
+
+The inherited worker template contains exactly
+`com.apple.security.app-sandbox` and `com.apple.security.inherit`.
+Capabilities belong on the parent. For a sandboxed distribution, bundle Python,
+rewrite both host and worker load commands to the bundle-local framework,
+same-team-sign native code, and give the helper an identifier nested beneath
+the parent bundle identifier.
+
+```bash
+codesign --force --sign "$SIGN_ID" --options runtime \
+  --entitlements Entitlements/SwiftPythonWorker.entitlements \
+  YourApp.app/Contents/MacOS/SwiftPythonWorker
+
+codesign --force --sign "$SIGN_ID" --options runtime \
+  --entitlements Entitlements/ConsumerApp.entitlements \
+  YourApp.app
+```
+
+The release gate notarizes the exact complete distribution and three app-shaped
+consumer fixtures (non-sandbox, inherited sandbox, and virtualization), staples
+them, applies quarantine provenance, requires
+`source=Notarized Developer ID`, reruns duplex, and rechecks each signed bundle
+for mutation. The virtualization fixture must complete 20 consecutive positive warm restores
+and the full public VM tenant workload without accepting a cold fallback.
+
+## Build and run public evidence
 
 ```bash
 swift build
@@ -150,222 +282,59 @@ swift run --package-path Examples/CoreRuntimeSmoke
 swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
+swift run --package-path Examples/DuplexSession
+scripts/audit_release_surface.sh 0.6.0-duplex.2
 scripts/consumer_path_smoke.sh
 ```
 
-The root package includes a small `swiftpython-smoke` executable only to make
-first contact obvious. The richer examples live under `Examples/`.
-`scripts/consumer_path_smoke.sh` creates a temporary external Swift package,
-depends on this checkout by path, and verifies both `Python.run` and
-`withProcessPool`.
-
-## How It Compares to Other Swift ↔ Python Options
-
-Most existing Swift ↔ Python bridges put CPython **in your app's address
-space**: one interpreter, one GIL, one crash domain. SwiftPython runs the
-same `Python.run` model in-process *and* a multi-process `PythonProcessPool`
-with a documented IPC protocol on top.
-
-| Axis | In-process bridge (e.g. PythonKit) | SwiftPython |
-|------|-----------------------------------|-------------|
-| Process model | Embeds `libpython` in your app | In-process `Python.run` **plus** `PythonProcessPool` worker processes |
-| Parallelism | Limited by a single GIL | One CPython + one GIL per worker; multiple workers run in parallel |
-| Crash isolation | Python crash takes down the host | Worker crashes are surfaced as Swift errors; respawn is built-in |
-| Native extensions (NumPy, Torch, …) | Yes, in the host process | Yes — in workers, where a crashing extension does not kill your app |
-| Shared-memory tensors across processes | N/A | `pool.createSharedTensor` + `withSharedBuffer` (typed Swift access into POSIX shm) |
-| Out-of-band streaming | N/A | `SharedRingBuffer` (POSIX shm) **or** `SocketOOBStreamBuffer` (UDS / vsock) — stream without holding the worker IPC socket, process-pool or VM tenant |
-| Python → Swift callbacks | N/A | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback`, `registerAsyncCallback` |
-| Worker telemetry | Manual host logging | Structured `ProcessPoolTelemetryEvent` stream with command spans, worker identity, callback/stream state, respawn evidence, Python exception metadata, and host correlation context |
-| VM-isolated tenants | N/A | `SandboxPool` with Linux VM guests (`execShell`, `execShellPTY`) |
-
-This is a positioning summary, not a claim of feature parity in either
-direction; PythonKit-style in-process bridges remain a perfectly good fit when
-your workload is small, trusted, and never needs to leave the app process.
-SwiftPython is built for the cases where you want isolation, parallelism, or
-large shared buffers in addition to the in-process surface.
-
-For a single executable that exercises the shared-memory arena, out-of-band
-streaming, and concurrent IPC together, see
-[`Examples/SharedTensorPipeline`](Examples/SharedTensorPipeline/).
-
-The guide covers:
-
-- in-process `Python.run`,
-- Swift/Python conversion and buffers,
-- `PyHandle` and `OwnedPyHandle`,
-- `PythonProcessPool`,
-- structured ProcessPool telemetry,
-- streaming values and progress,
-- DAG orchestration,
-- Python-to-Swift callbacks,
-- app-level wrappers for Python packages,
-- VM tenants and shell/PTY exec through `SandboxPool`.
-
-## App Bundle Layout
-
-For `.app` bundles, copy `SwiftPythonWorker` into `Contents/MacOS` next to your
-main executable.
-
-```text
-YourApp.app/
-  Contents/
-    MacOS/
-      YourApp
-      SwiftPythonWorker
-    Info.plist
-```
-
-If your app uses VM tenants and cannot rely on the SPM checkout at runtime,
-deploy `VMWorker/` with your app and set:
+For the final notarized VM release gate, supply the same-commit image and
+snapshot explicitly:
 
 ```bash
-SWIFTPYTHON_VM_WORKER_DIR=/absolute/path/to/VMWorker
+SWIFTPYTHON_NOTARY_PROFILE="SiriusMsg Notary" \
+SWIFTPYTHON_NOTARY_OUTPUT_DIR="$PWD/notarization" \
+SWIFTPYTHON_VM_RELEASE_GATE=1 \
+SWIFTPYTHON_VM_BASE_IMAGE=/absolute/path/to/base-ubuntu.img \
+SWIFTPYTHON_VM_SNAPSHOT=/absolute/path/to/snapshot \
+SWIFTPYTHON_VM_RESTORE_SECRET=/absolute/path/to/snapshot.restore-secret \
+SWIFTPYTHON_VM_CLONE_DIR=/absolute/path/to/consumer-clones \
+SWIFTPYTHON_VM_ITERATIONS=20 \
+  scripts/consumer_path_smoke.sh
 ```
 
-For development tools and CLIs, you can point directly at the worker:
-
-```bash
-SWIFTPYTHON_WORKER_PATH=/absolute/path/to/SwiftPythonWorker
-```
-
-or pass `workerExecutablePath:` when creating `PythonProcessPool`.
-
-## Finder and Dock Launches
-
-Finder-launched apps do not inherit your shell environment. If using Homebrew
-Python, set `PYTHONHOME` and `PATH` before starting your real app binary.
-
-Example wrapper:
-
-```bash
-#!/bin/bash
-export PYTHONHOME="/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13"
-export PATH="$PYTHONHOME/bin:$PATH"
-exec "$(dirname "$0")/YourApp.bin"
-```
-
-Apps that bundle Python should set these paths to their bundled framework or
-virtual environment instead.
-
-## Code Signing and Entitlements
-
-Python native extensions often require hardened runtime exceptions for dynamic
-library loading and executable memory. The worker is a separate executable, so
-it must be signed separately from your app.
-
-Sign the worker after copying it into the app:
-
-```bash
-codesign --force --sign "$SIGN_ID" --options runtime \
-  --entitlements Entitlements/SwiftPythonWorker.entitlements \
-  "YourApp.app/Contents/MacOS/SwiftPythonWorker"
-```
-
-Sign the app with the consumer entitlement template:
-
-```bash
-codesign --force --sign "$SIGN_ID" --options runtime \
-  --entitlements Entitlements/ConsumerApp.entitlements \
-  "YourApp.app/Contents/MacOS/YourApp"
-```
-
-Sign inner binaries first, then the outer app.
-
-During development, an Apple Development signing identity avoids repeated
-keychain prompts that happen with ad-hoc signing:
-
-```bash
-IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Development" | head -1 | awk -F'"' '{print $2}')
-SIGN_ID="${IDENTITY:--}"
-```
-
-### App Sandbox
-
-Use `Entitlements/SwiftPythonWorker-sandbox.entitlements` only when the parent
-app is sandboxed. It includes sandbox inheritance for the worker.
-
-Do not sign a worker with sandbox inheritance if the parent app is not sandboxed;
-the worker will get a restrictive default sandbox and may be unable to load
-Python packages.
-
-### VM Entitlement
-
-VM-backed features require Apple's Virtualization.framework entitlement. Use the
-provided VM entitlement template as the starting point for tools that build or
-boot VM tenants.
-
-## SandboxPool Quick Start
-
-Build or locate a prepared Ubuntu image, then create a pool:
-
-```swift
-let builder = UbuntuImageBuilder(
-    outputDir: "/Users/me/Library/Application Support/MyApp/Images",
-    swiftpythonVersion: "0.5.18"
-)
-let image = try await builder.build()
-
-let sandbox = try await SandboxPool(
-    baseImagePath: image,
-    cloneDir: "/Users/me/Library/Application Support/MyApp/Sandboxes"
-)
-
-let tenantID = SandboxTenantID(rawValue: "default")
-let tenant = try await sandbox.acquire(tenantID: tenantID)
-let result = try await sandbox.execShell(
-    tenantID: tenant.id,
-    "python3 --version"
-)
-
-print(String(decoding: result.stdout, as: UTF8.self))
-try await sandbox.release(tenant)
-await sandbox.shutdown()
-```
-
-See [Sandbox and VM Exec](docs/api-guide/ch9-sandbox-vm.md) for tenant
-lifetime, shell streaming, PTY sessions, events, and VM configuration.
+Every standalone example defaults to this checkout. For a published-tag proof,
+set `SWIFTPYTHON_COMMERCIAL_PACKAGE_URL` and
+`SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION`; prerelease identifiers are
+preserved rather than collapsed to `0.6.0`.
 
 ## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| `Library not loaded: libpython3.13.dylib` | Set `PYTHONHOME`, `PATH`, and linker flags for the Python 3.13 runtime you ship |
-| `workerNotFound(searchedPaths:)` | Copy `SwiftPythonWorker` into the app or pass `workerExecutablePath:` |
-| `protocolError` mentioning protocol v5 | Runtime, worker, and VM scripts are not from the same release tag |
-| `Bad CPU type in executable` launching `SwiftPythonWorker` | Use Apple Silicon for the shipped sidecar, or build and ship your own matching worker for Intel |
-| Worker starts in Terminal but not Finder | Your app launch environment is missing Python paths |
-| Python package imports in app but not worker | Worker process sees a different Python environment; set app launch environment consistently |
-| `VMWorker scripts not found` | Deploy `VMWorker/` or set `SWIFTPYTHON_VM_WORKER_DIR` |
-| SPM fingerprint mismatch | Delete `.build/`, `Package.resolved`, and SwiftPM fingerprint cache, then resolve again |
+| Symptom | Check |
+|---|---|
+| `Library not loaded: libpython3.13.dylib` | Bundle/select the same Python 3.13 layout used at link time |
+| `workerNotFound` | Copy the matched sidecar or set its explicit path |
+| protocol/helper/media skew | Compare the release tag and `manifest.json`; never mix helpers |
+| `Bad CPU type` for the worker | The shipped sidecar is arm64; build a matched x86_64 worker for Intel |
+| duplex `featureUnavailable` | Inspect live capabilities and put requirements on the open |
+| arena requirement rejected in VM | Expected: shared arena ingress is local UDS only |
+| VM image/snapshot rejected | Rebuild all five helpers, image, and snapshot from this release |
+| SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
 
-## Release Notes
+## Release notes
 
-| Version | Notes |
-|---------|-------|
-| 0.5.18 | Async ProcessPool callbacks remain busy through the worker's explicit result acknowledgement, preventing automatic resource-pressure shedding from discarding a callback-returned Future after its originating command returns; executable examples now fail nonzero on reported failures, and timing-sensitive runtime tests use observable barriers instead of fixed sleeps |
-| 0.5.17 | Successful idle-shed actions now emit an unconditional `idleShedCompleted(workerIDs:cause:)` lifecycle event after the existing per-worker events; the structured cause distinguishes explicit calls, periodic resource-monitor snapshots, and Darwin system-memory-pressure transitions without enabling high-frequency sample broadcasting |
-| 0.5.16 | Consumer stream cancellation starts its containment deadline before sending `streamCancel`, reports worker acknowledgement, preserves PID/generation on cooperative Stop, and classifies last-resort replacement as `streamCancellationEscalated` instead of `streamWedged` |
-| 0.5.15 | Bounded-stream-channel overflow now reports `streamChannelOverflow` instead of a confusing pool-admission `.backpressure`; Linux IPC logging now respects `SWIFTPYTHON_IPC_LOG` instead of printing every message unconditionally; snapshot restore-secret hashing no longer touches disk on non-CryptoKit platforms |
-| 0.5.14 | Busy-worker-safe idle shedding: `shedIdleWorkers(force:)` never shuts down a worker with an active command/stream response channel or an unanswered worker→host callback, so critical-pressure force sheds cannot fail a live stream with a spurious "Worker N is not responding", orphan in-flight callbacks, or trigger an immediate self-defeating respawn |
-| 0.5.13 | Structured ProcessPool telemetry/tracing: command spans, worker PID/generation, host correlation context, callback/stream/side-channel state, respawn evidence, timeout/no-response classification, redaction-safe Python exception diagnostics, and Swift 6 main-actor-safe `ProcessPoolTelemetry.withContext` |
-| 0.5.12 | Superseded by 0.5.13; initial telemetry release needed the Swift 6 `withContext` sendability correction for main-actor consumer entry points |
-| 0.5.10 | Respawn recovery: default per-worker respawn budget is 9, repeated identical-error recovery is capped at 3 SHA-256-matched attempts, and forced cleanup interrupts blocked host sockets so a forced recycle cannot hang behind its own reader/writer |
-| 0.5.9 | macOS spawn admission: worker startup now allows normal reclaimable-memory states such as 69% pressure with about 1.8 GiB available, while still rejecting genuinely scarce memory and hard thermal pressure |
-| 0.5.8 | Host resource-pressure gating: ProcessPool now throttles on aggregate host CPU pressure, gates cold worker spawn before selection, marks initial workers idle for shedding, and avoids Python `resource_tracker` warnings for Swift-owned OOB shared memory |
-| 0.5.6 | Shutdown-safe stream recovery: active value/event streams and manual respawn skip worker repair after pool drain or shutdown |
-| 0.5.5 | Typed ProcessPool callback overloads through four arguments across sync, async, and reentrant APIs |
-| 0.5.4 | Oversized-payload channel recovery: send-side payload caps and parent-side frame draining keep IPC channels usable after typed payload-too-large failures |
-| 0.5.3 | Public distribution polish: local-clone example resolution, first-run smoke target, consumer path dependency smoke, free Small Organization Commercial Grant, full distribution release zip, cleaned XCFramework metadata, and matched worker discovery from SwiftPM workspaces |
-| 0.5.2 | Runtime reliability patch: callback registration ownership, bounded stream demux backpressure, OOB writer failure signaling, VM health ping timeouts, SandboxPool active tenant locks, and release artifact checksum/upload generation |
-| 0.5.1 | ProcessPool reliability patch: CI-exercised reentrant callback fast-fail, bounded per-stream timeout cleanup, typed oversized-command errors, and failed-init worker cleanup |
-| 0.5.0 | ProcessPool async callbacks: `registerAsyncCallback`, worker `swift_bridge.call_async`, protocol-v5 callback IPC, and matched VM/Sandbox worker parity |
-| 0.4.0 | SandboxPool and VM supervisor runtime: Ubuntu image builder, VM tenant pool, shell capture/stream/PTY, quota and policy controls, packaged `VMWorker/` scripts |
-| 0.3.0 | Multi-stream worker protocol and public streaming surface cleanup |
-| 0.2.1 | Public worker respawn API with force-kill path |
-| 0.2.0 | Streaming overhaul: keepalive, progress events, owned handles, pool events, callback orphan observability |
-| 0.1.x | Initial commercial binary releases, worker hardening, app bundle fixes, shared buffer support |
+### 0.6.0-duplex.2
 
-## License
+- Worker wire v6 and first-class `PythonDuplexSession` with bounded credit,
+  half-close, control, interruption, terminal watermarks, and no replay.
+- Feature-negotiated logical messages with bounded fragmentation and
+  reassembly, plus local owned fixed-pool shared-arena ingress.
+- Separate optional Audio and Metal XCFramework products with realtime adapter
+  contracts, lease-safe GPU completion, poison/quarantine semantics, and a
+  route-specific copy ledger.
+- Same-version five-helper VM image/snapshot line with authenticated vsock
+  duplex and cold/warm restore gates.
+- Dual SwiftPM/xcodebuild module layouts, strengthened external consumer,
+  sandbox inheritance, notarization, Gatekeeper, and hosted-byte verification.
 
-License: AGPL-3.0, free Small Organization Commercial Grant, or written
-commercial license. See [LICENSE](LICENSE).
+Prior release history is recorded in the source repository changelog and older
+commercial tags.

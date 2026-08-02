@@ -16,6 +16,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import cross_val_score, learning_curve, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 
@@ -68,6 +69,13 @@ def _estimator(classifier: str):
     raise ValueError(f"Unsupported classifier: {classifier}")
 
 
+def _model(classifier: str, use_scaler: bool):
+    estimator = _estimator(classifier)
+    if use_scaler:
+        return make_pipeline(StandardScaler(), estimator)
+    return estimator
+
+
 def load_dataset(kind: str) -> str:
     bunch, feature_names, class_names = _dataset(kind)
     x = np.asarray(bunch.data, dtype=float)
@@ -90,11 +98,9 @@ def train_model(payload_json: str) -> str:
     bunch, _, class_names = _dataset(kind)
     x = np.asarray(bunch.data, dtype=float)
     y = np.asarray(bunch.target, dtype=int)
-    data_for_cv_and_split = StandardScaler().fit_transform(x) if use_scaler else x
-
     cv_scores = cross_val_score(
-        _estimator(classifier),
-        data_for_cv_and_split,
+        _model(classifier, use_scaler),
+        x,
         y,
         scoring="accuracy",
         cv=5,
@@ -103,7 +109,7 @@ def train_model(payload_json: str) -> str:
     cv_std = float(np.std(cv_scores))
 
     x_train, x_test, y_train, y_test = train_test_split(
-        data_for_cv_and_split,
+        x,
         y,
         test_size=0.25,
         random_state=42,
@@ -111,7 +117,7 @@ def train_model(payload_json: str) -> str:
         stratify=y,
     )
 
-    model = _estimator(classifier)
+    model = _model(classifier, use_scaler)
     model.fit(x_train, y_train)
     test_accuracy = float(model.score(x_test, y_test))
     y_pred = model.predict(x_test)
@@ -122,26 +128,21 @@ def train_model(payload_json: str) -> str:
         y_pred,
         target_names=class_names,
         digits=2,
+        zero_division=0,
     )
 
-    lc_train_sizes: list[int] = []
-    lc_mean_train: list[float] = []
-    lc_mean_test: list[float] = []
-    try:
-        train_sizes, train_scores, test_scores = learning_curve(
-            _estimator(classifier),
-            data_for_cv_and_split,
-            y,
-            cv=5,
-            scoring="accuracy",
-            shuffle=True,
-            random_state=42,
-        )
-        lc_train_sizes = [int(v) for v in train_sizes.tolist()]
-        lc_mean_train = [float(v) for v in np.mean(train_scores, axis=1).tolist()]
-        lc_mean_test = [float(v) for v in np.mean(test_scores, axis=1).tolist()]
-    except Exception:
-        pass
+    train_sizes, train_scores, test_scores = learning_curve(
+        _model(classifier, use_scaler),
+        x,
+        y,
+        cv=5,
+        scoring="accuracy",
+        shuffle=True,
+        random_state=42,
+    )
+    lc_train_sizes = [int(v) for v in train_sizes.tolist()]
+    lc_mean_train = [float(v) for v in np.mean(train_scores, axis=1).tolist()]
+    lc_mean_test = [float(v) for v in np.mean(test_scores, axis=1).tolist()]
 
     result = {
         "modelName": spec.get("classifierName", classifier),

@@ -126,23 +126,6 @@ enum SharedTensorPipeline {
 
         await drainTask.value
 
-        // Tell Python's resource_tracker that we (Swift) own this segment's
-        // lifecycle so it doesn't print a spurious "leaked shared_memory" warning
-        // at worker shutdown — SharedRingBuffer unlinks the shm in its deinit.
-        let trackedName = ring.shmName.hasPrefix("/")
-            ? String(ring.shmName.dropFirst())
-            : ring.shmName
-        _ = try? await pool.eval(
-            """
-            try:
-                from multiprocessing import resource_tracker as _rt
-                _rt.unregister('/\(trackedName)', 'shared_memory')
-            except Exception:
-                pass
-            """,
-            worker: 0
-        )
-
         let drained = await drainState.snapshot()
         print(
             "   drained \(drained.frames) telemetry frames, "

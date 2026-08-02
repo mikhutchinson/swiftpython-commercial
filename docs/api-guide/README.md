@@ -6,9 +6,11 @@ macOS app, worker service, or sandboxed tool without access to the private
 SwiftPython source tree.
 
 The private SwiftPython implementation, generator pipeline, and internal test
-layout are intentionally not documented here. Everything below is supported from
-the public package artifacts: `SwiftPythonRuntime.xcframework`,
-`SwiftPythonWorker`, `VMWorker/`, and the entitlement templates.
+layout are intentionally not documented here. Everything below is supported
+from the public package artifacts: `SwiftPythonRuntime.xcframework`, optional
+`SwiftPythonAudioInterop.xcframework` and
+`SwiftPythonMetalInterop.xcframework`, the matched `SwiftPythonWorker`,
+the five-file `VMWorker/` set, and the entitlement templates.
 
 ## Chapters
 
@@ -23,6 +25,8 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 | 7 - Callbacks | [ch7-callbacks.md](ch7-callbacks.md) | Python calling Swift functions, reentrant work, streaming callbacks |
 | 8 - Python Packages | [ch8-generated-modules.md](ch8-generated-modules.md) | Building app-level wrappers over NumPy, Pandas, ML, CLI tools, or your own modules |
 | 9 - Sandbox & VM Exec | [ch9-sandbox-vm.md](ch9-sandbox-vm.md) | Ubuntu VM tenants, shell exec, PTY sessions, VM-backed pools |
+| 10 - Full-Duplex Sessions | [ch10-full-duplex.md](ch10-full-duplex.md) | Capabilities, frames, logical messages, shared arena, control, lifecycle |
+| 11 - Audio & Metal Interop | [ch11-apple-interop.md](ch11-apple-interop.md) | Optional AVAudio adapters, Metal leases, GPU completion, copy evidence |
 
 ## Decision Map
 
@@ -30,21 +34,28 @@ the public package artifacts: `SwiftPythonRuntime.xcframework`,
 |------|------------|
 | Run small Python code in the app process | `try await Python.run { ... }` |
 | Convert Swift values to/from Python | `PythonConvertible`, `pyList`, `pyDict`, `PythonBuffer` |
-| Hold a Python object across actor/task boundaries | `PyHandle` |
+| Retain in-process Python identity across actor/task boundaries | `PyObjectRef` plus executor/GIL-scoped operations, or `PythonObjectRef` |
 | Hold a remote worker object with automatic cleanup | `OwnedPyHandle` |
 | Run CPU-bound Python in parallel | `PythonProcessPool` |
+| Send and receive concurrently on one pinned worker generation | `PythonDuplexSession` |
+| Send a bounded application unit larger than one media frame | `DuplexInput.sendMessage` with `.messages` requirements |
+| Send local mapped pages under an owned fixed-pool lease | `acquireSharedBuffer` with `.arenaIngress` requirements |
+| Capture/play PCM without session calls from the realtime callback | `SwiftPythonAudioInterop` |
+| Retain Metal storage through GPU completion and record actual copies | `SwiftPythonMetalInterop` |
 | Keep work pinned to one worker | `pool.worker(index)` / `StreamOptions.pinned(worker:)` |
 | Trace command, callback, stream, side-channel, and respawn lifecycle | `pool.telemetry()` + `ProcessPoolTelemetryContext` |
 | Stream a Python generator | `evalStream`, `invokeStream`, `methodStream` |
 | Stream values plus progress | `evalEvents`, `invokeEvents`, `methodEvents` |
-| Stream from a worker without holding its IPC socket | `startOutOfBandStream` + `SharedRingBuffer` (in-process), `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` (VM / socket-backed) |
+| Stream from a worker without holding its IPC socket | `startOutOfBandStream` + `SharedRingBuffer` (local process), `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` (VM / socket-backed) |
 | Zero-copy tensor sharing across host and workers | `createSharedTensor`, `withSharedBuffer`, `copyToShared` |
 | Observe worker lifecycle | `pool.events()` |
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
+| Restore a VM worker without accepting cold fallback | verified snapshot plus warm-restore gate |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
 | Pool callbacks / reentrant / `evalEvents` in one runnable CLI | `Examples/BridgingRing` |
 | Shared-memory arena + out-of-band streaming in one demo | `Examples/SharedTensorPipeline` |
+| Frame and fragmented-message duplex in one demo | `Examples/DuplexSession` |
 | Smoke-test wiring (`Python.run`, process pool CLIs) | `Examples/CoreRuntimeSmoke`, `Examples/ProcessPoolSmoke` |
 | Start from a complete macOS app | `Examples/IrisDemo` |
 

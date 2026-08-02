@@ -239,18 +239,17 @@ worker lives:
 
 | Worker backend | Buffer | Entrypoint | Transport |
 |---|---|---|---|
-| In-process (`SwiftPythonWorker`) | `SharedRingBuffer` | `startOutOfBandStream(generatorCode:worker:buffer:)` | POSIX shared memory |
+| Local process (`SwiftPythonWorker`) | `SharedRingBuffer` | `startOutOfBandStream(generatorCode:worker:buffer:)` | POSIX shared memory |
 | VM tenant / cross-isolation | `SocketOOBStreamBuffer` | `startOutOfBandSocketStream(generatorCode:worker:capacity:)` | UDS (process backend) or vsock (VM backend) |
 
 The two share the same Swift consumer shape — `readAvailable() -> Data`,
 `signalAbort()`, `isWriterDone`, `isAborted` — so a polling loop written
 against one switches to the other by changing the buffer type. The socket
-entrypoint is marked deprecated in source because a future runtime will
-collapse both calls into a single transport-capability-selecting
-`startOutOfBandStream`; the underlying socket OOB capability ships today and
-is the documented path for VM tenants until that consolidation lands.
+entrypoint is a current public API, not a compatibility shim. Use it explicitly
+for VM/vsock tenants; use the `SharedRingBuffer` overload for a local process
+worker whose negotiated OOB transport is shared memory.
 
-### `SharedRingBuffer` (in-process backend)
+### `SharedRingBuffer` (local process backend)
 
 A single-producer (Python) / single-consumer (Swift) ring buffer backed by a
 fresh POSIX shm segment.

@@ -40,6 +40,14 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "SwiftPythonRuntime", targets: ["SwiftPythonRuntime"]),
+        .library(
+            name: "SwiftPythonAudioInterop",
+            targets: ["SwiftPythonAudioInterop", "SwiftPythonRuntime"]
+        ),
+        .library(
+            name: "SwiftPythonMetalInterop",
+            targets: ["SwiftPythonMetalInterop", "SwiftPythonRuntime"]
+        ),
         .executable(name: "swiftpython-smoke", targets: ["SwiftPythonSmoke"]),
     ],
     targets: [
@@ -47,14 +55,30 @@ let package = Package(
             name: "SwiftPythonRuntime",
             path: "SwiftPythonRuntime.xcframework"
         ),
+        .binaryTarget(
+            name: "SwiftPythonAudioInterop",
+            path: "SwiftPythonAudioInterop.xcframework"
+        ),
+        .binaryTarget(
+            name: "SwiftPythonMetalInterop",
+            path: "SwiftPythonMetalInterop.xcframework"
+        ),
         .executableTarget(
             name: "SwiftPythonSmoke",
-            dependencies: ["SwiftPythonRuntime"],
+            dependencies: [
+                "SwiftPythonRuntime",
+                "SwiftPythonAudioInterop",
+                "SwiftPythonMetalInterop",
+            ],
             linkerSettings: pythonLinkerSettings
         ),
         .testTarget(
             name: "SwiftPythonSmokeTests",
-            dependencies: ["SwiftPythonRuntime"],
+            dependencies: [
+                "SwiftPythonRuntime",
+                "SwiftPythonAudioInterop",
+                "SwiftPythonMetalInterop",
+            ],
             linkerSettings: pythonLinkerSettings
         ),
     ]

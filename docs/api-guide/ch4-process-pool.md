@@ -187,6 +187,7 @@ await pool.shutdown()
 | `drain` | Stop accepting new work and wait for in-flight work |
 | `resume` | Leave drained mode |
 | `respawnWorker` | Replace a worker, optionally force-killing it |
+| `addWorkers` | Add local process-backed workers through the same configuration path |
 | `shutdown` | Stop all workers |
 
 ## Events
@@ -396,6 +397,6 @@ teardown.
 | `Bad CPU type in executable` launching the worker | Use Apple Silicon for the shipped sidecar, or ship a matching Intel worker |
 | Calls fail after worker respawn | Recreate worker-owned objects; old handles are stale |
 | Large results hit payload limits | Return a handle or use shared memory instead of pickling the full object |
-| Oversized command fails as protocol corruption | Update to 0.5.2 or newer; channel-0 decode failures route to the sole waiter and surface the typed payload error |
+| Oversized command looks like protocol corruption | The current release routes channel-0 decode failures to the sole waiter as the typed payload error; verify that runtime and worker are from one tag |
 | UI blocks waiting for a pool call | Keep pool use behind an actor/task and update UI from the main actor |
 | Multiple tenants need isolation | Use `SandboxPool` instead of a shared process pool |

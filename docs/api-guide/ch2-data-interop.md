@@ -218,15 +218,21 @@ and Swift reads back zero-copy — see
 
 ## Capsules
 
-Use capsules to pass an opaque Swift object reference through Python code.
+Use the generic `PyCapsuleRef<T: AnyObject>` API to pass an opaque Swift
+object reference through Python code.
 
 ```swift
 final class Engine {}
 
 let recovered: Engine = try await Python.run {
-    let engine = Engine()
-    let capsule = try PyObjectRef.capsule(engine, name: "com.example.Engine")
-    try capsule.extractCapsule(as: Engine.self, name: "com.example.Engine")
+    let capsule = try PyCapsuleRef(
+        Engine(),
+        name: "com.example.Engine"
+    )
+    return try PyCapsuleRef.extract(
+        from: capsule.pyObject,
+        name: "com.example.Engine"
+    )
 }
 ```
 
@@ -242,4 +248,12 @@ not portable across `PythonProcessPool` worker processes.
 | Large local array inspected in-process | `PythonBuffer` |
 | Large worker array reused across calls | `PyHandle` |
 | Large worker array read/write from Swift | pool shared memory |
+| Long-lived duplex bytes | `DuplexBuffer` or bounded logical messages |
+| Local zero-copy duplex ingress | session-owned `DuplexSharedBufferLease` |
 | Tenant-isolated file or process output | `SandboxPool.execShell*` |
+
+The pool-wide `SharedMemoryArena` tensor API and the duplex shared-ingress
+pool are different ownership models. Duplex accepts only opaque leases minted
+for one session, worker generation, pool, slot, and slot generation; it never
+accepts a caller-provided `SharedMemoryRegion` as authority. See
+[Chapter 10](ch10-full-duplex.md).

@@ -77,14 +77,19 @@ active.
 
 ## Raw Callbacks
 
-Use raw callbacks when your Python side already serializes data.
+Use raw callbacks when you want to own the JSON envelope instead of using a
+typed overload. The input is a JSON array of positional arguments; return a
+JSON array containing exactly one result value.
 
 ```swift
 let registration = try await pool.registerRawCallback(name: "uppercase_json") {
     @Sendable data in
-    let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    let args = try JSONSerialization.jsonObject(with: data) as? [Any] ?? []
+    let object = args.first as? [String: Any]
     let text = object?["text"] as? String ?? ""
-    return try JSONSerialization.data(withJSONObject: ["text": text.uppercased()])
+    return try JSONSerialization.data(
+        withJSONObject: [["text": text.uppercased()]]
+    )
 }
 ```
 
@@ -158,8 +163,8 @@ Inside worker Python code:
 ```python
 import swift_bridge
 
-swift_bridge.call(name, *args, **kwargs)
-swift_bridge.call_async(name, *args, **kwargs)
+swift_bridge.call(name, *args)
+swift_bridge.call_async(name, *args)
 swift_bridge.call_stream(name, *args)
 swift_bridge.is_registered(name)
 swift_bridge.registered_names()
@@ -170,6 +175,10 @@ swift_bridge.check_cancel()
 `progress` and `check_cancel` are covered in
 [Chapter 5](ch5-streaming.md). They are useful inside Python generators even
 when no Swift callback is registered.
+
+ProcessPool callbacks accept positional arguments only. `call` and
+`call_async` reject keyword arguments instead of silently dropping them;
+`call_stream` is positional by definition.
 
 ## Error Propagation
 

@@ -4,7 +4,8 @@ Swift concurrency and CPython have different ownership rules. The safe pattern
 is simple:
 
 - Use `Python.run` for in-process GIL-held work.
-- Do not move `PyObjectRef` across `await` boundaries.
+- A `PyObjectRef` may be retained across tasks, but every CPython operation
+  still needs a GIL/executor scope.
 - Store long-lived Python objects as `PyHandle` or `OwnedPyHandle`.
 - Keep worker-owned handles on the pool and worker that created them.
 
@@ -197,14 +198,16 @@ actor VectorIndex {
 }
 ```
 
-This keeps Python object lifetime explicit and avoids crossing the GIL boundary
-with raw references.
+This keeps remote worker identity and generation ownership explicit. For
+in-process identity, a retained `PyObjectRef` is allowed; execute its CPython
+operations through `Python.run`/`PythonExecutor` or use
+`PythonObjectRef` for executor-mediated access.
 
 ## Common Pitfalls
 
 | Issue | Fix |
 |-------|-----|
-| Capturing `PyObjectRef` in a `Task` | Convert it to a Swift value or store it as `PyHandle` first |
+| Calling methods on a retained `PyObjectRef` from an arbitrary task | Enter `Python.run`/`PythonExecutor` or use `PythonObjectRef` |
 | Calling `await` inside `Python.run` | Move async work outside the closure; use `storeSync` for handles |
 | Reusing a worker handle after respawn | Recreate the object; stale handles are rejected |
 | Passing a handle to a different pool | Keep handles private to the pool or actor that created them |

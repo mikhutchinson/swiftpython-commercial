@@ -80,9 +80,13 @@ Supported operations:
 | Assignment | `try object.setAttribute("name", value: ref)` |
 | Python display | `try Python.str(ref)`, `try Python.repr(ref)`, `try Python.type(ref)` |
 
-`PyObjectRef` is for GIL-held scopes. Do not keep it in long-lived Swift state or
-move it across `await` boundaries. Store it as a `PyHandle` when you need a
-sendable reference; see [Chapter 3](ch3-concurrency-handles.md).
+`PyObjectRef` is an `@unchecked Sendable` retained in-process reference and
+may be kept across tasks or `await` boundaries. That conformance does not make
+CPython operations thread-safe: perform attribute lookup, calls, subscripting,
+and conversion inside `Python.run`, `PythonExecutor`, or `withGIL`.
+`PythonObjectRef` provides executor-mediated access to deliberately shared
+in-process identity. Use `PyHandle` or `OwnedPyHandle` for objects stored in
+a ProcessPool worker; see [Chapter 3](ch3-concurrency-handles.md).
 
 ## Context Managers
 
@@ -142,7 +146,7 @@ reason and are already inside a GIL-held scope.
 
 | Issue | Fix |
 |-------|-----|
-| `PyObjectRef` used after an `await` | Convert to a Swift value or store as `PyHandle` before leaving the GIL-held scope |
+| CPython operation performed outside a GIL/executor scope | Retain the reference if identity matters, but perform the operation inside `Python.run`, `PythonExecutor`, or `withGIL` |
 | Import works in Terminal but not Finder launch | Set `PYTHONHOME` and app launch environment for the bundled/Homebrew Python |
 | Python package missing at runtime | Install or bundle it for the same Python 3.13 environment the app uses |
 | CPU-bound code blocks the app process | Move it to `PythonProcessPool` |

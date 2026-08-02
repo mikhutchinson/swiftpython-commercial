@@ -1,0 +1,172 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)
+// swift-module-flags: -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -swift-version 6 -O -module-name SwiftPythonMetalInterop -package-name swiftpython
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.3
+import Darwin
+import Foundation
+@preconcurrency import Metal
+import Swift
+import SwiftPythonRuntime
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+public enum DuplexMetalFallbackReason : Swift.String, Swift.Sendable, Swift.Equatable {
+  case explicitOwnedStorage
+  case virtualMachineNoSharedArena
+  case pointerNotPageAligned
+  case backingLengthNotPageAligned
+  case backingOutsideSingleArenaSegment
+  case bytesNoCopyRejected
+  case unsupportedStorageMode
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum DuplexMetalRoute : Swift.Sendable, Swift.Equatable {
+  case arenaSharedNoCopy
+  case ownedSharedCopy(reason: SwiftPythonMetalInterop.DuplexMetalFallbackReason)
+  case socketDirectKernelCopy
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalRoute, b: SwiftPythonMetalInterop.DuplexMetalRoute) -> Swift.Bool
+}
+public enum DuplexMetalCopyStatus : Swift.String, Swift.Sendable, Swift.Equatable {
+  case zeroCopy
+  case boundedCPUCopy
+  case kernelCopy
+  case failed
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct DuplexCopyLedgerEntry : Swift.Sendable, Swift.Equatable {
+  public let segment: Swift.String
+  public let route: SwiftPythonMetalInterop.DuplexMetalRoute
+  public let status: SwiftPythonMetalInterop.DuplexMetalCopyStatus
+  public let logicalBytes: Swift.Int
+  public let copiedBytes: Swift.Int
+  public let timestamp: _Concurrency.ContinuousClock.Instant
+  public init(segment: Swift.String, route: SwiftPythonMetalInterop.DuplexMetalRoute, status: SwiftPythonMetalInterop.DuplexMetalCopyStatus, logicalBytes: Swift.Int, copiedBytes: Swift.Int, timestamp: _Concurrency.ContinuousClock.Instant = .now)
+  public static func == (a: SwiftPythonMetalInterop.DuplexCopyLedgerEntry, b: SwiftPythonMetalInterop.DuplexCopyLedgerEntry) -> Swift.Bool
+}
+public struct DuplexCopyLedgerSnapshot : Swift.Sendable, Swift.Equatable {
+  public let entries: [SwiftPythonMetalInterop.DuplexCopyLedgerEntry]
+  public let copiedBytes: Swift.UInt64
+  public let observedBytes: Swift.UInt64
+  public let droppedEntries: Swift.UInt64
+  public static func == (a: SwiftPythonMetalInterop.DuplexCopyLedgerSnapshot, b: SwiftPythonMetalInterop.DuplexCopyLedgerSnapshot) -> Swift.Bool
+}
+final public class DuplexCopyLedger : @unchecked Swift.Sendable {
+  public static let maximumEntryCount: Swift.Int
+  public static let maximumSegmentCharacters: Swift.Int
+  public init(maximumEntries: Swift.Int = 1_024)
+  final public func record(_ entry: SwiftPythonMetalInterop.DuplexCopyLedgerEntry)
+  final public var snapshot: SwiftPythonMetalInterop.DuplexCopyLedgerSnapshot {
+    get
+  }
+  @objc deinit
+}
+public enum DuplexMetalBackingSource : Swift.Sendable {
+  case sharedArena(SwiftPythonRuntime.SharedMemoryArena)
+  case ownedShared
+  case virtualMachine
+}
+public enum DuplexMetalAccess : Swift.Sendable, Swift.Equatable {
+  case cpuWritesGPUReads
+  case gpuWritesCPUReads
+  case bidirectional
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalAccess, b: SwiftPythonMetalInterop.DuplexMetalAccess) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexMetalError : Swift.Error, Swift.Sendable, Swift.Equatable {
+  case invalidRegionCount(Swift.Int)
+  case invalidRegionCapacity(Swift.Int)
+  case invalidAlignment(Swift.Int)
+  case backingSizeExceedsLimit(Swift.Int)
+  case bufferCreationFailed
+  case poolExhausted
+  case invalidLogicalByteCount(Swift.Int)
+  case cpuOwnershipEnded
+  case commandBufferAlreadyCommitted
+  case duplicateCommandBuffer
+  case socketReadFailed(Swift.String)
+  case unexpectedSocketEOF(expected: Swift.Int, received: Swift.Int)
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalError, b: SwiftPythonMetalInterop.DuplexMetalError) -> Swift.Bool
+}
+public struct DuplexMetalPoolConfiguration : Swift.Sendable, Swift.Equatable {
+  public static let maximumRegionCount: Swift.Int
+  public static let maximumRegionCapacity: Swift.Int
+  public static let maximumBackingBytes: Swift.Int
+  public static let maximumArenaAlignment: Swift.Int
+  public let regionCount: Swift.Int
+  public let regionCapacity: Swift.Int
+  public let arenaAlignment: Swift.Int?
+  public init(regionCount: Swift.Int = 8, regionCapacity: Swift.Int = 64 * 1_024, arenaAlignment: Swift.Int? = nil)
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration, b: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration) -> Swift.Bool
+}
+public struct DuplexMetalPoolSnapshot : Swift.Sendable, Swift.Equatable {
+  public let regionCount: Swift.Int
+  public let availableRegions: Swift.Int
+  public let leasedRegions: Swift.Int
+  public let quarantinedRegions: Swift.Int
+  public let backingBytes: Swift.Int
+  public let reuseCount: Swift.UInt64
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalPoolSnapshot, b: SwiftPythonMetalInterop.DuplexMetalPoolSnapshot) -> Swift.Bool
+}
+public struct DuplexMetalBufferLease : @unchecked Swift.Sendable {
+  public var buffer: any Metal.MTLBuffer {
+    get
+  }
+  public let range: Swift.Range<Swift.Int>
+  public let route: SwiftPythonMetalInterop.DuplexMetalRoute
+  public let access: SwiftPythonMetalInterop.DuplexMetalAccess
+  public let arenaRegion: SwiftPythonRuntime.SharedMemoryRegion?
+  public func retainUntilCompleted(by commandBuffer: any Metal.MTLCommandBuffer) throws
+  public func finishCPUAccess() throws
+  public func recordCopy(segment: Swift.String, status: SwiftPythonMetalInterop.DuplexMetalCopyStatus, copiedBytes: Swift.Int)
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+public struct DuplexSharedMetalBufferLease : @unchecked Swift.Sendable {
+  public let buffer: any Metal.MTLBuffer
+  public let range: Swift.Range<Swift.Int>
+  public let access: SwiftPythonMetalInterop.DuplexMetalAccess
+  public let route: SwiftPythonMetalInterop.DuplexMetalRoute
+  public func retainUntilCompleted(by commandBuffer: any Metal.MTLCommandBuffer) throws
+  public func finishMetalAccess() throws
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+extension SwiftPythonRuntime.DuplexSharedBufferLease {
+  final public func makeMetalBufferLease(device: any Metal.MTLDevice, access: SwiftPythonMetalInterop.DuplexMetalAccess, ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws -> SwiftPythonMetalInterop.DuplexSharedMetalBufferLease
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+final public class DuplexMetalRegionPool : @unchecked Swift.Sendable {
+  final public let device: any Metal.MTLDevice
+  final public let backingSource: SwiftPythonMetalInterop.DuplexMetalBackingSource
+  final public let configuration: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration
+  final public let ledger: SwiftPythonMetalInterop.DuplexCopyLedger
+  final public let pageSize: Swift.Int
+  public init(device: any Metal.MTLDevice, backing: SwiftPythonMetalInterop.DuplexMetalBackingSource, configuration: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration = DuplexMetalPoolConfiguration(), ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws
+  final public func tryAcquire(logicalByteCount: Swift.Int, access: SwiftPythonMetalInterop.DuplexMetalAccess) throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease?
+  final public func acquire(logicalByteCount: Swift.Int, access: SwiftPythonMetalInterop.DuplexMetalAccess) async throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease
+  final public func makeLease(copying data: Foundation.Data, access: SwiftPythonMetalInterop.DuplexMetalAccess = .cpuWritesGPUReads) async throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease
+  final public func receiveDirectly(fromSocket fileDescriptor: Swift.Int32, byteCount: Swift.Int, access: SwiftPythonMetalInterop.DuplexMetalAccess = .cpuWritesGPUReads) async throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease
+  @discardableResult
+  final public func cancelAndQuarantineOutstanding(grace: Swift.Duration = .milliseconds(100)) async -> SwiftPythonMetalInterop.DuplexMetalPoolSnapshot
+  final public var snapshot: SwiftPythonMetalInterop.DuplexMetalPoolSnapshot {
+    get
+  }
+  @objc deinit
+}
+extension SwiftPythonMetalInterop.DuplexMetalFallbackReason : Swift.Hashable {}
+extension SwiftPythonMetalInterop.DuplexMetalFallbackReason : Swift.RawRepresentable {}
+extension SwiftPythonMetalInterop.DuplexMetalCopyStatus : Swift.Hashable {}
+extension SwiftPythonMetalInterop.DuplexMetalCopyStatus : Swift.RawRepresentable {}
+extension SwiftPythonMetalInterop.DuplexMetalAccess : Swift.Hashable {}

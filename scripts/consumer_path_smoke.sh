@@ -4,8 +4,97 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
 PYTHON_LIB_DIR="${SWIFTPYTHON_PYTHON_LIB_DIR:-}"
+NOTARY_PROFILE="${SWIFTPYTHON_NOTARY_PROFILE:-}"
+NOTARY_OUTPUT_DIR="${SWIFTPYTHON_NOTARY_OUTPUT_DIR:-}"
+KEEP_WORK_DIR="${SWIFTPYTHON_KEEP_WORK_DIR:-0}"
+VM_RELEASE_GATE="${SWIFTPYTHON_VM_RELEASE_GATE:-0}"
+VM_BASE_IMAGE="${SWIFTPYTHON_VM_BASE_IMAGE:-}"
+VM_SNAPSHOT="${SWIFTPYTHON_VM_SNAPSHOT:-}"
+VM_RESTORE_SECRET="${SWIFTPYTHON_VM_RESTORE_SECRET:-}"
+VM_CLONE_DIR="${SWIFTPYTHON_VM_CLONE_DIR:-}"
+VM_ITERATIONS="${SWIFTPYTHON_VM_ITERATIONS:-20}"
+SMOKE_ID_SUFFIX="$(
+    basename "$WORK_DIR" \
+        | sed 's/.*\.//' \
+        | tr -cd '[:alnum:]' \
+        | tr '[:upper:]' '[:lower:]'
+)"
+SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
 
-trap 'rm -rf "$WORK_DIR"' EXIT
+for required_tool in \
+    codesign \
+    install_name_tool \
+    lipo \
+    otool \
+    security \
+    swift \
+    xcodebuild
+do
+    command -v "$required_tool" >/dev/null \
+        || { echo "Required tool not found: $required_tool" >&2; exit 69; }
+done
+
+cleanup() {
+    if [ "$KEEP_WORK_DIR" = 1 ]; then
+        echo "Consumer smoke work directory retained at $WORK_DIR"
+    else
+        rm -rf "$WORK_DIR"
+    fi
+}
+trap cleanup EXIT
+
+CODESIGN_TIMESTAMP_ARGS=(--timestamp=none)
+if [ -n "$NOTARY_PROFILE" ]; then
+    if [ -z "$NOTARY_OUTPUT_DIR" ]; then
+        echo "Notary mode requires SWIFTPYTHON_NOTARY_OUTPUT_DIR so evidence is retained." >&2
+        exit 64
+    fi
+    for required_tool in ditto jq spctl xattr xcrun; do
+        command -v "$required_tool" >/dev/null \
+            || { echo "Required notary tool not found: $required_tool" >&2; exit 69; }
+    done
+    CODESIGN_TIMESTAMP_ARGS=(--timestamp)
+    if ! xcrun notarytool history \
+        --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+        echo "Notary profile could not be validated: $NOTARY_PROFILE" >&2
+        exit 69
+    fi
+fi
+
+if [ "$VM_RELEASE_GATE" = 1 ]; then
+    if [ -z "$NOTARY_PROFILE" ]; then
+        echo "VM release gate requires notarization mode." >&2
+        exit 64
+    fi
+    for required_path in \
+        "$VM_BASE_IMAGE" \
+        "$VM_SNAPSHOT" \
+        "$VM_RESTORE_SECRET"; do
+        if [ ! -e "$required_path" ]; then
+            echo "VM release-gate input does not exist: $required_path" >&2
+            exit 66
+        fi
+    done
+    if [ -z "$VM_CLONE_DIR" ]; then
+        echo "VM release gate requires SWIFTPYTHON_VM_CLONE_DIR." >&2
+        exit 64
+    fi
+    case "$VM_ITERATIONS" in
+        ''|*[!0-9]*|0)
+            echo "SWIFTPYTHON_VM_ITERATIONS must be a positive integer." >&2
+            exit 64
+            ;;
+    esac
+fi
+
+# Keep release-gate paths out of ordinary unsigned/signed consumer launches.
+# They are reintroduced only for the final notarized virtualization app.
+unset \
+    SWIFTPYTHON_VM_BASE_IMAGE \
+    SWIFTPYTHON_VM_SNAPSHOT \
+    SWIFTPYTHON_VM_RESTORE_SECRET \
+    SWIFTPYTHON_VM_CLONE_DIR \
+    SWIFTPYTHON_VM_ITERATIONS
 
 if [ -z "$PYTHON_LIB_DIR" ]; then
     for candidate in \
@@ -24,10 +113,56 @@ if [ -z "$PYTHON_LIB_DIR" ]; then
     echo "Python 3.13 library directory not found; set SWIFTPYTHON_PYTHON_LIB_DIR." >&2
     exit 1
 fi
+PYTHON_HOME_DIR="$(cd "$PYTHON_LIB_DIR/.." && pwd)"
+PYTHON_FRAMEWORK_DIR="$(cd "$PYTHON_HOME_DIR/../.." && pwd)"
+PYTHON_FRAMEWORK_BINARY="$PYTHON_HOME_DIR/Python"
+if [ ! -f "$PYTHON_FRAMEWORK_BINARY" ]; then
+    echo "Python framework binary not found at $PYTHON_FRAMEWORK_BINARY." >&2
+    exit 1
+fi
+PYTHON_FRAMEWORK_LOAD_PATH="$(
+    otool -L "$REPO_DIR/SwiftPythonWorker" \
+        | awk '/Python\.framework\/Versions\/3\.13\/Python/ { print $1; exit }'
+)"
+if [ -z "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
+    echo "SwiftPythonWorker does not declare a Python 3.13 framework dependency." >&2
+    exit 1
+fi
+
+run_with_timeout() {
+    local timeout_seconds="$1"
+    shift
+    "$@" &
+    local process_pid=$!
+    (
+        sleep "$timeout_seconds"
+        if kill -0 "$process_pid" 2>/dev/null; then
+            echo "Timed out after ${timeout_seconds}s: $*" >&2
+            for child_pid in $(pgrep -P "$process_pid" 2>/dev/null || true); do
+                kill -TERM "$child_pid" 2>/dev/null || true
+            done
+            kill -TERM "$process_pid" 2>/dev/null || true
+            sleep 5
+            for child_pid in $(pgrep -P "$process_pid" 2>/dev/null || true); do
+                kill -KILL "$child_pid" 2>/dev/null || true
+            done
+            kill -KILL "$process_pid" 2>/dev/null || true
+        fi
+    ) &
+    local watchdog_pid=$!
+    local exit_code=0
+    wait "$process_pid" || exit_code=$?
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+    return "$exit_code"
+}
 
 mkdir -p "$WORK_DIR/Sources/ConsumerSmoke"
 
-cat > "$WORK_DIR/Package.swift" <<EOF
+write_consumer_package() {
+    local destination="$1"
+    mkdir -p "$destination/Sources/ConsumerSmoke"
+    cat > "$destination/Package.swift" <<EOF
 // swift-tools-version: 6.0
 import PackageDescription
 
@@ -42,6 +177,8 @@ let package = Package(
             name: "ConsumerSmoke",
             dependencies: [
                 .product(name: "SwiftPythonRuntime", package: "swiftpython-commercial"),
+                .product(name: "SwiftPythonAudioInterop", package: "swiftpython-commercial"),
+                .product(name: "SwiftPythonMetalInterop", package: "swiftpython-commercial"),
             ],
             linkerSettings: [
                 .unsafeFlags([
@@ -54,16 +191,38 @@ let package = Package(
 )
 EOF
 
-cat > "$WORK_DIR/Sources/ConsumerSmoke/main.swift" <<'EOF'
+    # Keep an @main source out of `main.swift`: SwiftPM accepts either shape,
+    # but Xcode's package scheme otherwise treats the filename as a top-level
+    # entry point and rejects the @main declaration.
+    cat > "$destination/Sources/ConsumerSmoke/ConsumerSmoke.swift" <<'EOF'
+import Foundation
+import CryptoKit
+@preconcurrency import Metal
+import SwiftPythonAudioInterop
+import SwiftPythonMetalInterop
 import SwiftPythonRuntime
 
 @main
 enum ConsumerSmoke {
-    static func main() async throws {
-        let version: String = try await Python.run {
-            try String(pythonObject: Python.sys.version)
+    static func main() async {
+        do {
+            try await run()
+        } catch {
+            let diagnostic = Data("ConsumerSmoke failed: \(error)\n".utf8)
+            try? FileHandle.standardError.write(contentsOf: diagnostic)
+            Foundation.exit(EXIT_FAILURE)
         }
-        print("Python \(version)")
+    }
+
+    private static func run() async throws {
+        if ProcessInfo.processInfo.environment["SWIFTPYTHON_SKIP_IN_PROCESS"] != "1" {
+            let version: String = try await Python.run {
+                try String(pythonObject: Python.sys.version)
+            }
+            print("Python \(version)")
+        } else {
+            print("in-process Python skipped for sandbox worker-path proof")
+        }
 
         try await withProcessPool(workers: 1) { pool in
             let value: Double = try await pool.invokeResult(
@@ -72,9 +231,1187 @@ enum ConsumerSmoke {
                 args: [.python(144.0)]
             )
             print("math.sqrt(144.0) = \(value)")
+
+            let session = try await pool.openDuplexSession(
+                handler: .eval(
+                    code: """
+                    from swift_duplex import InputFrame
+                    def run(session):
+                        session.ready({"consumer": "commercial"})
+                        for event in session.iter_input():
+                            if isinstance(event, InputFrame):
+                                session.output.send(
+                                    bytes(event.buffer),
+                                    processed_input_through=event.sequence,
+                                )
+                        session.output.finish()
+                    """,
+                    entrypoint: "run"
+                )
+            )
+            let payload = Data("full-duplex-commercial-smoke".utf8)
+            try await session.input.send(DuplexInputFrame(payload: payload))
+            try await session.input.finish()
+            var outputs = session.output.makeAsyncIterator()
+            guard let frame = try await outputs.next() else {
+                throw ConsumerFailure.missingOutput
+            }
+            guard frame.buffer.copyData() == payload else {
+                throw ConsumerFailure.outputMismatch
+            }
+            try await session.acknowledgeOutput(
+                consumedThrough: DuplexPosition(
+                    sequence: frame.position.sequence,
+                    byteOffset: frame.buffer.count
+                )
+            )
+            guard try await outputs.next() == nil else {
+                throw ConsumerFailure.extraOutput
+            }
+            let result = try await session.result()
+            guard result.terminal == .completed else {
+                throw ConsumerFailure.badTerminal
+            }
+            await session.close()
+            print("full duplex loopback = \(payload.count) bytes")
+
+            try await runLogicalMessageSmoke(pool: pool)
+            try await runSharedArenaMetalSmoke(pool: pool)
+        }
+
+        try await runPublicMetalQuarantineSmoke()
+
+        let format = try DuplexAudioFormat(
+            sampleRate: 24_000,
+            channels: 1,
+            sampleType: .signedInteger16,
+            interleaving: .interleaved
+        )
+        let ledger = DuplexCopyLedger()
+        print(
+            "optional adapters = \(format.bytesPerFrame) bytes/frame, "
+                + "\(ledger.snapshot.observedBytes) Metal bytes observed"
+        )
+
+        try await runVMReleaseGateIfConfigured()
+    }
+
+    private static func runLogicalMessageSmoke(
+        pool: PythonProcessPool
+    ) async throws {
+        let logicalBytes = 10 * 1_024 * 1_024 + 137
+        let chunkBytes = 256 * 1_024
+        let payload = Data(repeating: 0xA7, count: logicalBytes)
+        var requirements = DuplexSessionRequirements.messages
+        requirements.minimumLogicalMessageBytes = logicalBytes
+        let format = DuplexFormat(
+            "video/hevc",
+            metadata: [
+                "codec": "hevc-main",
+                "display": "targeted",
+                "width": "4096",
+                "height": "2304",
+            ]
+        )
+        let session = try await pool.openDuplexSession(
+            handler: .eval(
+                code: """
+                import hashlib
+                from swift_duplex import InputFinished
+
+                def run(session):
+                    session.ready({"consumer": "commercial-message"})
+                    message = session.receive_message()
+                    assert message.total_bytes == \(logicalBytes)
+                    assert message.format == "video/hevc"
+                    assert message.format_metadata == {
+                        "codec": "hevc-main",
+                        "display": "targeted",
+                        "width": "4096",
+                        "height": "2304",
+                    }
+                    assert message.flags & 1 == 1
+                    assert message.timestamp_ns > 0
+                    assert message.storage_route == "inline"
+                    digest = hashlib.sha256()
+                    chunks = 0
+                    last_sequence = 0
+                    for chunk in message.chunks():
+                        assert chunk.byte_count <= \(chunkBytes)
+                        assert chunk.flags & 1 == 1
+                        assert chunk.format == "video/hevc"
+                        assert chunk.format_metadata["display"] == "targeted"
+                        digest.update(chunk.buffer)
+                        chunks += 1
+                        last_sequence = chunk.sequence
+                    assert chunks == \((logicalBytes + chunkBytes - 1) / chunkBytes)
+                    assert isinstance(session.receive(), InputFinished)
+                    session.output.send(
+                        digest.digest(),
+                        processed_input_through=last_sequence,
+                    )
+                    session.output.finish()
+                """,
+                entrypoint: "run"
+            ),
+            options: DuplexOptions(
+                inputFormat: format,
+                limits: DuplexLimits(
+                    maximumFrameBytes: 1 * 1_024 * 1_024,
+                    maximumLogicalMessageBytes: 12 * 1_024 * 1_024,
+                    preferredMessageChunkBytes: chunkBytes,
+                    inputCreditBytes: 1 * 1_024 * 1_024,
+                    inputCreditFrames: 4
+                ),
+                requirements: requirements
+            )
+        )
+        guard session.negotiatedConfiguration.limits.maximumFrameBytes
+                < logicalBytes,
+              session.negotiatedConfiguration.limits.preferredMessageChunkBytes
+                == chunkBytes else {
+            throw ConsumerFailure.badNegotiatedMessageConfiguration
+        }
+        try await session.input.sendMessage(
+            payload,
+            timestamp: ContinuousClock.now,
+            format: format,
+            flags: [.independent]
+        )
+        try await session.input.finish()
+        var outputs = session.output.makeAsyncIterator()
+        guard let digestFrame = try await outputs.next() else {
+            throw ConsumerFailure.missingOutput
+        }
+        guard digestFrame.buffer.copyData()
+                == Data(SHA256.hash(data: payload)) else {
+            throw ConsumerFailure.logicalMessageDigestMismatch
+        }
+        try await session.acknowledgeOutput(
+            consumedThrough: DuplexPosition(
+                sequence: digestFrame.position.sequence,
+                byteOffset: digestFrame.buffer.count
+            )
+        )
+        guard try await outputs.next() == nil else {
+            throw ConsumerFailure.extraOutput
+        }
+        guard try await session.result().terminal == .completed else {
+            throw ConsumerFailure.badTerminal
+        }
+        await session.close()
+        print(
+            "logical message = \(logicalBytes) bytes / "
+                + "\((logicalBytes + chunkBytes - 1) / chunkBytes) chunks"
+        )
+    }
+
+    private static func runSharedArenaMetalSmoke(
+        pool: PythonProcessPool
+    ) async throws {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let queue = device.makeCommandQueue() else {
+            throw ConsumerFailure.missingMetalDevice
+        }
+        let slotBytes = Int(getpagesize())
+        var options = DuplexOptions.default
+        options.requirements = .arenaIngress
+        options.limits = DuplexLimits(
+            maximumFrameBytes: slotBytes,
+            maximumLogicalMessageBytes: slotBytes,
+            preferredMessageChunkBytes: slotBytes,
+            inputCreditBytes: slotBytes,
+            inputCreditFrames: 1
+        )
+        options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
+            slotCount: 1,
+            slotCapacity: slotBytes,
+            maximumOutstandingReferencedBytes: slotBytes
+        )
+        let session = try await pool.openDuplexSession(
+            handler: .eval(
+                code: """
+                import gc
+                from swift_duplex import ApplicationControl, InputFinished
+
+                def run(session):
+                    session.ready({"consumer": "commercial-arena"})
+                    first = session.receive_message()
+                    chunks = first.chunks()
+                    chunk = next(chunks)
+                    assert chunk.storage_route == "shared_arena"
+                    assert chunk.byte_count == \(slotBytes)
+                    held = memoryview(chunk.buffer)
+                    assert held[0] == 0x6D and held[-1] == 0x6D
+                    del chunk, chunks, first
+                    gc.collect()
+                    session.send_event("arena-python-held")
+                    control = session.receive()
+                    assert isinstance(control, ApplicationControl)
+                    assert control.kind == "release-arena-python"
+                    held.release()
+                    del held, control
+                    gc.collect()
+                    session.send_event("arena-python-released")
+
+                    second = session.receive_message()
+                    assert second.storage_route == "shared_arena"
+                    assert second.read(max_bytes=\(slotBytes)) == b"n" * \(slotBytes)
+                    assert isinstance(session.receive(), InputFinished)
+                    session.output.finish()
+                """,
+                entrypoint: "run"
+            ),
+            options: options
+        )
+        let initial = try requirePoolSnapshot(session)
+        let coreLease = try await session.input.acquireSharedBuffer(
+            byteCount: slotBytes
+        )
+        try coreLease.withUnsafeMutableBytes { bytes in
+            for index in bytes.indices { bytes[index] = 0x6D }
+        }
+        let ledger = DuplexCopyLedger()
+        let metalLease = try coreLease.makeMetalBufferLease(
+            device: device,
+            access: .cpuWritesGPUReads,
+            ledger: ledger
+        )
+        var pointerIdentity = false
+        try coreLease.withUnsafeMutableBytes { bytes in
+            pointerIdentity = bytes.baseAddress == metalLease.buffer.contents()
+        }
+        guard pointerIdentity else {
+            throw ConsumerFailure.metalPointerIdentityMismatch
+        }
+        guard let command = queue.makeCommandBuffer() else {
+            throw ConsumerFailure.missingMetalCommandBuffer
+        }
+        try metalLease.retainUntilCompleted(by: command)
+        try await session.input.sendMessage(
+            coreLease,
+            flags: [.independent]
+        )
+
+        var events = session.events.makeAsyncIterator()
+        try await waitForApplication(
+            "arena-python-held",
+            events: &events
+        )
+        let held = try requirePoolSnapshot(session)
+        guard held.availableSlots == 0,
+              held.sentSlots == 1,
+              held.outstandingReferencedBytes == slotBytes else {
+            throw ConsumerFailure.arenaLeaseReleasedTooEarly
+        }
+        try await session.sendControl(
+            DuplexApplicationControl(kind: "release-arena-python")
+        )
+        try await waitForApplication(
+            "arena-python-released",
+            events: &events
+        )
+        let peerReleaseDeadline = ContinuousClock.now + .seconds(2)
+        while ContinuousClock.now < peerReleaseDeadline,
+              session.sharedBufferPoolSnapshot?
+                .outstandingReferencedBytes != 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let peerReleased = try requirePoolSnapshot(session)
+        guard peerReleased.outstandingReferencedBytes == 0,
+              peerReleased.availableSlots == 0,
+              peerReleased.sentSlots == 1 else {
+            throw ConsumerFailure.arenaPeerReleaseDidNotPreserveMetalLease
+        }
+
+        let blockedAcquire = Task {
+            try await session.input.acquireSharedBuffer(
+                byteCount: slotBytes
+            )
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        guard session.sharedBufferPoolSnapshot?.availableSlots == 0 else {
+            throw ConsumerFailure.arenaLeaseReleasedTooEarly
+        }
+        try metalLease.finishMetalAccess()
+        command.commit()
+        await command.completed()
+        guard command.status == .completed else {
+            throw ConsumerFailure.metalCommandFailed
+        }
+        let second = try await blockedAcquire.value
+        try second.withUnsafeMutableBytes { bytes in
+            for index in bytes.indices { bytes[index] = 0x6E }
+        }
+        try await session.input.sendMessage(second)
+        try await session.input.finish()
+        var output = session.output.makeAsyncIterator()
+        guard try await output.next() == nil else {
+            throw ConsumerFailure.extraOutput
+        }
+        guard try await session.result().terminal == .completed else {
+            throw ConsumerFailure.badTerminal
+        }
+        let final = try requirePoolSnapshot(session)
+        guard final.backingBytes == initial.backingBytes,
+              final.outstandingReferencedBytes == 0,
+              final.sentSlots == 0,
+              final.reuseCount >= 2,
+              ledger.snapshot.entries.contains(where: {
+                  $0.route == .arenaSharedNoCopy
+                      && $0.status == .zeroCopy
+                      && $0.logicalBytes == slotBytes
+              }) else {
+            throw ConsumerFailure.arenaFinalLeaseOrLedgerMismatch
+        }
+        await session.close()
+        print(
+            "shared arena = pointer-identical Metal mapping, "
+                + "Python/GPU final-lease turnover, \(final.backingBytes) fixed bytes"
+        )
+    }
+
+    private static func waitForApplication(
+        _ expected: String,
+        events: inout DuplexEvents.AsyncIterator
+    ) async throws {
+        while let event = try await events.next() {
+            if case .application(let application) = event,
+               application.kind == expected {
+                return
+            }
+        }
+        throw ConsumerFailure.missingApplicationEvent(expected)
+    }
+
+    private static func runPublicMetalQuarantineSmoke() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw ConsumerFailure.missingMetalDevice
+        }
+        let pool = try DuplexMetalRegionPool(
+            device: device,
+            backing: .ownedShared,
+            configuration: DuplexMetalPoolConfiguration(
+                regionCount: 1,
+                regionCapacity: 4_096
+            )
+        )
+        let lease = try await pool.acquire(
+            logicalByteCount: 64,
+            access: .gpuWritesCPUReads
+        )
+        let snapshot = await pool.cancelAndQuarantineOutstanding(
+            grace: .zero
+        )
+        guard snapshot.quarantinedRegions == 1,
+              snapshot.availableRegions == 0,
+              try pool.tryAcquire(
+                logicalByteCount: 1,
+                access: .cpuWritesGPUReads
+              ) == nil else {
+            throw ConsumerFailure.metalQuarantineWasReusable
+        }
+        withExtendedLifetime(lease) {}
+        print("Metal quarantine = outstanding region cannot be reused")
+    }
+
+    private static func runVMReleaseGateIfConfigured() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let baseImage = environment["SWIFTPYTHON_VM_BASE_IMAGE"] else {
+            return
+        }
+        guard let snapshot = environment["SWIFTPYTHON_VM_SNAPSHOT"],
+              let restoreSecretPath = environment["SWIFTPYTHON_VM_RESTORE_SECRET"],
+              let cloneDir = environment["SWIFTPYTHON_VM_CLONE_DIR"],
+              let iterationsText = environment["SWIFTPYTHON_VM_ITERATIONS"],
+              let iterations = Int(iterationsText),
+              iterations > 0 else {
+            throw ConsumerFailure.vmGate("incomplete VM release-gate environment")
+        }
+        let restoreSecret = try Data(
+            contentsOf: URL(fileURLWithPath: restoreSecretPath)
+        )
+        guard !restoreSecret.isEmpty else {
+            throw ConsumerFailure.vmGate("empty VM snapshot restore secret")
+        }
+        let imageManifest = try SandboxImageVerifier.verify(
+            diskPath: baseImage,
+            minimumSwiftPythonVersion: "0.6.0-duplex.2"
+        )
+        let lockDirectory = URL(fileURLWithPath: cloneDir)
+            .appending(path: "locks").path
+        let crashDirectory = URL(fileURLWithPath: cloneDir)
+            .appending(path: "crash-reports").path
+
+        for iteration in 1...iterations {
+            let tenantID = SandboxTenantID(
+                rawValue: "commercial-notary-\(iteration)-\(UUID().uuidString.prefix(8))"
+            )
+            let sandbox = try await SandboxPool(
+                baseImagePath: baseImage,
+                cloneDir: cloneDir,
+                config: SandboxPoolConfig(
+                    minimumSwiftPythonVersion: "0.6.0-duplex.2",
+                    lockDirectory: lockDirectory,
+                    crashReportsDirectory: crashDirectory,
+                    workersPerTenant: 1,
+                    snapshotValidationMode: .cryptographic
+                )
+            )
+            let events = await sandbox.events(bufferSize: 256)
+            let warmConfirmation = Task {
+                try await requireWarmRestore(events, tenantID: tenantID)
+            }
+            var acquired: SandboxTenant?
+            do {
+                let tenant = try await sandbox.acquire(
+                    tenantID: tenantID,
+                    vmConfig: VMConfiguration(
+                        guestOS: .ubuntu24,
+                        bootStrategy: .snapshotRestore(snapshotPath: snapshot),
+                        cpuCount: 2,
+                        cpuQuotaPercent: 100,
+                        memoryMB: 2_048,
+                        diskMB: 4_096,
+                        maxOpenFilesPerProcess: 1_024,
+                        diskImagePath: baseImage,
+                        attachSerialConsole: false,
+                        fileSystemMounts: [],
+                        allowNetworkEgress: false,
+                        supervisorAuthSecret: nil,
+                        snapshotRestoreAuthSecret: restoreSecret,
+                        guestSudoMode: .none
+                    )
+                )
+                acquired = tenant
+                try await waitForWarmRestore(warmConfirmation)
+                guard case .snapshotRestore = tenant.vmConfig.bootStrategy else {
+                    throw ConsumerFailure.vmGate("cold boot strategy returned")
+                }
+                try await runVMWorkloadMatrix(
+                    sandbox: sandbox,
+                    tenant: tenant,
+                    iteration: iteration
+                )
+                try await sandbox.release(tenant, force: true)
+                acquired = nil
+                await sandbox.shutdown()
+                let bundlePath = URL(fileURLWithPath: tenant.clonePath)
+                    .deletingLastPathComponent().path
+                guard !FileManager.default.fileExists(atPath: bundlePath),
+                      !FileManager.default.fileExists(atPath: tenant.lockFilePath) else {
+                    throw ConsumerFailure.vmGate("tenant clone or lock leaked")
+                }
+                print(
+                    "notarized VM warm restore \(iteration)/\(iterations) = PASS "
+                        + "image \(imageManifest.sha256.prefix(12))"
+                )
+            } catch {
+                warmConfirmation.cancel()
+                if let acquired {
+                    try? await sandbox.release(acquired, force: true)
+                }
+                await sandbox.shutdown()
+                throw error
+            }
+            warmConfirmation.cancel()
         }
     }
+
+    private static func requireWarmRestore(
+        _ events: AsyncStream<SandboxEvent>,
+        tenantID: SandboxTenantID
+    ) async throws {
+        for await event in events {
+            switch event {
+            case .snapshotRestoreSucceeded(let observed, _)
+                    where observed == tenantID:
+                return
+            case .snapshotRestoreFailed(
+                let observed,
+                _,
+                let reason,
+                let fellBackToColdBoot
+            ) where observed == tenantID:
+                throw ConsumerFailure.vmGate(
+                    "warm restore failed \(reason), cold fallback \(fellBackToColdBoot)"
+                )
+            case .eventsDropped(let count):
+                throw ConsumerFailure.vmGate("sandbox events dropped: \(count)")
+            default:
+                continue
+            }
+        }
+        throw ConsumerFailure.vmGate("sandbox event stream ended before warm restore")
+    }
+
+    private static func waitForWarmRestore(
+        _ confirmation: Task<Void, Error>
+    ) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await confirmation.value }
+            group.addTask {
+                try await Task.sleep(for: .seconds(15))
+                throw ConsumerFailure.vmGate("warm restore confirmation timed out")
+            }
+            _ = try await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private static func runVMWorkloadMatrix(
+        sandbox: SandboxPool,
+        tenant: SandboxTenant,
+        iteration: Int
+    ) async throws {
+        let evaluated: Int = try await tenant.processPool.evalResult(
+            "6 * 7",
+            timeout: 15
+        )
+        guard evaluated == 42 else {
+            throw ConsumerFailure.vmGate("VM eval returned \(evaluated)")
+        }
+
+        let stream: CancellableStream<Int> = try await tenant.processPool
+            .evalStream("range(4)")
+        var streamed: [Int] = []
+        for try await value in stream { streamed.append(value) }
+        guard streamed == [0, 1, 2, 3] else {
+            throw ConsumerFailure.vmGate("VM Python stream mismatch")
+        }
+
+        let callbackName = "commercial_vm_\(iteration)_\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        let registration = try await tenant.processPool.registerCallback(
+            name: callbackName
+        ) { @Sendable (value: Int) -> Int in
+            value * 2
+        }
+        let callbackResult: Int = try await tenant.processPool.evalResult(
+            """
+            import swift_bridge
+            swift_bridge.call("\(callbackName)", 21)
+            """,
+            timeout: 15
+        )
+        try await tenant.processPool.unregisterCallback(name: callbackName)
+        _ = registration
+        guard callbackResult == 42 else {
+            throw ConsumerFailure.vmGate("VM callback mismatch")
+        }
+
+        let capture = try await sandbox.execShell(
+            tenantID: tenant.id,
+            "printf 'capture-out'; printf 'capture-err' >&2",
+            options: ExecStreamOptions(timeout: 15, maxOutputBytes: 4_096)
+        )
+        guard capture.exitCode == 0,
+              String(decoding: capture.stdout, as: UTF8.self) == "capture-out",
+              String(decoding: capture.stderr, as: UTF8.self) == "capture-err" else {
+            throw ConsumerFailure.vmGate("VM shell capture mismatch")
+        }
+
+        let streamedShell = try await sandbox.execShellStream(
+            tenantID: tenant.id,
+            "printf 'stream-a'; sleep 0.05; printf 'stream-b'; printf 'stream-err' >&2",
+            options: ExecStreamOptions(timeout: 15, maxOutputBytes: 4_096)
+        )
+        let streamedCollection = try await collectSandboxSession(streamedShell)
+        guard streamedCollection.result.exitCode == 0,
+              String(decoding: streamedCollection.stdout, as: UTF8.self)
+                == "stream-astream-b",
+              String(decoding: streamedCollection.stderr, as: UTF8.self)
+                == "stream-err" else {
+            throw ConsumerFailure.vmGate("VM shell stream mismatch")
+        }
+
+        let pty = try await sandbox.execShellPTY(
+            tenantID: tenant.id,
+            "IFS= read -r token; printf 'PTY:%s:' \"$token\"; stty size",
+            options: ExecPTYOptions(
+                timeout: 15,
+                maxOutputBytes: 4_096,
+                initialSize: TerminalSize(columns: 80, rows: 24)
+            )
+        )
+        let ptyCollection = Task { try await collectSandboxSession(pty) }
+        try await pty.resize(to: TerminalSize(columns: 101, rows: 33))
+        try await pty.sendStdin(Data("commercial-vm-pty\n".utf8))
+        try await pty.finishStdin()
+        let collectedPTY = try await ptyCollection.value
+        let ptyText = String(decoding: collectedPTY.stdout, as: UTF8.self)
+        guard collectedPTY.result.exitCode == 0,
+              ptyText.contains("PTY:commercial-vm-pty:"),
+              ptyText.contains("33 101") else {
+            throw ConsumerFailure.vmGate("VM PTY mismatch")
+        }
+
+        try await runVMLogicalMessage(pool: tenant.processPool)
+        try await requireVMArenaIngressRejection(pool: tenant.processPool)
+    }
+
+    private static func collectSandboxSession(
+        _ session: SandboxExecSession
+    ) async throws -> (
+        stdout: Data,
+        stderr: Data,
+        result: SandboxShellResult
+    ) {
+        var stdout = Data()
+        var stderr = Data()
+        for try await chunk in session.chunks {
+            switch chunk.stream {
+            case .stdout: stdout.append(chunk.bytes)
+            case .stderr: stderr.append(chunk.bytes)
+            @unknown default:
+                throw ConsumerFailure.vmGate("unknown VM shell stream")
+            }
+        }
+        return (stdout, stderr, try await session.result.value)
+    }
+
+    private static func runVMLogicalMessage(
+        pool: PythonProcessPool
+    ) async throws {
+        let byteCount = 2 * 1_024 * 1_024 + 137
+        let chunkBytes = 128 * 1_024
+        let payload = Data(repeating: 0xA7, count: byteCount)
+        let format = DuplexFormat(
+            "video/hevc",
+            metadata: ["profile": "main", "gate": "notarized-vm"]
+        )
+        var requirements = DuplexSessionRequirements.messages
+        requirements.minimumLogicalMessageBytes = byteCount
+        var options = DuplexOptions.default
+        options.inputFormat = format
+        options.requirements = requirements
+        options.limits.maximumFrameBytes = 256 * 1_024
+        options.limits.maximumLogicalMessageBytes = 3 * 1_024 * 1_024
+        options.limits.preferredMessageChunkBytes = chunkBytes
+        options.limits.inputCreditBytes = 512 * 1_024
+        options.limits.inputCreditFrames = 4
+        let session = try await pool.openDuplexSession(
+            handler: .eval(
+                code: """
+                import hashlib
+                def run(session):
+                    session.ready({"gate": "notarized-vm"})
+                    message = session.receive_message()
+                    assert message.total_bytes == \(byteCount)
+                    assert message.format_metadata["gate"] == "notarized-vm"
+                    digest = hashlib.sha256()
+                    last_sequence = 0
+                    for chunk in message.chunks():
+                        digest.update(chunk.buffer)
+                        last_sequence = chunk.sequence
+                    session.receive()
+                    session.output.send(
+                        digest.digest(),
+                        processed_input_through=last_sequence,
+                    )
+                    session.output.finish()
+                """,
+                entrypoint: "run"
+            ),
+            options: options
+        )
+        do {
+            try await session.input.sendMessage(
+                payload,
+                format: format,
+                flags: [.independent]
+            )
+            try await session.input.finish()
+            var output = session.output.makeAsyncIterator()
+            guard let digest = try await output.next(),
+                  digest.buffer.copyData() == Data(SHA256.hash(data: payload)) else {
+                throw ConsumerFailure.vmGate("VM logical-message digest mismatch")
+            }
+            try await session.acknowledgeOutput(
+                consumedThrough: DuplexPosition(
+                    sequence: digest.position.sequence,
+                    byteOffset: digest.buffer.count
+                )
+            )
+            guard try await output.next() == nil,
+                  try await session.result().terminal == .completed else {
+                throw ConsumerFailure.vmGate("VM logical-message terminal mismatch")
+            }
+            await session.close()
+        } catch {
+            await session.cancel(reason: .user)
+            await session.close()
+            throw error
+        }
+    }
+
+    private static func requireVMArenaIngressRejection(
+        pool: PythonProcessPool
+    ) async throws {
+        var options = DuplexOptions.default
+        options.requirements = .arenaIngress
+        options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
+            slotCount: 1,
+            slotCapacity: 4_096,
+            maximumOutstandingReferencedBytes: 4_096
+        )
+        do {
+            let unexpected = try await pool.openDuplexSession(
+                handler: .function(
+                    module: "must_not_import_for_vm_arena_gate",
+                    name: "run"
+                ),
+                options: options
+            )
+            await unexpected.close()
+            throw ConsumerFailure.vmGate("VM accepted local arena ingress")
+        } catch let failure as DuplexFailure {
+            guard failure.code == .featureUnavailable,
+                  failure.origin == .host,
+                  failure.message.contains(DuplexFeature.arenaIngressV1.rawValue) else {
+                throw ConsumerFailure.vmGate("wrong VM arena rejection: \(failure)")
+            }
+        }
+    }
+
+    private static func requirePoolSnapshot(
+        _ session: PythonDuplexSession
+    ) throws -> DuplexSharedBufferPoolSnapshot {
+        guard let snapshot = session.sharedBufferPoolSnapshot else {
+            throw ConsumerFailure.missingArenaSnapshot
+        }
+        return snapshot
+    }
+}
+
+enum ConsumerFailure: Error {
+    case missingOutput
+    case outputMismatch
+    case extraOutput
+    case badTerminal
+    case badNegotiatedMessageConfiguration
+    case logicalMessageDigestMismatch
+    case missingMetalDevice
+    case missingMetalCommandBuffer
+    case metalPointerIdentityMismatch
+    case metalCommandFailed
+    case arenaLeaseReleasedTooEarly
+    case arenaPeerReleaseDidNotPreserveMetalLease
+    case arenaFinalLeaseOrLedgerMismatch
+    case metalQuarantineWasReusable
+    case missingArenaSnapshot
+    case missingApplicationEvent(String)
+    case vmGate(String)
 }
 EOF
+}
 
-swift run --package-path "$WORK_DIR"
+for module in SwiftPythonRuntime SwiftPythonAudioInterop SwiftPythonMetalInterop; do
+    test -d "$REPO_DIR/$module.xcframework/macos-"*"/Headers/$module.swiftmodule"
+    test -d "$REPO_DIR/$module.xcframework/macos-"*"/$module.swiftmodule"
+done
+
+SPM_DIR="$WORK_DIR/spm"
+XCODE_DIR="$WORK_DIR/xcode"
+write_consumer_package "$SPM_DIR"
+write_consumer_package "$XCODE_DIR"
+
+export SWIFTPYTHON_WORKER_PATH="$REPO_DIR/SwiftPythonWorker"
+
+echo "=== SwiftPM HeadersPath consumer ==="
+swift run --package-path "$SPM_DIR"
+
+echo "=== xcodebuild slice-root consumer ==="
+(
+    cd "$XCODE_DIR"
+    xcodebuild \
+        -quiet \
+        -scheme ConsumerSmoke \
+        -destination "platform=macOS,arch=arm64" \
+        -derivedDataPath "$WORK_DIR/DerivedData" \
+        CODE_SIGNING_ALLOWED=NO \
+        build
+)
+"$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
+
+DEVELOPER_ID="$(
+    security find-identity -v -p codesigning \
+        | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' \
+        | head -1
+)"
+if [ -z "$DEVELOPER_ID" ]; then
+    echo "A Developer ID Application identity is required." >&2
+    exit 1
+fi
+
+PARENT_SANDBOX_ENTITLEMENTS="$WORK_DIR/ConsumerSandbox.entitlements"
+cat > "$PARENT_SANDBOX_ENTITLEMENTS" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.security.network.server</key>
+  <true/>
+</dict>
+</plist>
+EOF
+
+PARENT_VM_ENTITLEMENTS="$WORK_DIR/ConsumerVM.entitlements"
+cat > "$PARENT_VM_ENTITLEMENTS" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.virtualization</key>
+  <true/>
+</dict>
+</plist>
+EOF
+
+assert_bundle_remained_sealed() {
+    local app="$1"
+    if find "$app" -type d -name __pycache__ -print -quit | grep -q .; then
+        echo "Python __pycache__ appeared in sealed app: $app" >&2
+        exit 1
+    fi
+    if find "$app" -type f -name '*.pyc' -print -quit | grep -q .; then
+        echo "Python bytecode appeared in sealed app: $app" >&2
+        exit 1
+    fi
+    codesign --verify --deep --strict --verbose=2 "$app"
+}
+
+bundle_content_digest() {
+    python3 - "$1" <<'PY'
+import hashlib
+import os
+import stat
+import sys
+
+root = os.path.abspath(sys.argv[1])
+digest = hashlib.sha256()
+for directory, directories, files in os.walk(root, followlinks=False):
+    directories.sort()
+    files.sort()
+    for name in directories + files:
+        path = os.path.join(directory, name)
+        relative = os.path.relpath(path, root).encode()
+        metadata = os.lstat(path)
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(stat.S_IMODE(metadata.st_mode).to_bytes(4, "big"))
+        if stat.S_ISLNK(metadata.st_mode):
+            target = os.readlink(path).encode()
+            digest.update(len(target).to_bytes(8, "big"))
+            digest.update(target)
+        elif stat.S_ISREG(metadata.st_mode):
+            with open(path, "rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+print(digest.hexdigest())
+PY
+}
+
+assert_bundle_content_unchanged() {
+    local app="$1"
+    local expected="$2"
+    local observed
+    observed="$(bundle_content_digest "$app")"
+    if [ "$observed" != "$expected" ]; then
+        echo "Sealed app content changed after execution: $app" >&2
+        echo "expected=$expected observed=$observed" >&2
+        exit 1
+    fi
+}
+
+assert_signed_entitlements_match() {
+    local executable="$1"
+    local expected_plist="$2"
+    python3 - "$executable" "$expected_plist" <<'PY'
+import plistlib
+import subprocess
+import sys
+
+completed = subprocess.run(
+    ["codesign", "-d", "--entitlements", ":-", sys.argv[1]],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+    check=True,
+)
+observed = plistlib.loads(completed.stdout)
+with open(sys.argv[2], "rb") as handle:
+    expected = plistlib.load(handle)
+if observed != expected:
+    raise SystemExit(
+        f"signed entitlements mismatch for {sys.argv[1]}: "
+        f"observed={observed!r} expected={expected!r}"
+    )
+PY
+}
+
+make_app() {
+    local mode="$1"
+    local identity="$2"
+    local parent_entitlements="$3"
+    local worker_entitlements="$4"
+    local app="$WORK_DIR/ConsumerSmoke-$mode.app"
+    local macos="$app/Contents/MacOS"
+    local frameworks="$app/Contents/Frameworks"
+    local python_framework="$frameworks/Python.framework"
+    local python_home_for_app="$PYTHON_HOME_DIR"
+    local mode_identifier=d
+    if [ "$mode" = sandbox ]; then
+        mode_identifier=s
+    elif [ "$mode" = virtualization ]; then
+        mode_identifier=v
+    fi
+    local bundle_identifier="ai.bestbyte.sp.$mode_identifier.$SMOKE_ID_SUFFIX"
+    local skip_in_process=0
+    if [ "$mode" = sandbox ]; then
+        skip_in_process=1
+        python_home_for_app="$frameworks/Python.framework/Versions/3.13"
+    fi
+    mkdir -p "$macos"
+    cp "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke" \
+        "$macos/ConsumerSmoke"
+    cp "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker"
+    if [ "$mode" = sandbox ]; then
+        mkdir -p "$python_home_for_app/lib"
+        cp "$PYTHON_FRAMEWORK_BINARY" "$python_home_for_app/Python"
+        mkdir -p "$python_home_for_app/Resources"
+        cp "$PYTHON_FRAMEWORK_DIR/Versions/3.13/Resources/Info.plist" \
+            "$python_home_for_app/Resources/Info.plist"
+        ln -s 3.13 "$python_framework/Versions/Current"
+        ln -s Versions/Current/Python "$python_framework/Python"
+        ln -s Versions/Current/Resources "$python_framework/Resources"
+        rsync -a \
+            --exclude site-packages \
+            --exclude config-3.13-darwin \
+            --exclude test \
+            --exclude __pycache__ \
+            --exclude '*.pyc' \
+            "$PYTHON_HOME_DIR/lib/python3.13/" \
+            "$python_home_for_app/lib/python3.13/"
+        install_name_tool -change \
+            "$PYTHON_FRAMEWORK_LOAD_PATH" \
+            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
+            "$macos/ConsumerSmoke"
+        install_name_tool -change \
+            "$PYTHON_FRAMEWORK_LOAD_PATH" \
+            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
+            "$macos/SwiftPythonWorker"
+
+        # Library validation accepts the embedded interpreter and extension
+        # modules because every Mach-O is signed by the app's own team.
+        while IFS= read -r -d '' nested_binary; do
+            if file "$nested_binary" | grep -q 'Mach-O'; then
+                codesign --force --sign "$identity" --options runtime \
+                    "${CODESIGN_TIMESTAMP_ARGS[@]}" "$nested_binary"
+            fi
+        done < <(find "$python_home_for_app" -type f -print0)
+
+        # Gatekeeper evaluates executable-bit payloads in quarantined bundles
+        # as code. Python installs contain plain-text helper scripts with that
+        # bit set, so normalize them before sealing the framework/app.
+        while IFS= read -r -d '' executable_payload; do
+            if ! file "$executable_payload" | grep -q 'Mach-O'; then
+                chmod a-x "$executable_payload"
+            fi
+        done < <(find "$python_home_for_app" -type f -perm -111 -print0)
+
+        codesign --force --sign "$identity" --options runtime \
+            "${CODESIGN_TIMESTAMP_ARGS[@]}" "$python_framework"
+    fi
+    cat > "$app/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key><string>ConsumerSmoke</string>
+  <key>CFBundleIdentifier</key><string>$bundle_identifier</string>
+  <key>CFBundleName</key><string>ConsumerSmoke</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+</dict>
+</plist>
+EOF
+    local worker_identifier="$bundle_identifier.SwiftPythonWorker"
+    codesign --force --sign "$identity" --options runtime \
+        --identifier "$worker_identifier" \
+        "${CODESIGN_TIMESTAMP_ARGS[@]}" --entitlements "$worker_entitlements" \
+        "$macos/SwiftPythonWorker"
+    codesign --force --sign "$identity" --options runtime \
+        "${CODESIGN_TIMESTAMP_ARGS[@]}" \
+        --entitlements "$parent_entitlements" "$app"
+    codesign --verify --deep --strict --verbose=2 "$app"
+    local before_run_digest
+    before_run_digest="$(bundle_content_digest "$app")"
+    run_with_timeout 90 env \
+        SWIFTPYTHON_WORKER_PATH="$macos/SwiftPythonWorker" \
+        SWIFTPYTHON_SKIP_IN_PROCESS="$skip_in_process" \
+        PYTHONHOME="$python_home_for_app" \
+        PYTHONNOUSERSITE=1 \
+        PYTHONDONTWRITEBYTECODE=1 \
+        "$macos/ConsumerSmoke"
+    assert_bundle_remained_sealed "$app"
+    assert_bundle_content_unchanged "$app" "$before_run_digest"
+}
+
+notarize_app() {
+    local mode="$1"
+    local app="$WORK_DIR/ConsumerSmoke-$mode.app"
+    local archive="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-notary.zip"
+    local result="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-notary-result.json"
+    local log="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-notary-log.json"
+    local assessment="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-spctl.txt"
+
+    mkdir -p "$NOTARY_OUTPUT_DIR"
+    if [ -e "$archive" ] || [ -e "$result" ] || [ -e "$log" ] || [ -e "$assessment" ]; then
+        echo "Refusing to overwrite notarization evidence for $mode in $NOTARY_OUTPUT_DIR" >&2
+        exit 1
+    fi
+
+    ditto -c -k --keepParent "$app" "$archive"
+    xcrun notarytool submit "$archive" \
+        --keychain-profile "$NOTARY_PROFILE" \
+        --wait --timeout 45m --output-format json > "$result"
+
+    local status
+    local submission_id
+    status="$(jq -r '.status' "$result")"
+    submission_id="$(jq -r '.id' "$result")"
+    if [ "$status" != Accepted ] || [ -z "$submission_id" ] || [ "$submission_id" = null ]; then
+        cat "$result" >&2
+        echo "Notarization did not return Accepted for $mode" >&2
+        exit 1
+    fi
+
+    xcrun notarytool log "$submission_id" \
+        --keychain-profile "$NOTARY_PROFILE" "$log"
+    if [ "$(jq -r '.status' "$log")" != Accepted ] \
+        || [ "$(jq -r '.statusCode' "$log")" != 0 ] \
+        || [ "$(jq -r '.issues | length' "$log")" != 0 ]; then
+        jq '{status,statusSummary,statusCode,issues}' "$log" >&2
+        exit 1
+    fi
+
+    xcrun stapler staple "$app"
+    xcrun stapler validate "$app"
+    xattr -w com.apple.quarantine \
+        "0083;$(date +%s);SwiftPythonNotaryGate;" "$app"
+    if ! spctl --assess --type execute --verbose=4 "$app" \
+        > "$assessment" 2>&1; then
+        cat "$assessment" >&2
+        exit 1
+    fi
+    if ! grep -F 'source=Notarized Developer ID' "$assessment" >/dev/null; then
+        cat "$assessment" >&2
+        echo "Gatekeeper did not report Notarized Developer ID for $mode" >&2
+        exit 1
+    fi
+
+    codesign --verify --deep --strict --verbose=2 "$app"
+    echo "Notarized consumer passed: $mode ($submission_id)"
+    cat "$assessment"
+}
+
+echo "=== Developer ID non-sandbox signed consumer ==="
+make_app \
+    developer-id \
+    "$DEVELOPER_ID" \
+    "$REPO_DIR/Entitlements/ConsumerApp.entitlements" \
+    "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+DEVELOPER_APP="$WORK_DIR/ConsumerSmoke-developer-id.app"
+assert_signed_entitlements_match \
+    "$DEVELOPER_APP/Contents/MacOS/SwiftPythonWorker" \
+    "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+
+echo "=== Developer ID sandbox-inherited signed consumer ==="
+make_app \
+    sandbox \
+    "$DEVELOPER_ID" \
+    "$PARENT_SANDBOX_ENTITLEMENTS" \
+    "$REPO_DIR/Entitlements/SwiftPythonWorker-sandbox.entitlements"
+SANDBOX_APP="$WORK_DIR/ConsumerSmoke-sandbox.app"
+assert_signed_entitlements_match \
+    "$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" \
+    "$REPO_DIR/Entitlements/SwiftPythonWorker-sandbox.entitlements"
+test "$(
+    codesign -dvv "$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" 2>&1 \
+        | sed -n 's/^Identifier=//p'
+)" = "$SANDBOX_BUNDLE_IDENTIFIER.SwiftPythonWorker"
+
+if [ "$VM_RELEASE_GATE" = 1 ]; then
+    echo "=== Developer ID virtualization signed consumer ==="
+    make_app \
+        virtualization \
+        "$DEVELOPER_ID" \
+        "$PARENT_VM_ENTITLEMENTS" \
+        "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+    VM_APP="$WORK_DIR/ConsumerSmoke-virtualization.app"
+    assert_signed_entitlements_match \
+        "$VM_APP" \
+        "$PARENT_VM_ENTITLEMENTS"
+fi
+
+if [ -n "$NOTARY_PROFILE" ]; then
+    echo "=== Notarized Developer ID non-sandbox consumer ==="
+    notarize_app developer-id
+    DEVELOPER_NOTARIZED_DIGEST="$(bundle_content_digest "$DEVELOPER_APP")"
+    run_with_timeout 90 env \
+        SWIFTPYTHON_WORKER_PATH="$DEVELOPER_APP/Contents/MacOS/SwiftPythonWorker" \
+        PYTHONHOME="$PYTHON_HOME_DIR" \
+        PYTHONNOUSERSITE=1 \
+        PYTHONDONTWRITEBYTECODE=1 \
+        "$DEVELOPER_APP/Contents/MacOS/ConsumerSmoke"
+    assert_bundle_remained_sealed "$DEVELOPER_APP"
+    assert_bundle_content_unchanged \
+        "$DEVELOPER_APP" \
+        "$DEVELOPER_NOTARIZED_DIGEST"
+
+    echo "=== Notarized Developer ID sandbox-inherited consumer ==="
+    notarize_app sandbox
+    SANDBOX_NOTARIZED_DIGEST="$(bundle_content_digest "$SANDBOX_APP")"
+    run_with_timeout 90 env \
+        SWIFTPYTHON_WORKER_PATH="$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" \
+        SWIFTPYTHON_SKIP_IN_PROCESS=1 \
+        PYTHONHOME="$SANDBOX_APP/Contents/Frameworks/Python.framework/Versions/3.13" \
+        PYTHONNOUSERSITE=1 \
+        PYTHONDONTWRITEBYTECODE=1 \
+        "$SANDBOX_APP/Contents/MacOS/ConsumerSmoke"
+    assert_bundle_remained_sealed "$SANDBOX_APP"
+    assert_bundle_content_unchanged \
+        "$SANDBOX_APP" \
+        "$SANDBOX_NOTARIZED_DIGEST"
+
+    if [ "$VM_RELEASE_GATE" = 1 ]; then
+        echo "=== Notarized Developer ID virtualization consumer ==="
+        notarize_app virtualization
+        VM_NOTARIZED_DIGEST="$(bundle_content_digest "$VM_APP")"
+        run_with_timeout 900 env \
+            SWIFTPYTHON_WORKER_PATH="$VM_APP/Contents/MacOS/SwiftPythonWorker" \
+            SWIFTPYTHON_VM_WORKER_DIR="$REPO_DIR/VMWorker" \
+            SWIFTPYTHON_VM_BASE_IMAGE="$VM_BASE_IMAGE" \
+            SWIFTPYTHON_VM_SNAPSHOT="$VM_SNAPSHOT" \
+            SWIFTPYTHON_VM_RESTORE_SECRET="$VM_RESTORE_SECRET" \
+            SWIFTPYTHON_VM_CLONE_DIR="$VM_CLONE_DIR" \
+            SWIFTPYTHON_VM_ITERATIONS="$VM_ITERATIONS" \
+            PYTHONHOME="$PYTHON_HOME_DIR" \
+            PYTHONNOUSERSITE=1 \
+            PYTHONDONTWRITEBYTECODE=1 \
+            "$VM_APP/Contents/MacOS/ConsumerSmoke"
+        assert_bundle_remained_sealed "$VM_APP"
+        assert_bundle_content_unchanged "$VM_APP" "$VM_NOTARIZED_DIGEST"
+    fi
+fi

@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(dirname "$SCRIPT_DIR")"
-REPO_DIR="$(cd "$PKG_DIR/../.." && pwd)"
 APP_NAME="IRIS"
 APP_DIR="$PKG_DIR/build/${APP_NAME}.app"
 OPEN_APP=0
@@ -49,10 +48,6 @@ done < <(find "$BIN_DIR" -maxdepth 1 -type d \( -name '*.resources' -o -name '*.
 if [ "$FOUND_RESOURCE_BUNDLE" -eq 0 ]; then
     echo "SwiftPM resource bundle not found in $BIN_DIR" >&2
     exit 1
-fi
-
-if [ -f "$REPO_DIR/SwiftPythonWorker" ]; then
-    cp "$REPO_DIR/SwiftPythonWorker" "$APP_DIR/Contents/MacOS/SwiftPythonWorker"
 fi
 
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'

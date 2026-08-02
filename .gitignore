@@ -3,3 +3,9 @@
 .swiftpm/
 build/
 DerivedData/
+Artifacts/
+*.dSYM/
+__pycache__/
+*.py[cod]
+.env
+.env.*
