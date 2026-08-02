@@ -1,0 +1,1 @@
+framework module SwiftPythonEngine { umbrella header "SwiftPythonEngine.h"; export * }

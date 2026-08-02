@@ -6,7 +6,7 @@ import Darwin
 import Foundation
 @preconcurrency import Metal
 import Swift
-@_spi(DuplexSharedBufferInterop) import SwiftPythonRuntime
+import SwiftPythonRuntime
 import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
@@ -68,10 +68,14 @@ final public class DuplexCopyLedger : @unchecked Swift.Sendable {
   }
   @objc deinit
 }
-public enum DuplexMetalBackingSource : Swift.Sendable {
-  case sharedArena(SwiftPythonRuntime.SharedMemoryArena)
-  case ownedShared
-  case virtualMachine
+public enum DuplexMetalStorage : Swift.Sendable, Swift.Equatable {
+  case managed
+  case remote
+  public static func == (a: SwiftPythonMetalInterop.DuplexMetalStorage, b: SwiftPythonMetalInterop.DuplexMetalStorage) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
 }
 public enum DuplexMetalAccess : Swift.Sendable, Swift.Equatable {
   case cpuWritesGPUReads
@@ -125,7 +129,6 @@ public struct DuplexMetalBufferLease : @unchecked Swift.Sendable {
   public let range: Swift.Range<Swift.Int>
   public let route: SwiftPythonMetalInterop.DuplexMetalRoute
   public let access: SwiftPythonMetalInterop.DuplexMetalAccess
-  public let arenaRegion: SwiftPythonRuntime.SharedMemoryRegion?
   public func retainUntilCompleted(by commandBuffer: any Metal.MTLCommandBuffer) throws
   public func finishCPUAccess() throws
   public func recordCopy(segment: Swift.String, status: SwiftPythonMetalInterop.DuplexMetalCopyStatus, copiedBytes: Swift.Int)
@@ -142,18 +145,20 @@ public struct DuplexSharedMetalBufferLease : @unchecked Swift.Sendable {
 }
 @available(macOS 15, iOS 18, tvOS 18, *)
 @available(watchOS, unavailable)
-extension SwiftPythonRuntime.DuplexSharedBufferLease {
+extension SwiftPythonRuntime.ManagedBuffer {
   final public func makeMetalBufferLease(device: any Metal.MTLDevice, access: SwiftPythonMetalInterop.DuplexMetalAccess, ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws -> SwiftPythonMetalInterop.DuplexSharedMetalBufferLease
 }
-@available(macOS 15, iOS 18, tvOS 18, *)
+@_hasMissingDesignatedInitializers @available(macOS 15, iOS 18, tvOS 18, *)
 @available(watchOS, unavailable)
 final public class DuplexMetalRegionPool : @unchecked Swift.Sendable {
   final public let device: any Metal.MTLDevice
-  final public let backingSource: SwiftPythonMetalInterop.DuplexMetalBackingSource
+  final public var storage: SwiftPythonMetalInterop.DuplexMetalStorage {
+    get
+  }
   final public let configuration: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration
   final public let ledger: SwiftPythonMetalInterop.DuplexCopyLedger
   final public let pageSize: Swift.Int
-  public init(device: any Metal.MTLDevice, backing: SwiftPythonMetalInterop.DuplexMetalBackingSource, configuration: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration = DuplexMetalPoolConfiguration(), ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws
+  convenience public init(device: any Metal.MTLDevice, storage: SwiftPythonMetalInterop.DuplexMetalStorage = .managed, configuration: SwiftPythonMetalInterop.DuplexMetalPoolConfiguration = DuplexMetalPoolConfiguration(), ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws
   final public func tryAcquire(logicalByteCount: Swift.Int, access: SwiftPythonMetalInterop.DuplexMetalAccess) throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease?
   final public func acquire(logicalByteCount: Swift.Int, access: SwiftPythonMetalInterop.DuplexMetalAccess) async throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease
   final public func makeLease(copying data: Foundation.Data, access: SwiftPythonMetalInterop.DuplexMetalAccess = .cpuWritesGPUReads) async throws -> SwiftPythonMetalInterop.DuplexMetalBufferLease
@@ -169,4 +174,5 @@ extension SwiftPythonMetalInterop.DuplexMetalFallbackReason : Swift.Hashable {}
 extension SwiftPythonMetalInterop.DuplexMetalFallbackReason : Swift.RawRepresentable {}
 extension SwiftPythonMetalInterop.DuplexMetalCopyStatus : Swift.Hashable {}
 extension SwiftPythonMetalInterop.DuplexMetalCopyStatus : Swift.RawRepresentable {}
+extension SwiftPythonMetalInterop.DuplexMetalStorage : Swift.Hashable {}
 extension SwiftPythonMetalInterop.DuplexMetalAccess : Swift.Hashable {}

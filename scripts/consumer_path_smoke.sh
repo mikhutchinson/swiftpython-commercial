@@ -13,6 +13,17 @@ VM_SNAPSHOT="${SWIFTPYTHON_VM_SNAPSHOT:-}"
 VM_RESTORE_SECRET="${SWIFTPYTHON_VM_RESTORE_SECRET:-}"
 VM_CLONE_DIR="${SWIFTPYTHON_VM_CLONE_DIR:-}"
 VM_ITERATIONS="${SWIFTPYTHON_VM_ITERATIONS:-20}"
+RELEASE_MANIFEST="${SWIFTPYTHON_RELEASE_MANIFEST:-$REPO_DIR/manifest.json}"
+RELEASE_VERSION="$(
+    python3 - "$RELEASE_MANIFEST" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    print(json.load(handle)["version"])
+PY
+)"
+export SWIFTPYTHON_RELEASE_VERSION="$RELEASE_VERSION"
 SMOKE_ID_SUFFIX="$(
     basename "$WORK_DIR" \
         | sed 's/.*\.//' \
@@ -23,6 +34,7 @@ SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
 
 for required_tool in \
     codesign \
+    ditto \
     install_name_tool \
     lipo \
     otool \
@@ -128,6 +140,12 @@ if [ -z "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
     echo "SwiftPythonWorker does not declare a Python 3.13 framework dependency." >&2
     exit 1
 fi
+ENGINE_FRAMEWORK="$REPO_DIR/SwiftPythonEngine.xcframework/macos-arm64_x86_64/SwiftPythonEngine.framework"
+ENGINE_BINARY="$ENGINE_FRAMEWORK/Versions/A/SwiftPythonEngine"
+if [ ! -f "$ENGINE_BINARY" ]; then
+    echo "SwiftPythonEngine universal framework binary not found at $ENGINE_BINARY." >&2
+    exit 1
+fi
 
 run_with_timeout() {
     local timeout_seconds="$1"
@@ -197,6 +215,7 @@ EOF
     cat > "$destination/Sources/ConsumerSmoke/ConsumerSmoke.swift" <<'EOF'
 import Foundation
 import CryptoKit
+import Darwin
 @preconcurrency import Metal
 import SwiftPythonAudioInterop
 import SwiftPythonMetalInterop
@@ -215,6 +234,7 @@ enum ConsumerSmoke {
     }
 
     private static func run() async throws {
+        try assertPrivateEngineLoadedOnce()
         if ProcessInfo.processInfo.environment["SWIFTPYTHON_SKIP_IN_PROCESS"] != "1" {
             let version: String = try await Python.run {
                 try String(pythonObject: Python.sys.version)
@@ -296,14 +316,29 @@ enum ConsumerSmoke {
         try await runVMReleaseGateIfConfigured()
     }
 
+    private static func assertPrivateEngineLoadedOnce() throws {
+        var paths: [String] = []
+        for index in 0..<_dyld_image_count() {
+            guard let name = _dyld_get_image_name(index) else { continue }
+            let path = String(cString: name)
+            if path.contains("SwiftPythonEngine.framework/")
+                    && path.hasSuffix("/SwiftPythonEngine") {
+                paths.append(path)
+            }
+        }
+        guard paths.count == 1 else {
+            throw ConsumerFailure.privateEngineImageCount(paths)
+        }
+        print("private Engine images = 1")
+    }
+
     private static func runLogicalMessageSmoke(
         pool: PythonProcessPool
     ) async throws {
         let logicalBytes = 10 * 1_024 * 1_024 + 137
         let chunkBytes = 256 * 1_024
         let payload = Data(repeating: 0xA7, count: logicalBytes)
-        var requirements = DuplexSessionRequirements.messages
-        requirements.minimumLogicalMessageBytes = logicalBytes
+        let requirements = DuplexSessionRequirements.messages
         let format = DuplexFormat(
             "video/hevc",
             metadata: [
@@ -366,10 +401,7 @@ enum ConsumerSmoke {
                 requirements: requirements
             )
         )
-        guard session.negotiatedConfiguration.limits.maximumFrameBytes
-                < logicalBytes,
-              session.negotiatedConfiguration.limits.preferredMessageChunkBytes
-                == chunkBytes else {
+        guard session.profile.maximumMessageBytes >= logicalBytes else {
             throw ConsumerFailure.badNegotiatedMessageConfiguration
         }
         try await session.input.sendMessage(
@@ -415,7 +447,7 @@ enum ConsumerSmoke {
         }
         let slotBytes = Int(getpagesize())
         var options = DuplexOptions.default
-        options.requirements = .arenaIngress
+        options.requirements = .managedBuffers
         options.limits = DuplexLimits(
             maximumFrameBytes: slotBytes,
             maximumLogicalMessageBytes: slotBytes,
@@ -423,10 +455,10 @@ enum ConsumerSmoke {
             inputCreditBytes: slotBytes,
             inputCreditFrames: 1
         )
-        options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
-            slotCount: 1,
-            slotCapacity: slotBytes,
-            maximumOutstandingReferencedBytes: slotBytes
+        options.managedBuffers = ManagedBufferConfiguration(
+            preset: .memoryEfficient,
+            maximumBufferBytes: slotBytes,
+            maximumBufferedBytes: slotBytes
         )
         let session = try await pool.openDuplexSession(
             handler: .eval(
@@ -464,8 +496,13 @@ enum ConsumerSmoke {
             ),
             options: options
         )
-        let initial = try requirePoolSnapshot(session)
-        let coreLease = try await session.input.acquireSharedBuffer(
+        let initial = try requireManagedBufferStatus(session)
+        guard initial.capacityBytes == slotBytes,
+              initial.bytesInUse == 0,
+              initial.isAvailable else {
+            throw ConsumerFailure.arenaInitialStateMismatch
+        }
+        let coreLease = try await session.input.acquireManagedBuffer(
             byteCount: slotBytes
         )
         try coreLease.withUnsafeMutableBytes { bytes in
@@ -498,10 +535,9 @@ enum ConsumerSmoke {
             "arena-python-held",
             events: &events
         )
-        let held = try requirePoolSnapshot(session)
-        guard held.availableSlots == 0,
-              held.sentSlots == 1,
-              held.outstandingReferencedBytes == slotBytes else {
+        let held = try requireManagedBufferStatus(session)
+        guard !held.isAvailable,
+              held.bytesInUse == slotBytes else {
             throw ConsumerFailure.arenaLeaseReleasedTooEarly
         }
         try await session.sendControl(
@@ -513,24 +549,22 @@ enum ConsumerSmoke {
         )
         let peerReleaseDeadline = ContinuousClock.now + .seconds(2)
         while ContinuousClock.now < peerReleaseDeadline,
-              session.sharedBufferPoolSnapshot?
-                .outstandingReferencedBytes != 0 {
+              session.managedBufferStatus?.bytesInUse != 0 {
             try await Task.sleep(for: .milliseconds(10))
         }
-        let peerReleased = try requirePoolSnapshot(session)
-        guard peerReleased.outstandingReferencedBytes == 0,
-              peerReleased.availableSlots == 0,
-              peerReleased.sentSlots == 1 else {
+        let peerReleased = try requireManagedBufferStatus(session)
+        guard peerReleased.bytesInUse == 0,
+              !peerReleased.isAvailable else {
             throw ConsumerFailure.arenaPeerReleaseDidNotPreserveMetalLease
         }
 
         let blockedAcquire = Task {
-            try await session.input.acquireSharedBuffer(
+            try await session.input.acquireManagedBuffer(
                 byteCount: slotBytes
             )
         }
         try await Task.sleep(for: .milliseconds(100))
-        guard session.sharedBufferPoolSnapshot?.availableSlots == 0 else {
+        guard session.managedBufferStatus?.isAvailable == false else {
             throw ConsumerFailure.arenaLeaseReleasedTooEarly
         }
         try metalLease.finishMetalAccess()
@@ -552,11 +586,10 @@ enum ConsumerSmoke {
         guard try await session.result().terminal == .completed else {
             throw ConsumerFailure.badTerminal
         }
-        let final = try requirePoolSnapshot(session)
-        guard final.backingBytes == initial.backingBytes,
-              final.outstandingReferencedBytes == 0,
-              final.sentSlots == 0,
-              final.reuseCount >= 2,
+        let final = try requireManagedBufferStatus(session)
+        guard final.capacityBytes == initial.capacityBytes,
+              final.bytesInUse == 0,
+              final.isAvailable,
               ledger.snapshot.entries.contains(where: {
                   $0.route == .arenaSharedNoCopy
                       && $0.status == .zeroCopy
@@ -567,7 +600,7 @@ enum ConsumerSmoke {
         await session.close()
         print(
             "shared arena = pointer-identical Metal mapping, "
-                + "Python/GPU final-lease turnover, \(final.backingBytes) fixed bytes"
+                + "Python/GPU final-lease turnover, \(final.capacityBytes) managed bytes"
         )
     }
 
@@ -590,7 +623,7 @@ enum ConsumerSmoke {
         }
         let pool = try DuplexMetalRegionPool(
             device: device,
-            backing: .ownedShared,
+            storage: .managed,
             configuration: DuplexMetalPoolConfiguration(
                 regionCount: 1,
                 regionCapacity: 4_096
@@ -634,58 +667,33 @@ enum ConsumerSmoke {
         guard !restoreSecret.isEmpty else {
             throw ConsumerFailure.vmGate("empty VM snapshot restore secret")
         }
-        let imageManifest = try SandboxImageVerifier.verify(
-            diskPath: baseImage,
-            minimumSwiftPythonVersion: "0.6.0-duplex.2"
-        )
-        let lockDirectory = URL(fileURLWithPath: cloneDir)
-            .appending(path: "locks").path
-        let crashDirectory = URL(fileURLWithPath: cloneDir)
-            .appending(path: "crash-reports").path
+        let minimumVersion = environment["SWIFTPYTHON_RELEASE_VERSION"]
+            ?? "0.6.0-duplex.3"
 
         for iteration in 1...iterations {
             let tenantID = SandboxTenantID(
                 rawValue: "commercial-notary-\(iteration)-\(UUID().uuidString.prefix(8))"
             )
-            let sandbox = try await SandboxPool(
-                baseImagePath: baseImage,
-                cloneDir: cloneDir,
-                config: SandboxPoolConfig(
-                    minimumSwiftPythonVersion: "0.6.0-duplex.2",
-                    lockDirectory: lockDirectory,
-                    crashReportsDirectory: crashDirectory,
-                    workersPerTenant: 1,
-                    snapshotValidationMode: .cryptographic
+            let sandbox = try await SandboxProviders.system.makePool(
+                configuration: SandboxConfiguration(
+                    runtimeAsset: URL(fileURLWithPath: baseImage),
+                    storageDirectory: URL(fileURLWithPath: cloneDir),
+                    compute: .balanced,
+                    startup: .accelerated(
+                        checkpoint: URL(fileURLWithPath: snapshot),
+                        credential: SandboxCredential(sealedBytes: restoreSecret)
+                    ),
+                    network: .denied,
+                    workersPerSandbox: 1,
+                    minimumRuntimeVersion: minimumVersion,
+                    integrity: .strict
                 )
             )
-            let events = await sandbox.events(bufferSize: 256)
-            let warmConfirmation = Task {
-                try await requireWarmRestore(events, tenantID: tenantID)
-            }
             var acquired: SandboxTenant?
             do {
-                let tenant = try await sandbox.acquire(
-                    tenantID: tenantID,
-                    vmConfig: VMConfiguration(
-                        guestOS: .ubuntu24,
-                        bootStrategy: .snapshotRestore(snapshotPath: snapshot),
-                        cpuCount: 2,
-                        cpuQuotaPercent: 100,
-                        memoryMB: 2_048,
-                        diskMB: 4_096,
-                        maxOpenFilesPerProcess: 1_024,
-                        diskImagePath: baseImage,
-                        attachSerialConsole: false,
-                        fileSystemMounts: [],
-                        allowNetworkEgress: false,
-                        supervisorAuthSecret: nil,
-                        snapshotRestoreAuthSecret: restoreSecret,
-                        guestSudoMode: .none
-                    )
-                )
+                let tenant = try await sandbox.acquire(tenantID: tenantID)
                 acquired = tenant
-                try await waitForWarmRestore(warmConfirmation)
-                guard case .snapshotRestore = tenant.vmConfig.bootStrategy else {
+                guard tenant.startupMode == .accelerated else {
                     throw ConsumerFailure.vmGate("cold boot strategy returned")
                 }
                 try await runVMWorkloadMatrix(
@@ -696,66 +704,19 @@ enum ConsumerSmoke {
                 try await sandbox.release(tenant, force: true)
                 acquired = nil
                 await sandbox.shutdown()
-                let bundlePath = URL(fileURLWithPath: tenant.clonePath)
-                    .deletingLastPathComponent().path
-                guard !FileManager.default.fileExists(atPath: bundlePath),
-                      !FileManager.default.fileExists(atPath: tenant.lockFilePath) else {
-                    throw ConsumerFailure.vmGate("tenant clone or lock leaked")
+                guard await sandbox.activeTenantIDs().isEmpty else {
+                    throw ConsumerFailure.vmGate("tenant remained active after release")
                 }
                 print(
-                    "notarized VM warm restore \(iteration)/\(iterations) = PASS "
-                        + "image \(imageManifest.sha256.prefix(12))"
+                    "notarized accelerated sandbox \(iteration)/\(iterations) = PASS"
                 )
             } catch {
-                warmConfirmation.cancel()
                 if let acquired {
                     try? await sandbox.release(acquired, force: true)
                 }
                 await sandbox.shutdown()
                 throw error
             }
-            warmConfirmation.cancel()
-        }
-    }
-
-    private static func requireWarmRestore(
-        _ events: AsyncStream<SandboxEvent>,
-        tenantID: SandboxTenantID
-    ) async throws {
-        for await event in events {
-            switch event {
-            case .snapshotRestoreSucceeded(let observed, _)
-                    where observed == tenantID:
-                return
-            case .snapshotRestoreFailed(
-                let observed,
-                _,
-                let reason,
-                let fellBackToColdBoot
-            ) where observed == tenantID:
-                throw ConsumerFailure.vmGate(
-                    "warm restore failed \(reason), cold fallback \(fellBackToColdBoot)"
-                )
-            case .eventsDropped(let count):
-                throw ConsumerFailure.vmGate("sandbox events dropped: \(count)")
-            default:
-                continue
-            }
-        }
-        throw ConsumerFailure.vmGate("sandbox event stream ended before warm restore")
-    }
-
-    private static func waitForWarmRestore(
-        _ confirmation: Task<Void, Error>
-    ) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { try await confirmation.value }
-            group.addTask {
-                try await Task.sleep(for: .seconds(15))
-                throw ConsumerFailure.vmGate("warm restore confirmation timed out")
-            }
-            _ = try await group.next()
-            group.cancelAll()
         }
     }
 
@@ -879,8 +840,7 @@ enum ConsumerSmoke {
             "video/hevc",
             metadata: ["profile": "main", "gate": "notarized-vm"]
         )
-        var requirements = DuplexSessionRequirements.messages
-        requirements.minimumLogicalMessageBytes = byteCount
+        let requirements = DuplexSessionRequirements.messages
         var options = DuplexOptions.default
         options.inputFormat = format
         options.requirements = requirements
@@ -948,11 +908,11 @@ enum ConsumerSmoke {
         pool: PythonProcessPool
     ) async throws {
         var options = DuplexOptions.default
-        options.requirements = .arenaIngress
-        options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
-            slotCount: 1,
-            slotCapacity: 4_096,
-            maximumOutstandingReferencedBytes: 4_096
+        options.requirements = .managedBuffers
+        options.managedBuffers = ManagedBufferConfiguration(
+            preset: .memoryEfficient,
+            maximumBufferBytes: 4_096,
+            maximumBufferedBytes: 4_096
         )
         do {
             let unexpected = try await pool.openDuplexSession(
@@ -966,17 +926,16 @@ enum ConsumerSmoke {
             throw ConsumerFailure.vmGate("VM accepted local arena ingress")
         } catch let failure as DuplexFailure {
             guard failure.code == .featureUnavailable,
-                  failure.origin == .host,
-                  failure.message.contains(DuplexFeature.arenaIngressV1.rawValue) else {
+                  failure.origin == .host else {
                 throw ConsumerFailure.vmGate("wrong VM arena rejection: \(failure)")
             }
         }
     }
 
-    private static func requirePoolSnapshot(
+    private static func requireManagedBufferStatus(
         _ session: PythonDuplexSession
-    ) throws -> DuplexSharedBufferPoolSnapshot {
-        guard let snapshot = session.sharedBufferPoolSnapshot else {
+    ) throws -> ManagedBufferStatus {
+        guard let snapshot = session.managedBufferStatus else {
             throw ConsumerFailure.missingArenaSnapshot
         }
         return snapshot
@@ -994,6 +953,8 @@ enum ConsumerFailure: Error {
     case missingMetalCommandBuffer
     case metalPointerIdentityMismatch
     case metalCommandFailed
+    case privateEngineImageCount([String])
+    case arenaInitialStateMismatch
     case arenaLeaseReleasedTooEarly
     case arenaPeerReleaseDidNotPreserveMetalLease
     case arenaFinalLeaseOrLedgerMismatch
@@ -1009,6 +970,17 @@ for module in SwiftPythonRuntime SwiftPythonAudioInterop SwiftPythonMetalInterop
     test -d "$REPO_DIR/$module.xcframework/macos-"*"/Headers/$module.swiftmodule"
     test -d "$REPO_DIR/$module.xcframework/macos-"*"/$module.swiftmodule"
 done
+if find "$REPO_DIR/SwiftPythonEngine.xcframework" -type f \( \
+    -name '*.swiftinterface' -o \
+    -name '*.swiftmodule' -o \
+    -name '*.swiftdoc' -o \
+    -name '*.swiftsourceinfo' -o \
+    -name '*.swift' -o \
+    -name '*.abi.json' \
+\) -print -quit | grep -q .; then
+    echo "Private Engine unexpectedly exposes Swift module metadata or source." >&2
+    exit 1
+fi
 
 SPM_DIR="$WORK_DIR/spm"
 XCODE_DIR="$WORK_DIR/xcode"
@@ -1031,7 +1003,8 @@ echo "=== xcodebuild slice-root consumer ==="
         CODE_SIGNING_ALLOWED=NO \
         build
 )
-"$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
+DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK")" \
+    "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
 
 DEVELOPER_ID="$(
     security find-identity -v -p codesigning \
@@ -1167,6 +1140,8 @@ make_app() {
     local macos="$app/Contents/MacOS"
     local frameworks="$app/Contents/Frameworks"
     local python_framework="$frameworks/Python.framework"
+    local embedded_engine="$frameworks/SwiftPythonEngine.framework"
+    local embedded_engine_binary="$embedded_engine/Versions/A/SwiftPythonEngine"
     local python_home_for_app="$PYTHON_HOME_DIR"
     local mode_identifier=d
     if [ "$mode" = sandbox ]; then
@@ -1184,6 +1159,13 @@ make_app() {
     cp "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke" \
         "$macos/ConsumerSmoke"
     cp "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker"
+    ditto "$ENGINE_FRAMEWORK" "$embedded_engine"
+    if ! otool -l "$macos/ConsumerSmoke" \
+        | grep -F '@executable_path/../Frameworks' >/dev/null; then
+        install_name_tool -add_rpath \
+            '@executable_path/../Frameworks' \
+            "$macos/ConsumerSmoke"
+    fi
     if [ "$mode" = sandbox ]; then
         mkdir -p "$python_home_for_app/lib"
         cp "$PYTHON_FRAMEWORK_BINARY" "$python_home_for_app/Python"
@@ -1209,6 +1191,13 @@ make_app() {
             "$PYTHON_FRAMEWORK_LOAD_PATH" \
             "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
             "$macos/SwiftPythonWorker"
+        if otool -L "$embedded_engine_binary" \
+            | grep -F "$PYTHON_FRAMEWORK_LOAD_PATH" >/dev/null; then
+            install_name_tool -change \
+                "$PYTHON_FRAMEWORK_LOAD_PATH" \
+                "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
+                "$embedded_engine_binary"
+        fi
 
         # Library validation accepts the embedded interpreter and extension
         # modules because every Mach-O is signed by the app's own team.
@@ -1231,6 +1220,8 @@ make_app() {
         codesign --force --sign "$identity" --options runtime \
             "${CODESIGN_TIMESTAMP_ARGS[@]}" "$python_framework"
     fi
+    codesign --force --sign "$identity" --options runtime \
+        "${CODESIGN_TIMESTAMP_ARGS[@]}" "$embedded_engine"
     cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"

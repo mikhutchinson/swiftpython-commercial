@@ -8,7 +8,7 @@ Runnable samples that complement [docs/api-guide](../docs/api-guide/).
 | [CoreRuntimeSmoke](CoreRuntimeSmoke/) | Minimal CLI: `Python.run` + `sys` / `json` |
 | [ProcessPoolSmoke](ProcessPoolSmoke/) | Minimal CLI: `withProcessPool`, `invokeResult`, `math.sqrt` |
 | [BridgingRing](BridgingRing/) | Showcase: callbacks + **`WorkerCallbackContext` reentrant** Python↔Swift + **`evalEvents`** generator/progress streams over the pool IPC |
-| [SharedTensorPipeline](SharedTensorPipeline/) | **Headline demo.** Pool-arena POSIX shared memory (`createSharedTensor` + `withSharedBuffer`) and out-of-band streaming (`SharedRingBuffer` + `startOutOfBandStream`) wired together with a liveness proof on the same worker. |
+| [SharedTensorPipeline](SharedTensorPipeline/) | **Headline demo.** Opaque managed tensors (`createManagedTensor` + `withManagedTensor`) and runtime-managed output streaming wired together with a same-worker liveness proof. |
 | [DuplexSession](DuplexSession/) | Worker-v6 frame loopback plus a fragmented logical message larger than the physical-frame ceiling |
 
 Dependencies resolve the parent checkout by path, so these examples work from a

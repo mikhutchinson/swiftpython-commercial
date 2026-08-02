@@ -1,85 +1,50 @@
 // swift-tools-version: 6.0
-import Foundation
 import PackageDescription
 
-private func pythonLibraryDirectory() -> String {
-    let env = ProcessInfo.processInfo.environment
-    if let explicit = env["SWIFTPYTHON_PYTHON_LIB_DIR"]?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-       !explicit.isEmpty {
-        return explicit
-    }
-    let pythonHome = env["PYTHON_HOME"] ?? env["PYTHONHOME"]
-    if let home = pythonHome?.trimmingCharacters(in: .whitespacesAndNewlines),
-       !home.isEmpty {
-        let frameworkLib = "\(home)/Frameworks/Python.framework/Versions/3.13/lib"
-        if FileManager.default.fileExists(atPath: frameworkLib) {
-            return frameworkLib
-        }
-        return "\(home)/lib"
-    }
-
-    let candidates = [
-        "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib",
-        "/usr/local/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib",
-        "/opt/homebrew/opt/python@3.13/lib",
-        "/usr/local/opt/python@3.13/lib",
-    ]
-    return candidates.first { FileManager.default.fileExists(atPath: $0) } ?? candidates[0]
-}
-
-private let pythonLinkerSettings: [LinkerSetting] = [
-    .unsafeFlags([
-        "-L\(pythonLibraryDirectory())",
-        "-lpython3.13",
-    ]),
-]
-
 let package = Package(
-    name: "swiftpython-commercial",
-    platforms: [.macOS(.v15)],
+    name: "swiftpython-commercial-binaries",
+    platforms: [
+        .macOS(.v15)
+    ],
     products: [
-        .library(name: "SwiftPythonRuntime", targets: ["SwiftPythonRuntime"]),
+        .library(
+            name: "SwiftPythonRuntime",
+            targets: ["SwiftPythonRuntime", "SwiftPythonEngine"]
+        ),
         .library(
             name: "SwiftPythonAudioInterop",
-            targets: ["SwiftPythonAudioInterop", "SwiftPythonRuntime"]
+            targets: [
+                "SwiftPythonAudioInterop", "SwiftPythonRuntime", "SwiftPythonEngine"
+            ]
         ),
         .library(
             name: "SwiftPythonMetalInterop",
-            targets: ["SwiftPythonMetalInterop", "SwiftPythonRuntime"]
+            targets: [
+                "SwiftPythonMetalInterop", "SwiftPythonRuntime", "SwiftPythonEngine"
+            ]
         ),
-        .executable(name: "swiftpython-smoke", targets: ["SwiftPythonSmoke"]),
     ],
     targets: [
         .binaryTarget(
             name: "SwiftPythonRuntime",
-            path: "SwiftPythonRuntime.xcframework"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.3/SwiftPythonRuntime.xcframework.zip",
+            checksum: "c844cce3f52248dcdcf9fbb66db8dd8ce765d171d25cc2705695932b517b5c8e"
+        ),
+        // Link/embed dependency only. Deliberately absent from products.
+        .binaryTarget(
+            name: "SwiftPythonEngine",
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.3/SwiftPythonEngine.xcframework.zip",
+            checksum: "f467de0374aa549f05847dd16758a60bb81581e7600d64238b6d33bbf73d33d4"
         ),
         .binaryTarget(
             name: "SwiftPythonAudioInterop",
-            path: "SwiftPythonAudioInterop.xcframework"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.3/SwiftPythonAudioInterop.xcframework.zip",
+            checksum: "2ab2ebb67c64f17194d3385851a69ba7097128c17391b37c3f8253e3b1a15ffb"
         ),
         .binaryTarget(
             name: "SwiftPythonMetalInterop",
-            path: "SwiftPythonMetalInterop.xcframework"
-        ),
-        .executableTarget(
-            name: "SwiftPythonSmoke",
-            dependencies: [
-                "SwiftPythonRuntime",
-                "SwiftPythonAudioInterop",
-                "SwiftPythonMetalInterop",
-            ],
-            linkerSettings: pythonLinkerSettings
-        ),
-        .testTarget(
-            name: "SwiftPythonSmokeTests",
-            dependencies: [
-                "SwiftPythonRuntime",
-                "SwiftPythonAudioInterop",
-                "SwiftPythonMetalInterop",
-            ],
-            linkerSettings: pythonLinkerSettings
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.3/SwiftPythonMetalInterop.xcframework.zip",
+            checksum: "de0ac1b1df5f86290ee5a4c9041cc71ae6fb3a2147591239b780e7024229e997"
         ),
     ]
 )

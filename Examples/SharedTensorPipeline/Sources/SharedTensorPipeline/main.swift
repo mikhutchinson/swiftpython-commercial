@@ -22,36 +22,32 @@ enum SharedTensorPipeline {
     static func runDemo(pool: PythonProcessPool) async throws {
         printBanner()
 
-        // ─── 1) Allocate a worker-shared float64 tensor in the pool arena ───
-        section("1. Pool arena allocates one POSIX-shm region, broadcast-attached to every worker")
-        let shared = try await pool.createSharedTensor(shape: [N], dtype: .float64)
-        guard let shm = shared.sharedMemory else {
-            throw DemoError.message("createSharedTensor returned a handle with no shared-memory backing")
-        }
-        let mib = Double(shm.size) / (1024.0 * 1024.0)
-        print("   shm name : \(shm.shmName)")
-        print("   shape    : \(shm.shape)  dtype=\(shm.dtype)")
-        print("   bytes    : \(shm.size) (\(String(format: "%.2f", mib)) MiB)")
-        print("   offset   : \(shm.offset)")
+        // ─── 1) Allocate a worker-shared float64 tensor ───
+        section("1. Runtime allocates one managed tensor for every worker")
+        let shared = try await pool.createManagedTensor(shape: [N], dtype: .float64)
+        let byteCount = N * MemoryLayout<Double>.stride
+        let mib = Double(byteCount) / (1024.0 * 1024.0)
+        print("   shape    : [\(N)]  dtype=float64")
+        print("   bytes    : \(byteCount) (\(String(format: "%.2f", mib)) MiB)")
         let workerCount = await pool.workerCount
-        print("   workers  : attached to all \(workerCount) commandable workers")
+        print("   workers  : available to all \(workerCount) commandable workers")
 
         // ─── 2) Swift seeds via mmap, no pickle, no IPC ───
-        section("2. Swift seeds every element through pool.withSharedBuffer (direct mmap write)")
+        section("2. Swift seeds every element through pool.withManagedTensor")
         let seedClock = ContinuousClock()
         let seedStart = seedClock.now
-        try await pool.withSharedBuffer(shared, as: Double.self) { buf in
+        try await pool.withManagedTensor(shared, as: Double.self) { buf in
             precondition(buf.count == N, "buffer count mismatch: \(buf.count) vs \(N)")
             for i in 0..<buf.count {
                 buf[i] = Double(i)
             }
         }
         let seedMs = milliseconds(seedClock.now - seedStart)
-        let seedGBps = (Double(shm.size) / (1024 * 1024 * 1024)) / (seedMs / 1000.0)
-        print("   wrote 0…\(N - 1) into mmap region in \(fmt(seedMs)) ms  (\(String(format: "%.2f", seedGBps)) GiB/s sustained)")
+        let seedGBps = (Double(byteCount) / (1024 * 1024 * 1024)) / (seedMs / 1000.0)
+        print("   wrote 0…\(N - 1) into managed storage in \(fmt(seedMs)) ms  (\(String(format: "%.2f", seedGBps)) GiB/s sustained)")
 
         // ─── 3) Two workers reduce halves of the SAME bytes, in parallel ───
-        section("3. Two workers reduce disjoint halves of the same mmap bytes, in parallel")
+        section("3. Two workers reduce disjoint halves of the same managed tensor")
         let half = N / 2
         let reduceStart = seedClock.now
         async let leftSum: Double = pool.worker(0).evalResult(
@@ -74,7 +70,7 @@ enum SharedTensorPipeline {
         guard total == expected else {
             throw DemoError.sumMismatch(expected: expected, actual: total)
         }
-        print("   ✓ exact float64 match (no copies, no pickle, just two mmap views)")
+        print("   ✓ exact float64 match through one opaque tensor handle")
 
         // ─── 4) Install the telemetry generator on worker 0 ───
         section("4. Out-of-band streaming: bring up a Python generator on worker 0")
@@ -95,21 +91,19 @@ enum SharedTensorPipeline {
         )
         print("   defined _spt_telemetry(n, sleep_ms) in worker 0 persistent namespace")
 
-        let ring = try SharedRingBuffer(capacity: RING_CAPACITY)
-        print("   ring buffer: name=\(ring.shmName)  capacity=\(ring.dataCapacity) B")
-        try await pool.startOutOfBandStream(
+        let output = try await pool.startOutputStream(
             generatorCode: "_spt_telemetry(\(TELEMETRY_FRAMES), sleep_ms=\(TELEMETRY_INTERVAL_MS))",
             worker: 0,
-            buffer: ring
+            capacity: RING_CAPACITY
         )
-        print("   started OOB writer thread on worker 0 — frames flow through shared memory")
+        print("   started runtime-managed output stream on worker 0")
         print("   key invariant: this side channel never touches the worker IPC socket lock")
 
         // ─── 5) Concurrent proof: regular evalResult on the same worker stays responsive ───
         section("5. Liveness proof: regular evalResult on worker 0 while OOB is streaming")
         let drainState = TelemetryDrain()
-        let drainTask = Task { @Sendable [ring] in
-            await drainState.drain(from: ring)
+        let drainTask = Task { @Sendable [output] in
+            await drainState.drain(from: output)
         }
 
         for probe in 1...4 {
@@ -131,7 +125,7 @@ enum SharedTensorPipeline {
             "   drained \(drained.frames) telemetry frames, "
             + "first elapsed_ms=\(fmt(drained.firstElapsedMs)) "
             + "last elapsed_ms=\(fmt(drained.lastElapsedMs))  "
-            + "writerDone=\(ring.isWriterDone) writePos=\(ring.writePosition) B"
+            + "finished=\(output.isFinished) failed=\(output.failed)"
         )
         guard drained.frames == TELEMETRY_FRAMES else {
             throw DemoError.frameCount(expected: TELEMETRY_FRAMES, actual: drained.frames)
@@ -139,8 +133,8 @@ enum SharedTensorPipeline {
         print("   ✓ every telemetry frame accounted for, no socket contention with eval probes")
 
         // ─── 6) Zero-copy readback from Swift's side of the same mmap ───
-        section("6. Zero-copy readback from Swift's mmap view")
-        try await pool.withSharedBuffer(shared, as: Double.self) { buf in
+        section("6. Read back through the managed tensor handle")
+        try await pool.withManagedTensor(shared, as: Double.self) { buf in
             precondition(buf.count == N)
             let head = (0..<min(8, buf.count)).map { String(format: "%.0f", buf[$0]) }
             let tailStart = max(0, buf.count - 8)
@@ -173,11 +167,11 @@ private actor TelemetryDrain {
         Snapshot(frames: frames, firstElapsedMs: firstElapsedMs, lastElapsedMs: lastElapsedMs)
     }
 
-    func drain(from ring: SharedRingBuffer) async {
-        // Poll the ring buffer until the Python writer flips the writerDone flag
+    func drain(from output: ManagedOutputBuffer) async {
+        // Poll the opaque buffer until the Python writer finishes
         // and we have consumed any remaining bytes.
         while !Task.isCancelled {
-            let chunk = ring.readAvailable()
+            let chunk = output.readAvailable()
             if !chunk.isEmpty {
                 lineBuffer.append(chunk)
                 while let nlIndex = lineBuffer.firstIndex(of: 0x0A) {
@@ -186,7 +180,7 @@ private actor TelemetryDrain {
                     handleLine(Data(line))
                 }
             }
-            if ring.isWriterDone && lineBuffer.isEmpty { break }
+            if output.isFinished && lineBuffer.isEmpty { break }
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
         // Flush any trailing partial line that ends without a newline.
@@ -228,14 +222,14 @@ private func section(_ title: String) {
 private func printBanner() {
     print("""
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║  SharedTensorPipeline — POSIX shared memory + out-of-band streaming  ║
+    ║  SharedTensorPipeline — managed tensors + output streaming          ║
     ╠══════════════════════════════════════════════════════════════════════╣
-    ║  • Pool arena allocates ONE shared float64 tensor                    ║
-    ║  • Swift seeds via mmap (no pickle, no IPC)                          ║
+    ║  • Runtime allocates ONE managed float64 tensor                      ║
+    ║  • Swift seeds through an opaque handle                              ║
     ║  • Two workers reduce halves of the same bytes in parallel           ║
-    ║  • A separate SharedRingBuffer streams Python telemetry              ║
+    ║  • A managed output buffer streams Python telemetry                  ║
     ║  • Regular evalResult on the same worker stays responsive            ║
-    ║  • Swift reads the result back through its mmap view                 ║
+    ║  • Swift reads the result back through the same handle               ║
     ╚══════════════════════════════════════════════════════════════════════╝
     """)
 }
@@ -245,9 +239,9 @@ private func printFooter(seedMs: Double, seedGBps: Double, reduceMs: Double, fra
     print("""
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     Pipeline OK
-      • mmap seed     : \(fmt(seedMs)) ms  (~\(String(format: "%.2f", seedGBps)) GiB/s)
+      • tensor seed   : \(fmt(seedMs)) ms  (~\(String(format: "%.2f", seedGBps)) GiB/s)
       • parallel sum  : \(fmt(reduceMs)) ms across 2 workers (exact float64 match)
-      • OOB telemetry : \(frames) JSON frames over SharedRingBuffer, IPC socket free
+      • OOB telemetry : \(frames) JSON frames over ManagedOutputBuffer
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     """)
 }

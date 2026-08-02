@@ -35,6 +35,7 @@ license_text = (root / "LICENSE").read_text()
 required = [
     f"Current release: `{version}`",
     "SwiftPythonRuntime.xcframework",
+    "SwiftPythonEngine.xcframework",
     "SwiftPythonAudioInterop.xcframework",
     "SwiftPythonMetalInterop.xcframework",
     "_swiftpython_wire.py",
@@ -54,6 +55,7 @@ if missing:
     raise SystemExit(f"README missing release facts: {missing}")
 for item in (
     "SwiftPythonRuntime.xcframework",
+    "SwiftPythonEngine.xcframework",
     "SwiftPythonAudioInterop.xcframework",
     "SwiftPythonMetalInterop.xcframework",
     "licensing@swiftpython.dev",
@@ -89,6 +91,10 @@ for product in (
 ):
     if package.count(f'name: "{product}"') < 2:
         raise SystemExit(f"Package.swift does not expose binary product {product}")
+if package.count('.binaryTarget(\n            name: "SwiftPythonEngine"') != 1:
+    raise SystemExit("Package.swift must declare exactly one private Engine binary target")
+if '.library(name: "SwiftPythonEngine"' in package:
+    raise SystemExit("SwiftPythonEngine must not be exposed as a product")
 
 expected_helpers = {
     "_swiftpython_wire.py",
@@ -110,7 +116,7 @@ if actual_helpers != expected_helpers:
 
 release_placeholder_prefixes = tuple(
     "__" + product + "_XCFRAMEWORK_"
-    for product in ("RUNTIME", "AUDIO", "METAL")
+    for product in ("RUNTIME", "ENGINE", "AUDIO", "METAL")
 )
 
 for path in root.rglob("*"):
@@ -163,6 +169,48 @@ PY
 for path in "$REPO_DIR"/Entitlements/*.plist "$REPO_DIR"/Entitlements/*.entitlements; do
     plutil -lint "$path" >/dev/null
 done
+
+engine_xcframework="$REPO_DIR/SwiftPythonEngine.xcframework"
+require_dir "$engine_xcframework"
+require_file "$engine_xcframework/Info.plist"
+engine_slice="$engine_xcframework/macos-arm64_x86_64"
+require_dir "$engine_slice"
+engine_framework="$engine_slice/SwiftPythonEngine.framework"
+require_dir "$engine_framework"
+engine_binary="$engine_framework/Versions/A/SwiftPythonEngine"
+require_file "$engine_binary"
+require_file "$engine_framework/Versions/A/Headers/SwiftPythonEngine.h"
+require_file "$engine_framework/Versions/A/Modules/module.modulemap"
+if find "$engine_xcframework" -type f \( \
+    -name '*.swiftinterface' -o \
+    -name '*.swiftmodule' -o \
+    -name '*.swiftdoc' -o \
+    -name '*.swiftsourceinfo' -o \
+    -name '*.swift' -o \
+    -name '*.abi.json' \
+\) -print -quit | grep -q .; then
+    fail "private Engine contains a Swift module, interface, docs, ABI JSON, or source"
+fi
+engine_archs="$(lipo -archs "$engine_binary")"
+for required_arch in arm64 x86_64; do
+    case " $engine_archs " in
+        *" $required_arch "*) ;;
+        *) fail "private Engine lacks $required_arch: $engine_archs" ;;
+    esac
+done
+engine_id="$(otool -D "$engine_binary")"
+grep -q '@rpath/SwiftPythonEngine.framework/Versions/A/SwiftPythonEngine' \
+    <<<"$engine_id" \
+    || fail "private Engine install name is not relocatable"
+if otool -L "$engine_binary" | grep -E 'Python\.framework|libpython' >/dev/null; then
+    fail "private Engine contains a build-machine Python load command"
+fi
+codesign --verify --deep --strict --verbose=2 "$engine_framework"
+engine_signing_info="$(codesign -dv --verbose=4 "$engine_framework" 2>&1)"
+grep -q '^Authority=Developer ID Application:' <<<"$engine_signing_info" \
+    || fail "private Engine is not Developer ID signed"
+grep -q 'flags=.*runtime' <<<"$engine_signing_info" \
+    || fail "private Engine signature does not enable hardened runtime"
 for path in "$REPO_DIR"/scripts/*.sh "$REPO_DIR"/Examples/IrisDemo/scripts/*.sh; do
     bash -n "$path"
 done
@@ -221,15 +269,17 @@ import sys
 
 payload = json.loads(sys.argv[1])
 products = {item["name"] for item in payload.get("products", [])}
-expected = {
+public_products = {
     "SwiftPythonRuntime",
     "SwiftPythonAudioInterop",
     "SwiftPythonMetalInterop",
-    "swiftpython-smoke",
 }
-if products != expected:
+allowed = (public_products, public_products | {"swiftpython-smoke"})
+if products not in allowed:
     raise SystemExit(
-        f"root Package.swift product mismatch: expected={sorted(expected)} "
+        "root Package.swift product mismatch: expected either "
+        f"{sorted(public_products)} or "
+        f"{sorted(public_products | {'swiftpython-smoke'})}; "
         f"actual={sorted(products)}"
     )
 PY
@@ -323,8 +373,9 @@ required = {
     "SwiftPythonRuntime": [
         "PythonDuplexSession",
         "SandboxPool",
-        "SandboxSnapshotValidationMode",
-        "UbuntuImageBuilder",
+        "SandboxProvider",
+        "SandboxConfiguration",
+        "ManagedBuffer",
     ],
     "SwiftPythonAudioInterop": [
         "DuplexAudioFormat",
@@ -352,6 +403,33 @@ for module, names in required.items():
     for leaked in ("/Users/", "CascadeProjects/", "/.build/"):
         if leaked in text:
             raise SystemExit(f"{module} public interface leaks build path {leaked!r}")
+
+runtime_root = root / "SwiftPythonRuntime.xcframework" / "macos-arm64_x86_64"
+denied = (
+    "SwiftPythonEngine",
+    "WorkerCommand",
+    "WorkerResponse",
+    "DuplexWire",
+    "SharedMemoryArena",
+    "DuplexShared",
+    "workerGeneration",
+    "quarantinedSlots",
+    "VMManager",
+    "VZVirtualMachine",
+    "UbuntuImageBuilder",
+    "KernelBoot",
+    "MLXPressurePolicy",
+    "softPressureRatio",
+    "@_spi(",
+)
+for layout in ("SwiftPythonRuntime.swiftmodule", "Headers/SwiftPythonRuntime.swiftmodule"):
+    for arch in ("arm64", "x86_64"):
+        for suffix in ("swiftinterface", "private.swiftinterface"):
+            path = runtime_root / layout / f"{arch}-apple-macos.{suffix}"
+            text = path.read_text()
+            leaked = [token for token in denied if token in text]
+            if leaked:
+                raise SystemExit(f"Runtime interface leaks {leaked} in {path}")
 PY
 
 if [ -n "$MANIFEST_PATH" ]; then
@@ -382,6 +460,7 @@ artifacts = manifest.get("artifacts", [])
 records = {(item.get("role"), item.get("name")): item for item in artifacts}
 expected_records = {
     ("binaryTarget", "SwiftPythonRuntime.xcframework.zip"),
+    ("privateBinaryDependency", "SwiftPythonEngine.xcframework.zip"),
     ("binaryTarget", "SwiftPythonAudioInterop.xcframework.zip"),
     ("binaryTarget", "SwiftPythonMetalInterop.xcframework.zip"),
     ("workerExecutable", "SwiftPythonWorker"),
@@ -411,7 +490,8 @@ for key, record in records.items():
         raise SystemExit(f"manifest SHA-256 mismatch for {key}")
     if len(data) != record.get("bytes"):
         raise SystemExit(f"manifest byte count mismatch for {key}")
-    if key[0] == "binaryTarget" and record.get("swiftPMChecksum") != digest:
+    if key[0] in {"binaryTarget", "privateBinaryDependency"} \
+            and record.get("swiftPMChecksum") != digest:
         raise SystemExit(f"SwiftPM checksum mismatch for {key}")
 
 for helper in (

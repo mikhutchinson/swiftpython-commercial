@@ -36,25 +36,26 @@ final class SwiftPythonSmokeTests: XCTestCase {
     }
 
     func testPublicDuplexConfigurationSurfaceIsConsumerVisible() throws {
-        var requirements = DuplexSessionRequirements.messages
-        requirements.minimumLogicalMessageBytes = 10 * 1_024 * 1_024
-
         var options = DuplexOptions.default
-        options.requirements = requirements
+        options.requirements = .messages
         options.limits.maximumFrameBytes = 256 * 1_024
         options.limits.maximumLogicalMessageBytes = 12 * 1_024 * 1_024
-        options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
-            slotCount: 2,
-            slotCapacity: 1 * 1_024 * 1_024,
-            maximumOutstandingReferencedBytes: 2 * 1_024 * 1_024
+        options.managedBuffers = ManagedBufferConfiguration(
+            preset: .memoryEfficient,
+            maximumBufferBytes: 1 * 1_024 * 1_024,
+            maximumBufferedBytes: 2 * 1_024 * 1_024
         )
 
-        XCTAssertTrue(options.requirements.requiredFeatures.contains(.messagesV1))
+        XCTAssertEqual(options.requirements, .messages)
         XCTAssertLessThan(
             options.limits.maximumFrameBytes,
             options.limits.maximumLogicalMessageBytes
         )
-        XCTAssertEqual(options.sharedBufferPool?.slotCount, 2)
+        XCTAssertEqual(options.managedBuffers?.preset, .memoryEfficient)
+        XCTAssertEqual(
+            options.managedBuffers?.maximumBufferedBytes,
+            2 * 1_024 * 1_024
+        )
         XCTAssertEqual(
             DuplexFormat(
                 "video/hevc",

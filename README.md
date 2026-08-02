@@ -4,7 +4,7 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.2`
+Current release: `0.6.0-duplex.3`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -22,7 +22,8 @@ Read [LICENSE](LICENSE) before distributing an application.
 
 | Path or release asset | Purpose |
 |---|---|
-| `SwiftPythonRuntime.xcframework` | Core in-process, ProcessPool, streaming, duplex, and VM/Sandbox API |
+| `SwiftPythonRuntime.xcframework` | Library-evolved consumer API surface |
+| `SwiftPythonEngine.xcframework` | Private code-only dependency; no product or textual Swift module |
 | `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
 | `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
 | `SwiftPythonWorker` | Matched arm64 local ProcessPool sidecar |
@@ -32,15 +33,15 @@ Read [LICENSE](LICENSE) before distributing an application.
 | `docs/api-guide/` | Public API and deployment guide |
 | `manifest.json` release asset | Version, source revision, protocols, byte sizes, and SHA-256 records |
 
-The three XCFrameworks are universal macOS binaries. The prebuilt
+The four XCFrameworks are universal macOS binaries. The prebuilt
 `SwiftPythonWorker` sidecar is arm64; an Intel ProcessPool deployment needs a
 same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The complete `SwiftPythonCommercial-0.6.0-duplex.2.zip` asset contains this
-public checkout. The three XCFramework zips are individual binary-target
-assets. `manifest.json` is a separate asset and attests all three zips, the
+The complete `SwiftPythonCommercial-0.6.0-duplex.3.zip` asset contains this
+public checkout. The four XCFramework zips are individual binary-target
+assets. `manifest.json` is a separate asset and attests all four zips, the
 worker, all five VM helpers, the complete distribution, and the same-version VM
 image used for the certified VM gate.
 
@@ -66,7 +67,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.2"
+        exact: "0.6.0-duplex.3"
     )
 ]
 ```
@@ -90,7 +91,8 @@ Choose only the products the application uses:
 
 `SwiftPythonAudioInterop` and `SwiftPythonMetalInterop` are independent
 optional products. A core-only consumer does not link AVFAudio or Metal through
-those adapters.
+those adapters. `SwiftPythonEngine` is intentionally not a product and must not
+be imported. SwiftPM links it as a private dependency of each public product.
 
 ## In-process and ProcessPool smoke
 
@@ -122,6 +124,7 @@ app. Worker discovery also accepts `SWIFTPYTHON_WORKER_PATH` or the explicit
 YourApp.app/
   Contents/
     Frameworks/
+      SwiftPythonEngine.framework/ # required private runtime code, embed once
       Python.framework/        # required for self-contained/sandboxed apps
     MacOS/
       YourApp
@@ -129,7 +132,10 @@ YourApp.app/
     Info.plist
 ```
 
-The worker and host must load the same bundled Python when the app cannot rely
+Embed the supplied signed `SwiftPythonEngine.framework` exactly once. The
+application executable must resolve its `@rpath` install name through
+`@executable_path/../Frameworks`; do not copy Engine into multiple nested
+locations. The worker, Engine, and host must load the same bundled Python when the app cannot rely
 on Homebrew. Copying a sidecar is not a signing or notarization step; use the
 distribution-specific rules below.
 
@@ -183,8 +189,9 @@ do {
 
 Frame-only sessions require `.frames`. Bounded logical-message fragmentation
 requires `.messages`. The local fixed-pool shared-ingress route requires
-`.arenaIngress` and a `DuplexSharedBufferPoolConfiguration`; VM/vsock uses
-inline logical-message chunks and does not advertise local arena ingress.
+`.managedBuffers` and a `ManagedBufferConfiguration`; isolated providers may use
+inline logical-message chunks instead. Backing paths, offsets, slot topology,
+generational counters, and quarantine state are private.
 Capability requirements are rechecked atomically against the exact generation
 reserved for open.
 
@@ -193,10 +200,10 @@ See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
 
 ## VM and Sandbox
 
-`0.6.0-duplex.2` includes the VM/Sandbox release slice. Its certified gate uses
+`0.6.0-duplex.3` includes the isolated Sandbox surface. Its certified gate uses
 the same source revision for:
 
-- all three XCFrameworks and the local sidecar;
+- all four XCFrameworks and the local sidecar;
 - `_swiftpython_wire.py`, `_swiftpython_duplex.py`,
   `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and
   `swiftpython_worker.py`;
@@ -229,9 +236,9 @@ import SwiftPythonMetalInterop
 `DuplexAudioCapture` and `DuplexAudioPlayback` keep AVAudio callbacks
 realtime-only; async pumps own session interaction.
 
-`DuplexSharedBufferLease.makeMetalBufferLease` maps a page-aligned local arena
-slot to an `MTLBuffer` without copying those arena pages. Registered command
-buffers and access completion hold the exact generation until safe reuse.
+`ManagedBuffer.makeMetalBufferLease` maps a page-aligned managed buffer to an
+`MTLBuffer` without copying those pages. Registered command buffers and access
+completion hold the opaque allocation until safe reuse.
 `DuplexCopyLedger` records actual zero-copy, bounded CPU-copy, or kernel-copy
 routes. It does not turn capture-source, IOSurface, socket, or VM routes into a
 blanket zero-copy claim.
@@ -283,7 +290,7 @@ swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
 swift run --package-path Examples/DuplexSession
-scripts/audit_release_surface.sh 0.6.0-duplex.2
+scripts/audit_release_surface.sh 0.6.0-duplex.3
 scripts/consumer_path_smoke.sh
 ```
 
@@ -321,6 +328,17 @@ preserved rather than collapsed to `0.6.0`.
 | SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
 
 ## Release notes
+
+### 0.6.0-duplex.3
+
+- Split proprietary transport, managed-memory, sandbox, and tuning code into
+  the private code-only `SwiftPythonEngine` framework.
+- Removed Engine Swift module metadata and textual interfaces from the
+  distribution; the public Runtime interface contains only consumer APIs.
+- Replaced low-level arenas, leases, ring buffers, VM builders/configuration,
+  and policy thresholds with managed handles, presets, and `SandboxProvider`.
+- Added private-Engine signing, embedding, one-copy load, interface-denylist,
+  and consumer behavior gates.
 
 ### 0.6.0-duplex.2
 

@@ -145,8 +145,8 @@ let mean: Double = try await pool.methodResult(handle: arr, name: "mean")
 For large arrays, keep the object on the worker or move to shared memory:
 
 ```swift
-let shared = try await pool.copyToShared(arr)
-let values: [Double] = try await pool.readFromShared(shared, as: Double.self)
+let shared = try await pool.copyToManagedTensor(arr)
+let values: [Double] = try await pool.readManagedTensor(shared, as: Double.self)
 ```
 
 ## Long-Running Package Calls

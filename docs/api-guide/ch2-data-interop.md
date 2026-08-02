@@ -146,25 +146,23 @@ Useful members:
 The buffer is valid only while the underlying Python object is alive and the
 buffer has not been released.
 
-## Shared Memory in `PythonProcessPool`
+## Managed Tensors in `PythonProcessPool`
 
-For large numeric arrays that should stay out of pickle payloads, use the pool
-shared-memory helpers.
-
-`pool.createSharedTensor(shape:dtype:)` allocates a region in the pool's
-`SharedMemoryArena` (POSIX shm) and broadcast-attaches it to every commandable
-worker. The returned `PyHandle` carries `PyHandleSharedMemoryRef` metadata —
-`shmName`, `offset`, `size`, `shape`, `dtype` — that workers use to `mmap` the
-same bytes zero-copy. Pass the handle through `bindings:` to make it visible
-as a NumPy array inside any `eval` / `invoke`.
+For large numeric arrays that should stay out of pickle payloads, use the pool's
+managed-tensor helpers. The returned `PyHandle` is opaque: pass it through
+`bindings:` to make the tensor visible inside `eval` or `invoke`. Backing
+names, offsets, growth policy, and mapping details remain private.
 
 ```swift
-let shared = try await pool.createSharedTensor(
+let shared = try await pool.createManagedTensor(
     shape: [1024, 1024],
     dtype: .float32
 )
 
-try await pool.writeToShared(Array(repeating: Float(1), count: 1024 * 1024), to: shared)
+try await pool.writeManagedTensor(
+    Array(repeating: Float(1), count: 1024 * 1024),
+    to: shared
+)
 
 let total: Float = try await pool.evalResult("""
 import numpy as np
@@ -172,27 +170,22 @@ float(x.sum())
 """, bindings: ["x": shared])
 ```
 
-### Direct Host-Side Access with `withSharedBuffer`
+### Direct Host-Side Access with `withManagedTensor`
 
-`writeToShared` / `readFromShared` are convenience wrappers that iterate
-element by element. For the truly zero-copy path — useful when the host is
-generating or consuming millions of elements — use `withSharedBuffer`:
+`writeManagedTensor` and `readManagedTensor` are convenience wrappers. For
+scoped direct access, use `withManagedTensor`:
 
 ```swift
-try await pool.withSharedBuffer(shared, as: Double.self) { buf in
-    // buf is an UnsafeMutableBufferPointer<Double> aliased onto the mmap'd region.
-    // Stores commit directly to memory pages workers will read; no IPC, no copy.
+try await pool.withManagedTensor(shared, as: Double.self) { buf in
+    // Scoped mutable access; do not retain the pointer after this closure.
     for i in 0..<buf.count {
         buf[i] = Double(i)
     }
 }
 ```
 
-`withSharedBuffer` validates that the Swift type matches the region's `dtype`
-and that the region size is a clean multiple of the element stride, then hands
-back an `UnsafeMutableBufferPointer<T>` aliased onto the mmap'd region. There
-is no Swift-side copy and no IPC traffic — the bytes you store land on the
-same memory pages that any worker resolves the binding to.
+`withManagedTensor` validates that the Swift type matches the tensor's `dtype`
+and shape. The pointer is valid only for the closure and must not escape.
 
 You can also copy an existing worker object into shared memory:
 
@@ -203,17 +196,17 @@ let arr = try await pool.invoke(
     args: [.python([2048, 2048])],
     kwargs: ["dtype": .python("float32")]
 )
-let sharedArr = try await pool.copyToShared(arr)
-let bytes: [Float] = try await pool.readFromShared(sharedArr, as: Float.self)
+let sharedArr = try await pool.copyToManagedTensor(arr)
+let bytes: [Float] = try await pool.readManagedTensor(sharedArr, as: Float.self)
 ```
 
-Shared memory is a performance feature, not the default. Start with normal
+Managed tensors are a performance feature, not the default. Start with normal
 `PythonConvertible` arguments and handles, then move hot paths to shared memory
 after profiling.
 
-For a runnable end-to-end demo — Swift seeds an 8 MiB float64 region through
-`withSharedBuffer`, two workers reduce halves in parallel through `bindings:`,
-and Swift reads back zero-copy — see
+For a runnable end-to-end demo, Swift seeds an 8 MiB float64 tensor through
+`withManagedTensor`, two workers reduce halves through `bindings:`, and Swift
+reads it back through the same opaque handle. See
 [`Examples/SharedTensorPipeline`](../../Examples/SharedTensorPipeline/).
 
 ## Capsules
@@ -249,11 +242,9 @@ not portable across `PythonProcessPool` worker processes.
 | Large worker array reused across calls | `PyHandle` |
 | Large worker array read/write from Swift | pool shared memory |
 | Long-lived duplex bytes | `DuplexBuffer` or bounded logical messages |
-| Local zero-copy duplex ingress | session-owned `DuplexSharedBufferLease` |
+| Managed local duplex ingress | session-owned `ManagedBuffer` |
 | Tenant-isolated file or process output | `SandboxPool.execShell*` |
 
-The pool-wide `SharedMemoryArena` tensor API and the duplex shared-ingress
-pool are different ownership models. Duplex accepts only opaque leases minted
-for one session, worker generation, pool, slot, and slot generation; it never
-accepts a caller-provided `SharedMemoryRegion` as authority. See
-[Chapter 10](ch10-full-duplex.md).
+Managed duplex ingress accepts only opaque handles minted for one session. It
+never accepts a caller-provided memory region as authority; its backing layout,
+generations, and reuse policy remain private. See [Chapter 10](ch10-full-duplex.md).

@@ -7,7 +7,8 @@ SwiftPython source tree.
 
 The private SwiftPython implementation, generator pipeline, and internal test
 layout are intentionally not documented here. Everything below is supported
-from the public package artifacts: `SwiftPythonRuntime.xcframework`, optional
+from the public package artifacts: `SwiftPythonRuntime.xcframework`, its
+code-only private dependency `SwiftPythonEngine.xcframework`, optional
 `SwiftPythonAudioInterop.xcframework` and
 `SwiftPythonMetalInterop.xcframework`, the matched `SwiftPythonWorker`,
 the five-file `VMWorker/` set, and the entitlement templates.
@@ -39,22 +40,22 @@ the five-file `VMWorker/` set, and the entitlement templates.
 | Run CPU-bound Python in parallel | `PythonProcessPool` |
 | Send and receive concurrently on one pinned worker generation | `PythonDuplexSession` |
 | Send a bounded application unit larger than one media frame | `DuplexInput.sendMessage` with `.messages` requirements |
-| Send local mapped pages under an owned fixed-pool lease | `acquireSharedBuffer` with `.arenaIngress` requirements |
+| Send local bytes through a runtime-managed handle | `acquireManagedBuffer` with `.managedBuffers` requirements |
 | Capture/play PCM without session calls from the realtime callback | `SwiftPythonAudioInterop` |
 | Retain Metal storage through GPU completion and record actual copies | `SwiftPythonMetalInterop` |
 | Keep work pinned to one worker | `pool.worker(index)` / `StreamOptions.pinned(worker:)` |
 | Trace command, callback, stream, side-channel, and respawn lifecycle | `pool.telemetry()` + `ProcessPoolTelemetryContext` |
 | Stream a Python generator | `evalStream`, `invokeStream`, `methodStream` |
 | Stream values plus progress | `evalEvents`, `invokeEvents`, `methodEvents` |
-| Stream from a worker without holding its IPC socket | `startOutOfBandStream` + `SharedRingBuffer` (local process), `startOutOfBandSocketStream` + `SocketOOBStreamBuffer` (VM / socket-backed) |
-| Zero-copy tensor sharing across host and workers | `createSharedTensor`, `withSharedBuffer`, `copyToShared` |
+| Stream from a worker without holding its IPC socket | `startOutputStream` + `ManagedOutputBuffer` |
+| Share an opaque managed tensor across host and workers | `createManagedTensor`, `withManagedTensor`, `copyToManagedTensor` |
 | Observe worker lifecycle | `pool.events()` |
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
-| Restore a VM worker without accepting cold fallback | verified snapshot plus warm-restore gate |
+| Require accelerated isolated startup | `SandboxConfiguration.startup` plus `tenant.startupMode` |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
 | Pool callbacks / reentrant / `evalEvents` in one runnable CLI | `Examples/BridgingRing` |
-| Shared-memory arena + out-of-band streaming in one demo | `Examples/SharedTensorPipeline` |
+| Managed tensor + output streaming in one demo | `Examples/SharedTensorPipeline` |
 | Frame and fragmented-message duplex in one demo | `Examples/DuplexSession` |
 | Smoke-test wiring (`Python.run`, process pool CLIs) | `Examples/CoreRuntimeSmoke`, `Examples/ProcessPoolSmoke` |
 | Start from a complete macOS app | `Examples/IrisDemo` |

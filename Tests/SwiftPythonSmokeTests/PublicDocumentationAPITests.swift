@@ -17,36 +17,31 @@ final class PublicDocumentationAPITests: XCTestCase {
         )
         XCTAssertEqual(audio.bytesPerFrame, 2)
 
-        var requirements = DuplexSessionRequirements.messages
-        requirements.minimumLogicalMessageBytes = 10 * 1_024 * 1_024
         var duplex = DuplexOptions.default
-        duplex.requirements = requirements
-        duplex.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
-            slotCount: 4,
-            slotCapacity: 16 * 1_024 * 1_024,
-            maximumOutstandingReferencedBytes: 32 * 1_024 * 1_024
+        duplex.requirements = .managedBuffers
+        duplex.limits.maximumLogicalMessageBytes = 10 * 1_024 * 1_024
+        duplex.managedBuffers = ManagedBufferConfiguration(
+            preset: .throughput,
+            maximumBufferBytes: 16 * 1_024 * 1_024,
+            maximumBufferedBytes: 32 * 1_024 * 1_024
         )
-        XCTAssertTrue(duplex.requirements.requiredFeatures.contains(.messagesV1))
+        XCTAssertEqual(duplex.requirements, .managedBuffers)
 
-        let sandbox = SandboxPoolConfig(
-            minimumSwiftPythonVersion: "0.6.0-duplex.2",
-            verifyImageManifest: true,
-            workersPerTenant: 1,
-            snapshotValidationMode: .cryptographic
-        )
-        XCTAssertEqual(sandbox.snapshotValidationMode, .cryptographic)
-
-        let vm = VMConfiguration(
-            guestOS: .ubuntu24,
-            bootStrategy: .snapshotRestore(
-                snapshotPath: "/tmp/documentation.swiftpython-snapshot"
+        let sandbox = SandboxConfiguration(
+            runtimeAsset: URL(fileURLWithPath: "/tmp/base.img"),
+            storageDirectory: URL(fileURLWithPath: "/tmp/sandboxes"),
+            compute: .balanced,
+            startup: .accelerated(
+                checkpoint: URL(fileURLWithPath: "/tmp/release.swiftpython-snapshot"),
+                credential: SandboxCredential(sealedBytes: Data("secret".utf8))
             ),
-            cpuCount: 2,
-            memoryMB: 2_048,
-            allowNetworkEgress: false,
-            guestSudoMode: .none
+            network: .denied,
+            workersPerSandbox: 1,
+            minimumRuntimeVersion: "0.6.0-duplex.3",
+            integrity: .strict
         )
-        XCTAssertEqual(vm.guestOS, .ubuntu24)
+        XCTAssertEqual(sandbox.integrity, .strict)
+        XCTAssertEqual(sandbox.compute, .balanced)
 
         let ledger = DuplexCopyLedger()
         ledger.record(
@@ -97,18 +92,11 @@ final class PublicDocumentationAPITests: XCTestCase {
         )
         _ = stream
 
-        let ring = try SharedRingBuffer(capacity: 64 * 1_024)
-        try await pool.startOutOfBandStream(
-            generatorCode: "(b'x' for _ in range(1))",
-            worker: 0,
-            buffer: ring
-        )
-        _ = try await pool.startOutOfBandSocketStream(
+        _ = try await pool.startOutputStream(
             generatorCode: "(b'x' for _ in range(1))",
             worker: 0,
             capacity: 64 * 1_024
         )
-
         let callback = try await pool.registerCallback(name: "docs_add") {
             @Sendable (a: Int, b: Int) -> Int in a + b
         }
@@ -148,7 +136,7 @@ final class PublicDocumentationAPITests: XCTestCase {
             Data("message".utf8),
             format: DuplexFormat("application/octet-stream")
         )
-        let lease = try await session.input.acquireSharedBuffer(
+        let lease = try await session.input.acquireManagedBuffer(
             byteCount: 4_096,
             alignment: .page
         )

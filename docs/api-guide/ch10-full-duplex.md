@@ -15,16 +15,15 @@ Duplex requires worker wire v6 plus live feature, transport, authentication,
 helper-schema, payload-route, and limit declarations. Lowering the ordinary
 worker protocol floor for a legacy call never emulates duplex.
 
-`duplexCapabilities(for:)` is an immutable observation tied to one worker ID
-and generation. Put requirements on the open itself because a worker can be
-replaced after inspection:
+`duplexSupport(for:)` is a high-level observation for advisory UI or routing.
+Put requirements on the open itself because a worker can be replaced after
+inspection:
 
 ```swift
-let snapshot = await pool.duplexCapabilities(for: 0)
-precondition(snapshot?.supports(.messagesV1) == true)
+let support = await pool.duplexSupport(for: 0)
+precondition(support?.supportsMessages == true)
 
-var requirements = DuplexSessionRequirements.messages
-requirements.minimumLogicalMessageBytes = 10 * 1_024 * 1_024
+let requirements = DuplexSessionRequirements.messages
 var options = DuplexOptions.default
 options.requirements = requirements
 
@@ -40,7 +39,7 @@ The standard requirement sets are:
 |---|---|
 | `.frames` | worker-v6 frame duplex |
 | `.messages` | frames plus bounded logical-message fragmentation |
-| `.arenaIngress` | messages plus current local shared-arena helper schema |
+| `.managedBuffers` | messages plus runtime-managed local buffer support |
 
 The pool rechecks requirements against the exact generation it reserves. An
 unsupported feature or helper schema fails locally before handler setup.
@@ -166,48 +165,48 @@ Retaining a Python chunk intentionally withholds ingress credit. Duplicate,
 missing, overlapping, out-of-order, incomplete, and over-limit messages fail
 without allocating an unbounded full-message buffer.
 
-## Local shared-arena ingress
+## Managed local ingress buffers
 
 Transport and payload storage are independent. A local UDS session can carry
-inline bytes or a descriptor for a slot in a runtime-owned fixed arena.
+inline bytes or an opaque runtime-managed buffer reference.
 VM/vsock carries inline bytes and does not advertise this route.
 
 ```swift
 var options = DuplexOptions.default
-options.requirements = .arenaIngress
-options.sharedBufferPool = DuplexSharedBufferPoolConfiguration(
-    slotCount: 4,
-    slotCapacity: 16 * 1_024 * 1_024,
-    maximumOutstandingReferencedBytes: 32 * 1_024 * 1_024
+options.requirements = .managedBuffers
+options.managedBuffers = ManagedBufferConfiguration(
+    preset: .throughput,
+    maximumBufferBytes: 16 * 1_024 * 1_024,
+    maximumBufferedBytes: 32 * 1_024 * 1_024
 )
 
 let session = try await pool.openDuplexSession(
     handler: handler,
     options: options
 )
-let lease = try await session.input.acquireSharedBuffer(
+let buffer = try await session.input.acquireManagedBuffer(
     byteCount: encodedKeyframe.count,
     alignment: .page
 )
-try lease.withUnsafeMutableBytes { destination in
+try buffer.withUnsafeMutableBytes { destination in
     encodedKeyframe.copyBytes(to: destination)
 }
 try await session.input.sendMessage(
-    lease,
+    buffer,
     format: DuplexFormat("video/hevc"),
     flags: [.independent]
 )
 ```
 
-The opaque lease belongs to one session, worker generation, pool, slot, and
-slot generation. Sending ends CPU-write ownership. Stale, cross-session,
-revoked, and double-send attempts fail locally. Python sees a borrowed
-read-only view with `storage_route == "shared_arena"`.
+The opaque handle belongs to one session. Sending ends CPU-write ownership.
+Stale, cross-session, revoked, and double-send attempts fail locally. Python
+sees a borrowed read-only view. Pool topology, generational counters, backing
+paths, offsets, and quarantine state remain private Engine details.
 
-The slot is reusable only after the final peer, native, and GPU lease releases
-it. Referenced logical bytes, not descriptor size, are charged to admission.
-A caller-controlled path or naked public `SharedMemoryRegion` is never duplex
-send authority.
+Capacity becomes available only after the final peer, native, and GPU use has
+ended. `session.managedBufferStatus` exposes only coarse capacity, bytes in use,
+and availability. A caller-controlled path or naked public memory region is
+never duplex send authority.
 
 ## Control, interruption, and terminal truth
 
@@ -228,9 +227,8 @@ it is not a promise that arbitrary Python or GPU work is preemptible between
 safe points.
 
 `result()` waits for terminal truth and throws a typed `DuplexFailure` for a
-failed terminal. Sessions expose `workerID` and `workerGeneration`, never
-migrate, never replay, and resolve once with final accepted, processed,
-produced, and acknowledged watermarks.
+failed terminal. Sessions remain pinned, never migrate or replay, and resolve
+once with final accepted, processed, produced, and acknowledged watermarks.
 
 ## Native and VM transport limits
 

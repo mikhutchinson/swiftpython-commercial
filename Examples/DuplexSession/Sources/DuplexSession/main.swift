@@ -81,11 +81,9 @@ enum DuplexSessionExample {
             "video/hevc",
             metadata: ["profile": "main"]
         )
-        var requirements = DuplexSessionRequirements.messages
-        requirements.minimumLogicalMessageBytes = byteCount
         var options = DuplexOptions.default
         options.inputFormat = format
-        options.requirements = requirements
+        options.requirements = .messages
         options.limits.maximumFrameBytes = 256 * 1_024
         options.limits.maximumLogicalMessageBytes = 3 * 1_024 * 1_024
         options.limits.preferredMessageChunkBytes = chunkBytes

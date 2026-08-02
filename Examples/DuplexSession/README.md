@@ -18,7 +18,7 @@ The local checkout is used by default. To validate the published tag instead:
 
 ```bash
 SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://github.com/mikhutchinson/swiftpython-commercial.git \
-SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.6.0-duplex.2 \
+SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION=0.6.0-duplex.3 \
 swift run --package-path Examples/DuplexSession
 ```
 

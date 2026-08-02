@@ -97,24 +97,22 @@ commandBuffer.commit()
 ```
 
 For CPU-write/GPU-read, send may proceed after CPU write ownership ends while a
-registered GPU read keeps the slot unavailable for reuse. For GPU-write or
+registered GPU read keeps the managed buffer unavailable for reuse. For GPU-write or
 bidirectional access, `sendMessage` waits until Metal access and registered
 commands complete successfully.
 
-A registered GPU writer that fails poisons that exact arena generation.
-Neither a later successful command nor a ledger entry revives it; the slot is
-quarantined. Cancellation or worker death with live GPU ownership also prevents
-unsafe reuse.
+A registered GPU writer that fails makes that exact backing allocation
+unavailable. Neither a later successful command nor a ledger entry revives it.
+Cancellation or worker death with live GPU ownership also prevents unsafe
+reuse. The underlying recovery counters and topology are private.
 
 ## Standalone Metal pool
 
 `DuplexMetalRegionPool` is a bounded pool for adapter storage outside a
-session-owned ingress pool. It can use a `SharedMemoryArena`, owned shared
-storage, or a VM route and records the actual fallback/copy path. Its snapshot
-reports fixed region count, available/leased/quarantined regions, backing
-bytes, and reuse count.
+session-owned ingress pool. It records the actual fallback or copy path for
+adapter-owned storage.
 
-Use a session-owned `DuplexSharedBufferLease` when the exact mapped pages must
-be sent through local arena ingress. Use a standalone region pool when the
+Use a session-owned `ManagedBuffer` when its mapped bytes must be sent through
+managed local ingress. Use a standalone region pool when the
 application needs bounded Metal staging but the transport route has different
 copy semantics.
