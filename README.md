@@ -291,7 +291,7 @@ For the final notarized VM release gate, supply the same-commit image and
 snapshot explicitly:
 
 ```bash
-SWIFTPYTHON_NOTARY_PROFILE="SiriusMsg Notary" \
+SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>" \
 SWIFTPYTHON_NOTARY_OUTPUT_DIR="$PWD/notarization" \
 SWIFTPYTHON_VM_RELEASE_GATE=1 \
 SWIFTPYTHON_VM_BASE_IMAGE=/absolute/path/to/base-ubuntu.img \

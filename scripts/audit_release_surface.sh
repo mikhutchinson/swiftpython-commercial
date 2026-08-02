@@ -47,6 +47,7 @@ required = [
     "three app-shaped",
     "20 consecutive positive warm restores",
     "SWIFTPYTHON_VM_RELEASE_GATE=1",
+    'SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>"',
 ]
 missing = [item for item in required if item not in readme]
 if missing:
