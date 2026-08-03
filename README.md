@@ -278,6 +278,10 @@ them, applies quarantine provenance, requires
 `source=Notarized Developer ID`, reruns duplex, and rechecks each signed bundle
 for mutation. The virtualization fixture must complete 20 consecutive positive warm restores
 and the full public VM tenant workload without accepting a cold fallback.
+Before publication, `scripts/consumer_path_smoke.sh` derives a temporary
+path-based binary manifest from this checkout. That keeps every local and
+notarized fixture on the candidate XCFramework bytes instead of resolving the
+preceding hosted tag or requiring the new asset URLs to exist early.
 
 ## Build and run public evidence
 

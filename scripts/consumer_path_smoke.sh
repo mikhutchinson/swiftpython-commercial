@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
+LOCAL_PACKAGE_DIR="$WORK_DIR/swiftpython-commercial-local"
 PYTHON_LIB_DIR="${SWIFTPYTHON_PYTHON_LIB_DIR:-}"
 NOTARY_PROFILE="${SWIFTPYTHON_NOTARY_PROFILE:-}"
 NOTARY_OUTPUT_DIR="${SWIFTPYTHON_NOTARY_OUTPUT_DIR:-}"
@@ -177,6 +178,64 @@ run_with_timeout() {
 
 mkdir -p "$WORK_DIR/Sources/ConsumerSmoke"
 
+write_local_binary_package() {
+    mkdir -p "$LOCAL_PACKAGE_DIR"
+    python3 - "$REPO_DIR/Package.swift" "$LOCAL_PACKAGE_DIR/Package.swift" <<'PY'
+import pathlib
+import re
+import sys
+
+source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+expected = {
+    "SwiftPythonRuntime",
+    "SwiftPythonEngine",
+    "SwiftPythonAudioInterop",
+    "SwiftPythonMetalInterop",
+}
+pattern = re.compile(
+    r'\.binaryTarget\(\s*'
+    r'name: "([^"]+)",\s*'
+    r'url: "[^"]+",\s*'
+    r'checksum: "[0-9a-f]{64}"\s*'
+    r'\)',
+    re.DOTALL,
+)
+found = set()
+
+def replace(match: re.Match[str]) -> str:
+    name = match.group(1)
+    found.add(name)
+    return (
+        '.binaryTarget(\n'
+        f'            name: "{name}",\n'
+        f'            path: "{name}.xcframework"\n'
+        '        )'
+    )
+
+rendered = pattern.sub(replace, source)
+if found != expected:
+    raise SystemExit(
+        f"candidate package binary targets changed: expected {sorted(expected)}, "
+        f"found {sorted(found)}"
+    )
+if "releases/download/" in rendered or "checksum:" in rendered:
+    raise SystemExit("local candidate manifest still contains a remote binary target")
+pathlib.Path(sys.argv[2]).write_text(rendered, encoding="utf-8")
+PY
+
+    for module in \
+        SwiftPythonRuntime \
+        SwiftPythonEngine \
+        SwiftPythonAudioInterop \
+        SwiftPythonMetalInterop
+    do
+        ditto \
+            "$REPO_DIR/$module.xcframework" \
+            "$LOCAL_PACKAGE_DIR/$module.xcframework"
+    done
+    swift package --package-path "$LOCAL_PACKAGE_DIR" dump-package >/dev/null
+}
+
 write_consumer_package() {
     local destination="$1"
     mkdir -p "$destination/Sources/ConsumerSmoke"
@@ -188,7 +247,7 @@ let package = Package(
     name: "ConsumerSmoke",
     platforms: [.macOS(.v15)],
     dependencies: [
-        .package(name: "swiftpython-commercial", path: "$REPO_DIR"),
+        .package(name: "swiftpython-commercial", path: "$LOCAL_PACKAGE_DIR"),
     ],
     targets: [
         .executableTarget(
@@ -984,6 +1043,7 @@ fi
 
 SPM_DIR="$WORK_DIR/spm"
 XCODE_DIR="$WORK_DIR/xcode"
+write_local_binary_package
 write_consumer_package "$SPM_DIR"
 write_consumer_package "$XCODE_DIR"
 

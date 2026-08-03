@@ -105,6 +105,9 @@ final public class GILContext {
 public func withGIL<T>(_ operation: () throws -> T) rethrows -> T
 public func withoutGIL<T>(_ operation: () throws -> T) rethrows -> T
 public struct PyHandle : Swift.Sendable, Swift.Hashable {
+  public var workerLifetimeToken: SwiftPythonRuntime.WorkerLifetimeToken? {
+    get
+  }
   public static func == (a: SwiftPythonRuntime.PyHandle, b: SwiftPythonRuntime.PyHandle) -> Swift.Bool
   public func hash(into hasher: inout Swift.Hasher)
   public var hashValue: Swift.Int {
@@ -934,6 +937,13 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func run<NodeID, Output>(_ dag: SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>, maxParallelism: Swift.Int? = nil, failurePolicy: SwiftPythonRuntime.DAGFailurePolicy) async throws -> SwiftPythonRuntime.DAGResult<NodeID, Output> where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
   public func run<NodeID, Output>(nodes: [SwiftPythonRuntime.ProcessPoolDAG<NodeID, Output>.Node], maxParallelism: Swift.Int? = nil) async throws -> [NodeID : Output] where NodeID : Swift.Hashable, NodeID : Swift.Sendable, Output : Swift.Sendable
 }
+public struct WorkerLifetimeToken : Swift.Sendable, Swift.Hashable {
+  public static func == (a: SwiftPythonRuntime.WorkerLifetimeToken, b: SwiftPythonRuntime.WorkerLifetimeToken) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
 public struct ProcessPoolConfiguration : Swift.Sendable, Swift.Equatable {
   public var sendTimeout: Foundation.TimeInterval
   public var receiveTimeout: Foundation.TimeInterval
@@ -1149,6 +1159,7 @@ public enum ProcessPoolTelemetry {
 public struct ProcessPoolWorkerIdentity : Swift.Sendable, Swift.Equatable {
   public let workerID: Swift.Int
   public let pid: _DarwinFoundation2.pid_t
+  public let workerLifetimeToken: SwiftPythonRuntime.WorkerLifetimeToken
   public static func == (a: SwiftPythonRuntime.ProcessPoolWorkerIdentity, b: SwiftPythonRuntime.ProcessPoolWorkerIdentity) -> Swift.Bool
 }
 public enum ProcessPoolCommandSurface : Swift.String, Swift.Sendable, Swift.Equatable {
@@ -1357,6 +1368,7 @@ public struct ProcessPoolRespawnTelemetry : Swift.Sendable, Swift.Equatable {
   public let workerID: Swift.Int
   public let oldPID: _DarwinFoundation2.pid_t
   public let newPID: _DarwinFoundation2.pid_t
+  public let workerLifetimeToken: SwiftPythonRuntime.WorkerLifetimeToken
   public let reason: SwiftPythonRuntime.PoolEvent.RespawnReason
   public let crashEvidenceExists: Swift.Bool
   public let diagnostic: SwiftPythonRuntime.ProcessPoolErrorDiagnostic?
@@ -1852,6 +1864,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public var workerCount: Swift.Int {
     get
   }
+  public func workerLifetimeToken(for workerIndex: Swift.Int) -> SwiftPythonRuntime.WorkerLifetimeToken?
   public func workerPID(for workerIndex: Swift.Int) -> _DarwinFoundation2.pid_t?
   public func respawnCount(for workerIndex: Swift.Int) -> Swift.Int
   public func isWorkerDead(_ workerIndex: Swift.Int) -> Swift.Bool
@@ -2670,12 +2683,61 @@ public struct SandboxTenantID : Swift.Sendable, Swift.Hashable, Swift.Codable, S
   }
   public init(from decoder: any Swift.Decoder) throws
 }
+public enum SandboxFailure : Swift.Error, Swift.Sendable, Swift.Equatable {
+  case runtimeAssetMissing
+  case runtimeAssetIntegrityFailed
+  case runtimeVersionUnsupported
+  case startupTimedOut(elapsedMilliseconds: Swift.UInt64)
+  case startupUnavailable
+  case interactiveSessionUnavailable
+  case operationTimedOut(elapsedMilliseconds: Swift.UInt64)
+  case outputLimitExceeded(observedBytes: Swift.Int, limitBytes: Swift.Int, partialOutput: Foundation.Data)
+  case permissionDenied
+  case networkDenied
+  case resourceLimitExceeded
+  case environmentAlreadyActive
+  case unavailable
+  public static func == (a: SwiftPythonRuntime.SandboxFailure, b: SwiftPythonRuntime.SandboxFailure) -> Swift.Bool
+}
+extension SwiftPythonRuntime.SandboxFailure : Foundation.LocalizedError {
+  public var errorDescription: Swift.String? {
+    get
+  }
+}
+public enum SandboxStopReason : Swift.Sendable, Swift.Equatable {
+  case released
+  case forceStopped
+  case idleTimeout
+  case reconfigured
+  case shutdown
+  public static func == (a: SwiftPythonRuntime.SandboxStopReason, b: SwiftPythonRuntime.SandboxStopReason) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum SandboxOperationOutcome : Swift.Sendable, Swift.Equatable {
+  case succeeded(exitCode: Swift.Int32)
+  case failed(exitCode: Swift.Int32)
+  case timedOut(elapsedMilliseconds: Swift.UInt64)
+  public static func == (a: SwiftPythonRuntime.SandboxOperationOutcome, b: SwiftPythonRuntime.SandboxOperationOutcome) -> Swift.Bool
+}
+public struct SandboxDiagnostic : Swift.Sendable, Swift.Equatable {
+  public let details: Swift.String
+  public init(details: Swift.String)
+  public static func == (a: SwiftPythonRuntime.SandboxDiagnostic, b: SwiftPythonRuntime.SandboxDiagnostic) -> Swift.Bool
+}
+public enum SandboxUnavailableReason : Swift.Sendable, Swift.Equatable {
+  case runtimeFailure(diagnostic: SwiftPythonRuntime.SandboxDiagnostic?)
+  case resourceLimit
+  public static func == (a: SwiftPythonRuntime.SandboxUnavailableReason, b: SwiftPythonRuntime.SandboxUnavailableReason) -> Swift.Bool
+}
 public enum SandboxActivity : Swift.Sendable, Swift.Equatable {
   case ready(tenantID: SwiftPythonRuntime.SandboxTenantID, startupMilliseconds: Swift.UInt64)
-  case stopped(tenantID: SwiftPythonRuntime.SandboxTenantID)
+  case stopped(tenantID: SwiftPythonRuntime.SandboxTenantID, reason: SwiftPythonRuntime.SandboxStopReason)
   case operationStarted(tenantID: SwiftPythonRuntime.SandboxTenantID, traceID: Foundation.UUID?)
-  case operationFinished(tenantID: SwiftPythonRuntime.SandboxTenantID, succeeded: Swift.Bool, traceID: Foundation.UUID?)
-  case unavailable(tenantID: SwiftPythonRuntime.SandboxTenantID)
+  case operationFinished(tenantID: SwiftPythonRuntime.SandboxTenantID, outcome: SwiftPythonRuntime.SandboxOperationOutcome, traceID: Foundation.UUID?)
+  case unavailable(tenantID: SwiftPythonRuntime.SandboxTenantID, reason: SwiftPythonRuntime.SandboxUnavailableReason)
   case eventsDropped(count: Swift.Int)
   public static func == (a: SwiftPythonRuntime.SandboxActivity, b: SwiftPythonRuntime.SandboxActivity) -> Swift.Bool
 }
@@ -2713,6 +2775,15 @@ public struct SandboxTenant : Swift.Sendable {
   }
 }
 public struct SandboxConfiguration : Swift.Sendable, Swift.Hashable {
+  public enum Environment : Swift.String, Swift.Sendable, Swift.Hashable {
+    case ubuntu24
+    case alpine
+    public init?(rawValue: Swift.String)
+    public typealias RawValue = Swift.String
+    public var rawValue: Swift.String {
+      get
+    }
+  }
   public enum ComputePreset : Swift.String, Swift.Sendable, Swift.Hashable {
     case efficiency
     case balanced
@@ -2720,6 +2791,16 @@ public struct SandboxConfiguration : Swift.Sendable, Swift.Hashable {
     public init?(rawValue: Swift.String)
     public typealias RawValue = Swift.String
     public var rawValue: Swift.String {
+      get
+    }
+  }
+  public struct ResourceLimits : Swift.Sendable, Swift.Hashable {
+    public var processorCount: Swift.Int
+    public var memoryMegabytes: Swift.Int
+    public init(processorCount: Swift.Int, memoryMegabytes: Swift.Int)
+    public static func == (a: SwiftPythonRuntime.SandboxConfiguration.ResourceLimits, b: SwiftPythonRuntime.SandboxConfiguration.ResourceLimits) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
       get
     }
   }
@@ -2752,13 +2833,16 @@ public struct SandboxConfiguration : Swift.Sendable, Swift.Hashable {
   }
   public var runtimeAsset: Foundation.URL
   public var storageDirectory: Foundation.URL
+  public var environment: SwiftPythonRuntime.SandboxConfiguration.Environment
   public var compute: SwiftPythonRuntime.SandboxConfiguration.ComputePreset
+  public var resourceLimits: SwiftPythonRuntime.SandboxConfiguration.ResourceLimits?
+  public var idleEvictionTimeout: Foundation.TimeInterval
   public var startup: SwiftPythonRuntime.SandboxConfiguration.StartupPolicy
   public var network: SwiftPythonRuntime.SandboxConfiguration.NetworkPolicy
   public var workersPerSandbox: Swift.Int
   public var minimumRuntimeVersion: Swift.String
   public var integrity: SwiftPythonRuntime.SandboxConfiguration.IntegrityPolicy
-  public init(runtimeAsset: Foundation.URL, storageDirectory: Foundation.URL, compute: SwiftPythonRuntime.SandboxConfiguration.ComputePreset = .balanced, startup: SwiftPythonRuntime.SandboxConfiguration.StartupPolicy = .standard, network: SwiftPythonRuntime.SandboxConfiguration.NetworkPolicy = .denied, workersPerSandbox: Swift.Int = 1, minimumRuntimeVersion: Swift.String = "0.4.0", integrity: SwiftPythonRuntime.SandboxConfiguration.IntegrityPolicy = .standard)
+  public init(runtimeAsset: Foundation.URL, storageDirectory: Foundation.URL, environment: SwiftPythonRuntime.SandboxConfiguration.Environment = .ubuntu24, compute: SwiftPythonRuntime.SandboxConfiguration.ComputePreset = .balanced, resourceLimits: SwiftPythonRuntime.SandboxConfiguration.ResourceLimits? = nil, idleEvictionTimeout: Foundation.TimeInterval = 300, startup: SwiftPythonRuntime.SandboxConfiguration.StartupPolicy = .standard, network: SwiftPythonRuntime.SandboxConfiguration.NetworkPolicy = .denied, workersPerSandbox: Swift.Int = 1, minimumRuntimeVersion: Swift.String = "0.4.0", integrity: SwiftPythonRuntime.SandboxConfiguration.IntegrityPolicy = .standard)
   public static func == (a: SwiftPythonRuntime.SandboxConfiguration, b: SwiftPythonRuntime.SandboxConfiguration) -> Swift.Bool
   public func hash(into hasher: inout Swift.Hasher)
   public var hashValue: Swift.Int {
@@ -3592,6 +3676,8 @@ extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Equatable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Hashable {}
 extension SwiftPythonRuntime.SandboxExecStream : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.PosixSignal : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.SandboxStopReason : Swift.Hashable {}
+extension SwiftPythonRuntime.SandboxConfiguration.Environment : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SandboxConfiguration.ComputePreset : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SandboxConfiguration.IntegrityPolicy : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SandboxConfiguration.NetworkPolicy : Swift.RawRepresentable {}
