@@ -116,10 +116,6 @@ enum DuplexSessionExample {
             options: options
         )
         do {
-            guard session.negotiatedConfiguration.limits.maximumFrameBytes
-                    < byteCount else {
-                throw ExampleFailure.messageWasNotFragmented
-            }
             try await session.input.sendMessage(
                 payload,
                 format: format,
@@ -157,7 +153,6 @@ enum DuplexSessionExample {
 
 enum ExampleFailure: Error {
     case frameMismatch
-    case messageWasNotFragmented
     case digestMismatch
     case badTerminal
 }

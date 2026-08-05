@@ -333,6 +333,13 @@ preserved rather than collapsed to `0.6.0`.
 
 ## Release notes
 
+### Unreleased
+
+- Fixed the external `DuplexSession` example so it no longer reaches the
+  Runtime package's internal negotiated-configuration state, and extended the
+  release-surface audit to type-check command-line examples against the shipped
+  public module.
+
 ### 0.6.0-duplex.5
 
 - Added opaque, generation-bound application-control receipts with repeatable

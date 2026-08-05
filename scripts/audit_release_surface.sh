@@ -262,6 +262,36 @@ if not any(item.get("exact") == [version] for item in requirements):
 PY
 done
 
+# Type-check every command-line example directly against the shipped public
+# module. Package-manifest validation alone cannot catch an example reaching a
+# package-only API. IrisDemo is built by the post-publication example gate
+# because SwiftPM must synthesize its resource-bundle accessor.
+for example in \
+    BridgingRing \
+    CoreRuntimeSmoke \
+    DuplexSession \
+    ProcessPoolSmoke \
+    SharedTensorPipeline
+do
+    example_sources=()
+    while IFS= read -r source; do
+        example_sources+=("$source")
+    done < <(
+        find "$REPO_DIR/Examples/$example/Sources" \
+            -name '*.swift' \
+            -print \
+            | sort
+    )
+    [ "${#example_sources[@]}" -gt 0 ] \
+        || fail "$example has no Swift source files"
+    xcrun swiftc \
+        -typecheck \
+        -parse-as-library \
+        -target arm64-apple-macos15.0 \
+        -I "$REPO_DIR/SwiftPythonRuntime.xcframework/macos-arm64_x86_64/Headers" \
+        "${example_sources[@]}"
+done
+
 root_package="$(swift package --package-path "$REPO_DIR" dump-package)"
 python3 - "$root_package" <<'PY'
 import json
