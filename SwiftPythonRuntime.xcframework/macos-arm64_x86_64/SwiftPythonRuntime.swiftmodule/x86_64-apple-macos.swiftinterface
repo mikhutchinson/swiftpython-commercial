@@ -200,6 +200,40 @@ public struct DuplexSessionID : Swift.Hashable, Swift.Sendable, Swift.CustomStri
     get
   }
 }
+public struct DuplexControlReceipt : Swift.Hashable, Swift.Sendable, Swift.CustomStringConvertible {
+  public static func == (lhs: SwiftPythonRuntime.DuplexControlReceipt, rhs: SwiftPythonRuntime.DuplexControlReceipt) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var description: Swift.String {
+    get
+  }
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexControlResolution : Swift.Sendable, Swift.Equatable {
+  case owned
+  case rejected(SwiftPythonRuntime.DuplexControlRejectionReason)
+  case pending
+  case deliveryUncertain(terminal: SwiftPythonRuntime.DuplexTerminalState?, failure: SwiftPythonRuntime.DuplexFailure?)
+  public static func == (a: SwiftPythonRuntime.DuplexControlResolution, b: SwiftPythonRuntime.DuplexControlResolution) -> Swift.Bool
+}
+public enum DuplexControlRejectionReason : Swift.Sendable, Swift.Equatable {
+  case resourceLimit
+  public static func == (a: SwiftPythonRuntime.DuplexControlRejectionReason, b: SwiftPythonRuntime.DuplexControlRejectionReason) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexControlError : Swift.Error, Swift.Sendable, Swift.Equatable {
+  case resolutionTimedOut(receipt: SwiftPythonRuntime.DuplexControlReceipt)
+  case resolutionCancelled(receipt: SwiftPythonRuntime.DuplexControlReceipt)
+  case deliveryUncertain(receipt: SwiftPythonRuntime.DuplexControlReceipt, terminal: SwiftPythonRuntime.DuplexTerminalState?, failure: SwiftPythonRuntime.DuplexFailure?)
+  public var receipt: SwiftPythonRuntime.DuplexControlReceipt {
+    get
+  }
+  public static func == (a: SwiftPythonRuntime.DuplexControlError, b: SwiftPythonRuntime.DuplexControlError) -> Swift.Bool
+}
 public struct DuplexMessageID : Swift.Hashable, Swift.Sendable, Swift.CustomStringConvertible {
   public init()
   public var description: Swift.String {
@@ -703,6 +737,8 @@ public struct DuplexEvents : _Concurrency.AsyncSequence, Swift.Sendable {
     get
   }
   final public func sendControl(_ message: SwiftPythonRuntime.DuplexApplicationControl) async throws
+  final public func submitControl(_ message: SwiftPythonRuntime.DuplexApplicationControl) async throws -> SwiftPythonRuntime.DuplexControlReceipt
+  final public func resolveControl(_ receipt: SwiftPythonRuntime.DuplexControlReceipt, timeout: Swift.Duration = .seconds(2)) async throws -> SwiftPythonRuntime.DuplexControlResolution
   @discardableResult
   final public func interrupt(reason: SwiftPythonRuntime.DuplexInterruptionReason = .application, consumedOutputThrough: SwiftPythonRuntime.DuplexPosition? = nil) async throws -> Foundation.UUID
   final public func acknowledgeOutput(consumedThrough position: SwiftPythonRuntime.DuplexPosition) async throws
@@ -847,6 +883,7 @@ public enum PoolEvent : Swift.Sendable {
     case explicit
     case userInitiated
     case runtimeProvider
+    case duplexControlTransportFailure
     public static func == (a: SwiftPythonRuntime.PoolEvent.RespawnReason, b: SwiftPythonRuntime.PoolEvent.RespawnReason) -> Swift.Bool
     public func hash(into hasher: inout Swift.Hasher)
     public var hashValue: Swift.Int {
@@ -3173,6 +3210,8 @@ public func PyErr_Clear()
 public func PyErr_SetString(_: SwiftPythonRuntime.PyObjectPointer?, _: Swift.UnsafePointer<Swift.CChar>)
 @_silgen_name("PyExc_RuntimeError")
 nonisolated(unsafe) public var PyExc_RuntimeError: SwiftPythonRuntime.PyObjectPointer
+@_silgen_name("PyExc_TimeoutError")
+nonisolated(unsafe) public var PyExc_TimeoutError: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyExc_TypeError")
 nonisolated(unsafe) public var PyExc_TypeError: SwiftPythonRuntime.PyObjectPointer
 @_silgen_name("PyExc_KeyError")
@@ -3629,6 +3668,7 @@ extension SwiftPythonRuntime.DuplexInterruptionReason : Swift.RawRepresentable {
 extension SwiftPythonRuntime.DuplexCancellationReason : Swift.Equatable {}
 extension SwiftPythonRuntime.DuplexCancellationReason : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexCancellationReason : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.DuplexControlRejectionReason : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexMessageAbortReason : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexMessageAbortReason : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.DuplexInterruptionPolicy : Swift.Hashable {}

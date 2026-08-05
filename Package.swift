@@ -27,24 +27,24 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "SwiftPythonRuntime",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.4/SwiftPythonRuntime.xcframework.zip",
-            checksum: "9e4fd18990a083aecf9f6684f1eaac4f87f6d61c66f0406963c5495c9fd91dd7"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.5/SwiftPythonRuntime.xcframework.zip",
+            checksum: "f7a684fbb994610c49f2cd80b8806b84024cb87445416b3fa7bba70908038f61"
         ),
         // Link/embed dependency only. Deliberately absent from products.
         .binaryTarget(
             name: "SwiftPythonEngine",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.4/SwiftPythonEngine.xcframework.zip",
-            checksum: "79e27654538847d00699beee676a890c41aceaa3f7585bcb8ef7ca8fdc6a13b7"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.5/SwiftPythonEngine.xcframework.zip",
+            checksum: "dc667767df2e621de61dd8cb216d488f8a3c4b9e60353dfe3226a9d5f9dfbd09"
         ),
         .binaryTarget(
             name: "SwiftPythonAudioInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.4/SwiftPythonAudioInterop.xcframework.zip",
-            checksum: "a4fabb65981719478693440f4a8b770c6ce6cb3079e703496f5513a88d6a05df"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.5/SwiftPythonAudioInterop.xcframework.zip",
+            checksum: "75b73d4f2a576f59402526d12b74c78d004ee89b52ff99b4c4518d37a0e97010"
         ),
         .binaryTarget(
             name: "SwiftPythonMetalInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.4/SwiftPythonMetalInterop.xcframework.zip",
-            checksum: "7ebf9e514aaa64fa4e17241363a5f407e1ea0b43a9767b6285ea6b75e86c2d6b"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.5/SwiftPythonMetalInterop.xcframework.zip",
+            checksum: "0eebc62673d1511be1991933f13b55ac2a5d66ed85ff2bc208304c94d4eb0dd6"
         ),
     ]
 )

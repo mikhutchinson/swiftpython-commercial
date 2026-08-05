@@ -210,9 +210,31 @@ never duplex send authority.
 
 ## Control, interruption, and terminal truth
 
-`sendControl` transfers an application-control value to a bounded Python
-inbox. Priority interruption uses a distinct reserve and carries the
-application's consumed-output cursor:
+For explicit ownership handling, submit an application control and retain its
+opaque, generation-bound receipt until it resolves:
+
+```swift
+let receipt = try await session.submitControl(control)
+switch try await session.resolveControl(receipt, timeout: .milliseconds(250)) {
+case .owned:
+    markApplied()
+case .rejected(let reason):
+    markRejected(reason)
+case .pending:
+    retain(receipt)
+case .deliveryUncertain(let terminal, let failure):
+    retainForReconciliation(receipt, terminal: terminal, failure: failure)
+}
+```
+
+Resolution is repeatable. Timeout or cancellation means acknowledgement is
+incomplete, not that Python failed to acquire the control. Never submit a
+duplicate while its receipt is pending or delivery-uncertain. The
+source-compatible `sendControl` convenience throws `DuplexControlError`
+carrying the receipt when it cannot prove a final resolution.
+
+Priority interruption uses a distinct reserve and carries the application's
+consumed-output cursor:
 
 ```swift
 let interruptionID = try await session.interrupt(
