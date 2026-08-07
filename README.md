@@ -4,7 +4,7 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.5`
+Current release: `0.6.0-duplex.6`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -39,7 +39,7 @@ same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The complete `SwiftPythonCommercial-0.6.0-duplex.5.zip` asset contains this
+The complete `SwiftPythonCommercial-0.6.0-duplex.6.zip` asset contains this
 public checkout. The four XCFramework zips are individual binary-target
 assets. `manifest.json` is a separate asset and attests all four zips, the
 worker, all five VM helpers, the complete distribution, and the same-version VM
@@ -67,7 +67,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.5"
+        exact: "0.6.0-duplex.6"
     )
 ]
 ```
@@ -294,7 +294,7 @@ swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
 swift run --package-path Examples/DuplexSession
-scripts/audit_release_surface.sh 0.6.0-duplex.5
+scripts/audit_release_surface.sh 0.6.0-duplex.6
 scripts/consumer_path_smoke.sh
 ```
 
@@ -335,6 +335,13 @@ preserved rather than collapsed to `0.6.0`.
 
 ### Unreleased
 
+### 0.6.0-duplex.6
+
+- Fixed the duplex control reader so an empty 60-second receive interval is a
+  liveness poll rather than a terminal `runtimeUnavailable` failure. Healthy
+  workers may now remain silent while a model or accelerator is busy; actual
+  worker death, channel closure, protocol failure, and explicit deadlines stay
+  terminal.
 - Fixed the external `DuplexSession` example so it no longer reaches the
   Runtime package's internal negotiated-configuration state, and extended the
   release-surface audit to type-check command-line examples against the shipped
