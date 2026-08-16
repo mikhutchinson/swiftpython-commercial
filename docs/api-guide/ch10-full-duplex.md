@@ -252,6 +252,51 @@ safe points.
 failed terminal. Sessions remain pinned, never migrate or replay, and resolve
 once with final accepted, processed, produced, and acknowledged watermarks.
 
+## Backend-neutral accelerator policy
+
+Accelerator use is explicit. Existing MLX consumers may continue to use
+`.mlx(MLXDuplexPolicy)`. An independent backend package uses one opaque,
+lowercase backend ID and the shared policy types instead of requiring a new
+SwiftPython API case:
+
+```swift
+let backend = AcceleratorBackendID(rawValue: "example_backend")
+let policy = AcceleratorBackendPolicy(
+    backend: backend,
+    lane: .poolDefault,
+    warmup: .init(timeout: .seconds(90)),
+    residency: .init(
+        maximumModels: 1,
+        maximumResidentBytes: 8 * 1_024 * 1_024 * 1_024,
+        maximumSimultaneousLeases: 2,
+        defaultIdleTTL: .seconds(300)
+    ),
+    admission: .init(
+        maximumQueuedStepsPerSession: 8,
+        maximumActiveSessions: 2,
+        maximumProcessLanes: 1,
+        maximumStateItems: 32_768,
+        maximumStateBytes: 512 * 1_024 * 1_024
+    ),
+    pressure: .balanced
+)
+
+var options = DuplexOptions.default
+options.accelerator = .backend(policy)
+```
+
+The native worker must declare `duplex.accelerator.backend.v1` and its helper
+schema before the handler is installed. The backend ID and process-wide lane,
+residency, and admission policy stay fixed for one worker generation; a
+conflicting open fails with an accelerator resource-limit error. The current
+VM guest does not declare the generic capability, so VM opens that require it
+fail locally rather than pretending support.
+
+`DuplexSessionProfile.acceleratorBackend` reports the negotiated opaque ID.
+Backend adapters can publish route-specific counters through
+`AcceleratorBackendResourceStats`, keyed by `AcceleratorBackendID`; missing
+engine counters remain unknown rather than being inferred from process RSS.
+
 ## Native and VM transport limits
 
 The live capability snapshot owns all limits. In this release, local UDS can

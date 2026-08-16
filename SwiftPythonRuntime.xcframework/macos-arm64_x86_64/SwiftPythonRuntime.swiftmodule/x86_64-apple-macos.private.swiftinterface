@@ -157,6 +157,7 @@ public struct DuplexSupport : Swift.Hashable, Swift.Sendable {
   public let supportsFrames: Swift.Bool
   public let supportsMessages: Swift.Bool
   public let supportsManagedBuffers: Swift.Bool
+  public let supportsAcceleratorBackend: Swift.Bool
   public static func == (a: SwiftPythonRuntime.DuplexSupport, b: SwiftPythonRuntime.DuplexSupport) -> Swift.Bool
   public func hash(into hasher: inout Swift.Hasher)
   public var hashValue: Swift.Int {
@@ -388,6 +389,7 @@ public enum AcceleratorPressureLevel : Swift.Int, Swift.Sendable, Swift.Equatabl
 }
 extension SwiftPythonRuntime.ResourceSnapshot {
   public func acceleratorPressureLevel(for preset: SwiftPythonRuntime.AcceleratorPressurePreset, residentBudgetBytes: Swift.UInt64) -> SwiftPythonRuntime.AcceleratorPressureLevel
+  public func acceleratorPressureLevel(for preset: SwiftPythonRuntime.AcceleratorPressurePreset, residentBudgetBytes: Swift.UInt64, backend: SwiftPythonRuntime.AcceleratorBackendID) -> SwiftPythonRuntime.AcceleratorPressureLevel
 }
 public struct MLXDuplexPolicy : Swift.Sendable, Swift.Equatable {
   public var lane: SwiftPythonRuntime.MLXLaneSelection
@@ -399,9 +401,53 @@ public struct MLXDuplexPolicy : Swift.Sendable, Swift.Equatable {
   public static let `default`: SwiftPythonRuntime.MLXDuplexPolicy
   public static func == (a: SwiftPythonRuntime.MLXDuplexPolicy, b: SwiftPythonRuntime.MLXDuplexPolicy) -> Swift.Bool
 }
+public enum AcceleratorLaneSelection : Swift.Sendable, Swift.Equatable {
+  case poolDefault
+  case worker(Swift.Int)
+  case named(Swift.String)
+  public static func == (a: SwiftPythonRuntime.AcceleratorLaneSelection, b: SwiftPythonRuntime.AcceleratorLaneSelection) -> Swift.Bool
+}
+public struct AcceleratorWarmupPolicy : Swift.Sendable, Swift.Equatable {
+  public var timeout: Swift.Duration
+  public init(timeout: Swift.Duration = .seconds(60))
+  public static let `default`: SwiftPythonRuntime.AcceleratorWarmupPolicy
+  public static func == (a: SwiftPythonRuntime.AcceleratorWarmupPolicy, b: SwiftPythonRuntime.AcceleratorWarmupPolicy) -> Swift.Bool
+}
+public struct AcceleratorResidencyPolicy : Swift.Sendable, Swift.Equatable {
+  public var maximumModels: Swift.Int
+  public var maximumResidentBytes: Swift.Int
+  public var maximumSimultaneousLeases: Swift.Int
+  public var defaultIdleTTL: Swift.Duration
+  public init(maximumModels: Swift.Int = 1, maximumResidentBytes: Swift.Int = 8 * 1_024 * 1_024 * 1_024, maximumSimultaneousLeases: Swift.Int = 4, defaultIdleTTL: Swift.Duration = .seconds(300))
+  public static let `default`: SwiftPythonRuntime.AcceleratorResidencyPolicy
+  public static func == (a: SwiftPythonRuntime.AcceleratorResidencyPolicy, b: SwiftPythonRuntime.AcceleratorResidencyPolicy) -> Swift.Bool
+}
+public struct AcceleratorAdmissionPolicy : Swift.Sendable, Swift.Equatable {
+  public var maximumQueuedStepsPerSession: Swift.Int
+  public var maximumActiveSessions: Swift.Int
+  public var maximumProcessLanes: Swift.Int
+  public var startupStressProbe: Swift.String?
+  public var schedulingWeight: Swift.Int
+  public var maximumStateItems: Swift.Int
+  public var maximumStateBytes: Swift.Int
+  public init(maximumQueuedStepsPerSession: Swift.Int = 8, maximumActiveSessions: Swift.Int = 4, maximumProcessLanes: Swift.Int = 1, startupStressProbe: Swift.String? = nil, schedulingWeight: Swift.Int = 1, maximumStateItems: Swift.Int = 32_768, maximumStateBytes: Swift.Int = 512 * 1_024 * 1_024)
+  public static let `default`: SwiftPythonRuntime.AcceleratorAdmissionPolicy
+  public static func == (a: SwiftPythonRuntime.AcceleratorAdmissionPolicy, b: SwiftPythonRuntime.AcceleratorAdmissionPolicy) -> Swift.Bool
+}
+public struct AcceleratorBackendPolicy : Swift.Sendable, Swift.Equatable {
+  public var backend: SwiftPythonRuntime.AcceleratorBackendID
+  public var lane: SwiftPythonRuntime.AcceleratorLaneSelection
+  public var warmup: SwiftPythonRuntime.AcceleratorWarmupPolicy
+  public var residency: SwiftPythonRuntime.AcceleratorResidencyPolicy
+  public var admission: SwiftPythonRuntime.AcceleratorAdmissionPolicy
+  public var pressure: SwiftPythonRuntime.AcceleratorPressurePreset
+  public init(backend: SwiftPythonRuntime.AcceleratorBackendID, lane: SwiftPythonRuntime.AcceleratorLaneSelection = .poolDefault, warmup: SwiftPythonRuntime.AcceleratorWarmupPolicy = .default, residency: SwiftPythonRuntime.AcceleratorResidencyPolicy = .default, admission: SwiftPythonRuntime.AcceleratorAdmissionPolicy = .default, pressure: SwiftPythonRuntime.AcceleratorPressurePreset = .balanced)
+  public static func == (a: SwiftPythonRuntime.AcceleratorBackendPolicy, b: SwiftPythonRuntime.AcceleratorBackendPolicy) -> Swift.Bool
+}
 public enum DuplexAcceleratorPolicy : Swift.Sendable, Swift.Equatable {
   case none
   case mlx(SwiftPythonRuntime.MLXDuplexPolicy)
+  case backend(SwiftPythonRuntime.AcceleratorBackendPolicy)
   public static func == (a: SwiftPythonRuntime.DuplexAcceleratorPolicy, b: SwiftPythonRuntime.DuplexAcceleratorPolicy) -> Swift.Bool
 }
 public struct DuplexLimits : Swift.Sendable, Swift.Equatable {
@@ -529,6 +575,7 @@ public struct DuplexSessionProfile : Swift.Sendable, Swift.Equatable {
   public let maximumMessageBytes: Swift.Int
   public let supportsManagedBuffers: Swift.Bool
   public let accelerator: SwiftPythonRuntime.DuplexNegotiatedAcceleratorKind
+  public let acceleratorBackend: SwiftPythonRuntime.AcceleratorBackendID?
   public static func == (a: SwiftPythonRuntime.DuplexSessionProfile, b: SwiftPythonRuntime.DuplexSessionProfile) -> Swift.Bool
 }
 public enum DuplexFailureCode : Swift.String, Swift.Sendable, Swift.Equatable {
@@ -1088,6 +1135,22 @@ public struct AcceleratorResourceCounters : Swift.Sendable, Swift.Equatable {
   public init(activeBytes: Swift.UInt64, peakBytes: Swift.UInt64, cacheBytes: Swift.UInt64, queueDepth: Swift.Int, executing: Swift.Bool)
   public static func == (a: SwiftPythonRuntime.AcceleratorResourceCounters, b: SwiftPythonRuntime.AcceleratorResourceCounters) -> Swift.Bool
 }
+public struct AcceleratorBackendID : Swift.RawRepresentable, Swift.Hashable, Swift.Sendable, Swift.Codable {
+  public let rawValue: Swift.String
+  public init(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+}
+public struct AcceleratorBackendResourceStats : Swift.Sendable, Swift.Equatable {
+  public let activeBytes: Swift.UInt64?
+  public let peakBytes: Swift.UInt64?
+  public let cacheBytes: Swift.UInt64?
+  public let queueDepth: Swift.Int
+  public let executingLaneCount: Swift.Int
+  public let admittedLaneCount: Swift.Int
+  public let admittedSessionCount: Swift.Int
+  public init(activeBytes: Swift.UInt64? = nil, peakBytes: Swift.UInt64? = nil, cacheBytes: Swift.UInt64? = nil, queueDepth: Swift.Int = 0, executingLaneCount: Swift.Int = 0, admittedLaneCount: Swift.Int = 0, admittedSessionCount: Swift.Int = 0)
+  public static func == (a: SwiftPythonRuntime.AcceleratorBackendResourceStats, b: SwiftPythonRuntime.AcceleratorBackendResourceStats) -> Swift.Bool
+}
 public struct AcceleratorResourceEvidence : Swift.Sendable, Swift.Equatable {
   public let processPhysicalFootprintBytes: Swift.UInt64?
   public let managedBufferCapacityBytes: Swift.UInt64
@@ -1100,7 +1163,8 @@ public struct AcceleratorResourceEvidence : Swift.Sendable, Swift.Equatable {
   public let executingLaneCount: Swift.Int
   public let admittedMLXLaneCount: Swift.Int
   public let admittedMLXSessionCount: Swift.Int
-  public init(processPhysicalFootprintBytes: Swift.UInt64? = nil, managedBufferCapacityBytes: Swift.UInt64 = 0, managedBufferAllocatedBytes: Swift.UInt64 = 0, hostMetalBufferPoolBytes: Swift.UInt64? = nil, mlxActiveBytes: Swift.UInt64? = nil, mlxPeakBytes: Swift.UInt64? = nil, mlxCacheBytes: Swift.UInt64? = nil, acceleratorQueueDepth: Swift.Int = 0, executingLaneCount: Swift.Int = 0, admittedMLXLaneCount: Swift.Int = 0, admittedMLXSessionCount: Swift.Int = 0)
+  public let backendStats: [SwiftPythonRuntime.AcceleratorBackendID : SwiftPythonRuntime.AcceleratorBackendResourceStats]
+  public init(processPhysicalFootprintBytes: Swift.UInt64? = nil, managedBufferCapacityBytes: Swift.UInt64 = 0, managedBufferAllocatedBytes: Swift.UInt64 = 0, hostMetalBufferPoolBytes: Swift.UInt64? = nil, mlxActiveBytes: Swift.UInt64? = nil, mlxPeakBytes: Swift.UInt64? = nil, mlxCacheBytes: Swift.UInt64? = nil, acceleratorQueueDepth: Swift.Int = 0, executingLaneCount: Swift.Int = 0, admittedMLXLaneCount: Swift.Int = 0, admittedMLXSessionCount: Swift.Int = 0, backendStats: [SwiftPythonRuntime.AcceleratorBackendID : SwiftPythonRuntime.AcceleratorBackendResourceStats] = [:])
   public static func == (a: SwiftPythonRuntime.AcceleratorResourceEvidence, b: SwiftPythonRuntime.AcceleratorResourceEvidence) -> Swift.Bool
 }
 public struct ResourceSnapshot : Swift.Sendable {
@@ -1740,6 +1804,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
 extension SwiftPythonRuntime.PythonProcessPool {
   public func resourceSnapshot() async -> SwiftPythonRuntime.ResourceSnapshot?
   public func reportAcceleratorResourceCounters(_ counters: SwiftPythonRuntime.AcceleratorResourceCounters?, worker: Swift.Int) throws
+  public func reportAcceleratorResourceCounters(_ counters: SwiftPythonRuntime.AcceleratorResourceCounters?, worker: Swift.Int, backend: SwiftPythonRuntime.AcceleratorBackendID) throws
   public func reportHostMetalBufferPoolBytes(_ bytes: Swift.UInt64?)
 }
 extension SwiftPythonRuntime.PythonProcessPool {

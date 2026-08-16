@@ -4,7 +4,7 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.6`
+Current release: `0.6.0-duplex.7`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -39,7 +39,7 @@ same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The complete `SwiftPythonCommercial-0.6.0-duplex.6.zip` asset contains this
+The complete `SwiftPythonCommercial-0.6.0-duplex.7.zip` asset contains this
 public checkout. The four XCFramework zips are individual binary-target
 assets. `manifest.json` is a separate asset and attests all four zips, the
 worker, all five VM helpers, the complete distribution, and the same-version VM
@@ -67,7 +67,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.6"
+        exact: "0.6.0-duplex.7"
     )
 ]
 ```
@@ -294,7 +294,7 @@ swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
 swift run --package-path Examples/DuplexSession
-scripts/audit_release_surface.sh 0.6.0-duplex.6
+scripts/audit_release_surface.sh 0.6.0-duplex.7
 scripts/consumer_path_smoke.sh
 ```
 
@@ -334,6 +334,18 @@ preserved rather than collapsed to `0.6.0`.
 ## Release notes
 
 ### Unreleased
+
+### 0.6.0-duplex.7
+
+- Added a backend-neutral accelerator contract with opaque backend IDs and
+  shared lane, warm-up, residency, admission, pressure, and resource-evidence
+  policies. Backend packages can now build on the public Runtime interface
+  without adding a branded llama.cpp policy to SwiftPython.
+- Added negotiated `duplex.accelerator.backend.v1` admission for native workers
+  while preserving the existing MLX source contract and worker-wire-v6 JSON
+  shape. VM guests remain explicit about the capabilities they actually carry.
+- Fixed a terminal/acknowledgement race so a direction-end published after a
+  successful output acknowledgement cannot lose the acknowledged cursor.
 
 ### 0.6.0-duplex.6
 

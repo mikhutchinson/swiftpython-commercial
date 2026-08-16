@@ -110,6 +110,7 @@ SESSION_ROUTED_RESPONSES = frozenset({
 
 # Capability names known to this host source.
 WORKER_CAPABILITY_NAMES = frozenset({
+    "duplex.accelerator.backend.v1",
     "duplex.arena-ingress.v1",
     "duplex.messages.v1",
     "duplex.sessions.v1",

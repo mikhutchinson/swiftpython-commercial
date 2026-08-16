@@ -342,7 +342,7 @@ class _ModelRegistry:
     ):
         key = self._validate_key(key)
         partition = self._validate_partition(partition)
-        registry_key = (partition, key)
+        registry_key = (accelerator.kind, partition, key)
         estimated = int(estimated_bytes)
         if estimated <= 0:
             raise ValueError("estimated_bytes must be positive")
@@ -639,7 +639,15 @@ class DuplexAccelerator:
 
     @property
     def available(self):
-        return self._configuration.get("kind") == "mlx"
+        return self.backend_id != "none"
+
+    @property
+    def backend_id(self):
+        return str(self._configuration.get("kind", "none"))
+
+    @property
+    def kind(self):
+        return self.backend_id
 
     @property
     def configuration(self):
@@ -657,8 +665,21 @@ class DuplexAccelerator:
     def _require_available(self):
         if not self.available:
             raise AcceleratorUnavailableError(
-                "this duplex session has no MLX accelerator lane"
+                "this duplex session has no accelerator lane"
             )
+
+    def require_backend(self, backend_id):
+        requested = str(backend_id)
+        self._require_available()
+        if requested != self.backend_id:
+            raise AcceleratorUnavailableError(
+                f"accelerator backend {self.backend_id!r} does not "
+                f"satisfy required backend {requested!r}"
+            )
+        return self
+
+    def require_kind(self, kind):
+        return self.require_backend(kind)
 
     def run_step(
         self,
@@ -734,7 +755,7 @@ class DuplexAccelerator:
             )
             if elapsed > timeout_ns:
                 raise TimeoutError(
-                    "MLX representative warm-up exceeded its policy timeout"
+                "accelerator representative warm-up exceeded its policy timeout"
                 )
             _native.accelerator_finish_warmup(
                 self._session._token,
@@ -757,8 +778,14 @@ class DuplexAccelerator:
         ttl_seconds=None,
         observe_bytes=None,
         partition=None,
+        backend_id=None,
+        backend_kind=None,
     ):
         self._require_available()
+        if backend_id is not None:
+            self.require_backend(backend_id)
+        if backend_kind is not None:
+            self.require_backend(backend_kind)
         return _MODEL_REGISTRY.lease(
             self,
             key=key,
@@ -838,6 +865,17 @@ class DuplexAccelerator:
         return BoundedStateWindow(
             requested_items,
             requested_bytes,
+        )
+
+    def context_budget(
+        self,
+        *,
+        maximum_tokens=None,
+        maximum_bytes=None,
+    ):
+        return self.state_window(
+            maximum_items=maximum_tokens,
+            maximum_bytes=maximum_bytes,
         )
 
     def mark_first_output(self):
