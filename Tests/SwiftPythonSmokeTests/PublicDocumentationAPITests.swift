@@ -17,6 +17,19 @@ final class PublicDocumentationAPITests: XCTestCase {
         )
         XCTAssertEqual(audio.bytesPerFrame, 2)
 
+        #if os(macOS)
+            let hardwareProbe = try DuplexAudioHardwareProbeConfiguration(
+                wireFormat: audio,
+                durationSeconds: 2,
+                timeoutSeconds: 30,
+                requiresNonIdentityCaptureConversion: true
+            )
+            XCTAssertEqual(hardwareProbe.wireFormat, audio)
+            XCTAssertEqual(hardwareProbe.durationSeconds, 2)
+            XCTAssertEqual(hardwareProbe.timeoutSeconds, 30)
+            _ = DuplexAudioHardwareProbeLauncher.permissionState
+        #endif
+
         var duplex = DuplexOptions.default
         duplex.requirements = .managedBuffers
         duplex.limits.maximumLogicalMessageBytes = 10 * 1_024 * 1_024
@@ -145,5 +158,34 @@ final class PublicDocumentationAPITests: XCTestCase {
         try await session.acknowledgeOutput(
             consumedThrough: DuplexPosition(sequence: 1, byteOffset: 16)
         )
+
+        #if os(macOS)
+            let format = try DuplexAudioFormat(
+                sampleRate: 24_000,
+                channels: 1,
+                sampleType: .signedInteger16,
+                interleaving: .interleaved
+            )
+            let probe = try DuplexAudioHardwareProbeConfiguration(
+                wireFormat: format,
+                durationSeconds: 2,
+                timeoutSeconds: 30,
+                requiresNonIdentityCaptureConversion: true
+            )
+            let outcome = try await DuplexAudioHardwareProbeLauncher.run(
+                configuration: probe
+            )
+            switch outcome {
+            case let .ready(report):
+                _ = report.metrics.captureHostTimestampFallbackCount
+                _ = report.metrics.captureClockResetCount
+                _ = report.metrics.captureHostClockResetCount
+                _ = report.metrics.playbackInvalidSampleTimeCount
+            case let .notReady(failure):
+                _ = failure
+            @unknown default:
+                break
+            }
+        #endif
     }
 }

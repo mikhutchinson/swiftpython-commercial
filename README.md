@@ -6,6 +6,11 @@ Virtualization.framework-backed Linux tenants.
 
 Current release: `0.6.0-duplex.7`
 
+That published tag predates the raw audio-readiness helper and does not contain
+it. The unreleased integration in this checkout is the distribution contract
+for the next candidate that carries `DuplexAudioHardwareProbeLauncher`; it must
+not be represented as evidence that `0.6.0-duplex.7` shipped the helper.
+
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
 ## License
@@ -27,8 +32,9 @@ Read [LICENSE](LICENSE) before distributing an application.
 | `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
 | `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
 | `SwiftPythonWorker` | Matched arm64 local ProcessPool sidecar |
+| `SwiftPythonAudioProbe` (next launcher-bearing candidate) | Fixed-path, kill/reap-bounded macOS hardware-readiness helper |
 | `VMWorker/` | Matched five-file generated protocol/helper/supervisor/worker set |
-| `Entitlements/` | Parent, worker, inherited-sandbox worker, and virtualization templates |
+| `Entitlements/` | Parent, worker, audio-probe, inherited-sandbox, and virtualization templates |
 | `Examples/` | Standalone packages compiled against this public distribution |
 | `docs/api-guide/` | Public API and deployment guide |
 | `manifest.json` release asset | Version, source revision, protocols, byte sizes, and SHA-256 records |
@@ -39,11 +45,18 @@ same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The complete `SwiftPythonCommercial-0.6.0-duplex.7.zip` asset contains this
-public checkout. The four XCFramework zips are individual binary-target
-assets. `manifest.json` is a separate asset and attests all four zips, the
+The published `SwiftPythonCommercial-0.6.0-duplex.7.zip` asset contains the
+checkout at that tag. The four XCFramework zips are individual binary-target
+assets. Its `manifest.json` is a separate asset and attests all four zips, the
 worker, all five VM helpers, the complete distribution, and the same-version VM
-image used for the certified VM gate.
+image used for that certified VM gate.
+
+A launcher-bearing candidate uses manifest schema 3 and adds exactly one
+`audioHardwareProbeExecutable` record for `SwiftPythonAudioProbe`, plus
+`protocols.audioHardwareProbe: 1`. Its complete distribution must contain the
+same helper bytes and both probe entitlement templates. The raw helper is not a
+fifth SwiftPM binary target: the package continues to declare exactly the four
+XCFramework targets above.
 
 ## Requirements
 
@@ -128,6 +141,7 @@ YourApp.app/
       Python.framework/        # required for self-contained/sandboxed apps
     MacOS/
       YourApp
+      SwiftPythonAudioProbe
       SwiftPythonWorker
     Info.plist
 ```
@@ -138,6 +152,14 @@ application executable must resolve its `@rpath` install name through
 locations. The worker, Engine, and host must load the same bundled Python when the app cannot rely
 on Homebrew. Copying a sidecar is not a signing or notarization step; use the
 distribution-specific rules below.
+
+The public audio launcher resolves only
+`Bundle.main.bundleURL/Contents/MacOS/SwiftPythonAudioProbe`. A URL-based
+SwiftPM dependency does not auto-embed that raw executable. Copy the helper
+from the exact matching complete distribution or commercial checkout, relocate
+its Python load command when the app bundles Python, re-sign it as nested code,
+and then sign the containing app. Do not add a PATH, build-directory, worker,
+caller-supplied-path, XPC, autobuild, or in-process fallback.
 
 ## Full-duplex sessions
 
@@ -236,6 +258,15 @@ import SwiftPythonMetalInterop
 `DuplexAudioCapture` and `DuplexAudioPlayback` keep AVAudio callbacks
 realtime-only; async pumps own session interaction.
 
+On macOS, `DuplexAudioHardwareProbeLauncher` provides a bounded point-in-time
+hardware readiness receipt using the fixed nested helper. The parent app owns a
+nonempty `NSMicrophoneUsageDescription`, the first microphone prompt, and—when
+sandboxed—`com.apple.security.device.audio-input`. The helper requires already
+granted permission and never prompts. A `ready` receipt proves only one fresh,
+muted, helper-owned shared engine at that instant; it does not certify the
+caller's engine or a future route. See Chapter 11 for the public call shape and
+the zero-required capture clock-health counters.
+
 `ManagedBuffer.makeMetalBufferLease` maps a page-aligned managed buffer to an
 `MTLBuffer` without copying those pages. Registered command buffers and access
 completion hold the opaque allocation until safe reuse.
@@ -247,25 +278,31 @@ See [Chapter 11](docs/api-guide/ch11-apple-interop.md).
 
 ## App Sandbox and signing
 
-Select worker entitlements from the parent app's sandbox state, not from the
-certificate class:
+Select nested-code entitlements from the parent app's sandbox state, not from
+the certificate class:
 
-| Parent | Worker template |
-|---|---|
-| Non-sandbox, any signing identity | `SwiftPythonWorker.entitlements` |
-| Sandboxed, Apple Development or Developer ID | `SwiftPythonWorker-sandbox.entitlements` |
+| Parent | Worker template | Audio-probe template |
+|---|---|---|
+| Non-sandbox, any signing identity | `SwiftPythonWorker.entitlements` | `SwiftPythonAudioProbe.entitlements` |
+| Sandboxed, Apple Development or Developer ID | `SwiftPythonWorker-sandbox.entitlements` | `SwiftPythonAudioProbe-sandbox.entitlements` |
 
-The inherited worker template contains exactly
+Each inherited nested-code template contains exactly
 `com.apple.security.app-sandbox` and `com.apple.security.inherit`.
-Capabilities belong on the parent. For a sandboxed distribution, bundle Python,
-rewrite both host and worker load commands to the bundle-local framework,
-same-team-sign native code, and give the helper an identifier nested beneath
-the parent bundle identifier.
+Capabilities belong on the parent. For a sandboxed distribution, bundle
+Python, rewrite the host, worker, and probe load commands to the bundle-local
+framework, and same-team-sign all native code. Sign the probe with the exact
+identifier `<parent signing identifier>.SwiftPythonAudioProbe` at the fixed
+path before signing the outer app.
 
 ```bash
 codesign --force --sign "$SIGN_ID" --options runtime \
   --entitlements Entitlements/SwiftPythonWorker.entitlements \
   YourApp.app/Contents/MacOS/SwiftPythonWorker
+
+codesign --force --sign "$SIGN_ID" --options runtime \
+  --identifier "${PARENT_SIGNING_IDENTIFIER}.SwiftPythonAudioProbe" \
+  --entitlements Entitlements/SwiftPythonAudioProbe.entitlements \
+  YourApp.app/Contents/MacOS/SwiftPythonAudioProbe
 
 codesign --force --sign "$SIGN_ID" --options runtime \
   --entitlements Entitlements/ConsumerApp.entitlements \
@@ -283,6 +320,27 @@ path-based binary manifest from this checkout. That keeps every local and
 notarized fixture on the candidate XCFramework bytes instead of resolving the
 preceding hosted tag or requiring the new asset URLs to exist early.
 
+`SWIFTPYTHON_AUDIO_PROBE_GATE` controls only the device-dependent launcher
+portion of that fixture:
+
+- `off` verifies embedding/signing structure but makes no launcher claim;
+- `containment` runs the public launcher and accepts a strict receipt or only a
+  valid typed device/helper-timeout result after confirmed containment; either
+  result is explicitly not release-gate evidence; and
+- `ready` requires a strict `.ready` receipt, including zero capture host-time
+  fallbacks and device/host clock resets. The separately reported
+  `playbackInvalidSampleTimeCount` is diagnostic, not a zero-required gate.
+
+Notary mode refuses `off` and `containment`. It requires
+`SWIFTPYTHON_AUDIO_PROBE_GATE=ready`, runs the Developer ID non-sandbox and
+sandbox launcher fixtures before notarization, then reruns both exact stapled,
+quarantined candidates through LaunchServices (`open`), without a worker-path
+override. Each final run must expose a live exact bundle identifier and emit
+one fresh nonce-bound success receipt before exit; retained stdout, stderr, and
+receipt files are part of the gate evidence. All three app-shaped fixtures
+embed and re-sign the helper; the virtualization fixture does not make a
+redundant device claim.
+
 ## Build and run public evidence
 
 ```bash
@@ -294,8 +352,11 @@ swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
 swift run -c release --package-path Examples/SharedTensorPipeline
 swift run --package-path Examples/DuplexSession
-scripts/audit_release_surface.sh 0.6.0-duplex.7
-scripts/consumer_path_smoke.sh
+SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
+  scripts/audit_release_surface.sh "$CANDIDATE_VERSION"
+SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
+SWIFTPYTHON_AUDIO_PROBE_GATE=containment \
+  scripts/consumer_path_smoke.sh
 ```
 
 For the final notarized VM release gate, supply the same-commit image and
@@ -304,6 +365,8 @@ snapshot explicitly:
 ```bash
 SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>" \
 SWIFTPYTHON_NOTARY_OUTPUT_DIR="$PWD/notarization" \
+SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
+SWIFTPYTHON_AUDIO_PROBE_GATE=ready \
 SWIFTPYTHON_VM_RELEASE_GATE=1 \
 SWIFTPYTHON_VM_BASE_IMAGE=/absolute/path/to/base-ubuntu.img \
 SWIFTPYTHON_VM_SNAPSHOT=/absolute/path/to/snapshot \
@@ -324,6 +387,8 @@ preserved rather than collapsed to `0.6.0`.
 |---|---|
 | `Library not loaded: libpython3.13.dylib` | Bundle/select the same Python 3.13 layout used at link time |
 | `workerNotFound` | Copy the matched sidecar or set its explicit path |
+| `helperNotFound` or helper identity failure | Embed the exact `SwiftPythonAudioProbe` at the fixed app path and re-sign it with the parent team and derived identifier |
+| microphone preflight failure | Put the purpose string and any sandbox audio-input capability on the parent, obtain permission there, then launch |
 | protocol/helper/media skew | Compare the release tag and `manifest.json`; never mix helpers |
 | `Bad CPU type` for the worker | The shipped sidecar is arm64; build a matched x86_64 worker for Intel |
 | duplex `featureUnavailable` | Inspect live capabilities and put requirements on the open |
@@ -334,6 +399,10 @@ preserved rather than collapsed to `0.6.0`.
 ## Release notes
 
 ### Unreleased
+
+- Added the new-candidate raw `SwiftPythonAudioProbe` distribution contract,
+  schema-3 manifest audit, entitlement templates, and signed app-shaped
+  containment/readiness fixtures. Published `0.6.0-duplex.7` remains unchanged.
 
 ### 0.6.0-duplex.7
 

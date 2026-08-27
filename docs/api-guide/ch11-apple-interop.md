@@ -60,6 +60,91 @@ Lifecycle notifications are observations. The application decides whether an
 audio interruption should finish input, interrupt model output, cancel, or
 reopen a later session.
 
+## Bounded macOS hardware readiness
+
+`DuplexAudioHardwareProbeLauncher` is macOS-only. It launches one fresh helper
+engine at the fixed path
+`Bundle.main.bundleURL/Contents/MacOS/SwiftPythonAudioProbe`; it never searches
+`PATH`, discovers a worker or build product, autobuilds, accepts a caller path,
+uses XPC, or falls back to an in-process engine. Published
+`0.6.0-duplex.7` predates this helper. A newer candidate exposing the launcher
+is complete only when the exact matching raw helper is embedded, re-signed,
+and verified with it.
+
+The parent application owns microphone privacy policy:
+
+- put a nonempty `NSMicrophoneUsageDescription` in the parent `Info.plist`;
+- put `com.apple.security.device.audio-input` on a sandboxed parent;
+- request the first microphone authorization through the app's UI; and
+- run the launcher only when
+  `DuplexAudioHardwareProbeLauncher.permissionState == .granted`.
+
+The helper requires already-granted permission and never prompts. Sign it
+before the outer app with the same team and the exact signing identifier
+`<parent signing identifier>.SwiftPythonAudioProbe`. Use
+`SwiftPythonAudioProbe.entitlements` for a non-sandbox parent or
+`SwiftPythonAudioProbe-sandbox.entitlements` for sandbox inheritance. A
+URL-based SwiftPM dependency does not auto-embed this raw executable.
+
+```swift
+enum ReadinessError: Error {
+    case microphonePermissionNotGranted
+}
+
+let wire = try DuplexAudioFormat(
+    sampleRate: 24_000,
+    channels: 1,
+    sampleType: .signedInteger16,
+    interleaving: .interleaved
+)
+let request = try DuplexAudioHardwareProbeConfiguration(
+    wireFormat: wire,
+    durationSeconds: 2,
+    timeoutSeconds: 30,
+    requiresNonIdentityCaptureConversion: true
+)
+
+guard DuplexAudioHardwareProbeLauncher.permissionState == .granted else {
+    throw ReadinessError.microphonePermissionNotGranted
+}
+switch try await DuplexAudioHardwareProbeLauncher.run(
+    configuration: request
+) {
+case let .ready(report):
+    precondition(report.engineScope == .isolatedChildProcess)
+    precondition(report.metrics.captureHostTimestampFallbackCount == 0)
+    precondition(report.metrics.captureClockResetCount == 0)
+    precondition(report.metrics.captureHostClockResetCount == 0)
+case let .notReady(failure):
+    throw failure
+@unknown default:
+    fatalError("Update SwiftPython before interpreting a new probe result")
+}
+```
+
+The launcher validates canonical path, static and suspended-process identity,
+sandbox inheritance, strict schema-v1 I/O, and bounded TERM-then-KILL cleanup.
+A `.ready` report proves only overlapping capture/playback on one fresh,
+muted, helper-owned engine at that instant. It does not certify an existing
+caller engine, reserve the route, or predict a future route. Production
+capture/playback must still handle typed route and configuration changes.
+
+Ready requires zero capture host-timestamp fallbacks, capture device-clock
+resets, and capture host-clock resets. Keep
+`playbackInvalidSampleTimeCount` as a separate diagnostic: downstream
+sample-rate conversion can legitimately invalidate HAL callback sample time,
+so that counter alone is not loss and is not a zero-required gate.
+
+The commercial fixture exposes `SWIFTPYTHON_AUDIO_PROBE_GATE=off`,
+`containment`, and `ready`. `containment` may observe a strict receipt or
+establish bounded launch/cleanup around a typed device failure, but the fixture
+never promotes that mode to release-gate evidence. Only `ready` satisfies the
+notarized release device gate. The final non-sandbox and inherited-sandbox
+fixtures are launched as quarantined stapled `.app` bundles through
+LaunchServices, not by directly executing `Contents/MacOS`. The gate observes
+the exact transient bundle identifier, relies on bundle worker discovery, and
+requires one fresh nonce-bound success receipt before the app exits.
+
 ## Route-specific Metal evidence
 
 `DuplexMetalRoute` distinguishes:

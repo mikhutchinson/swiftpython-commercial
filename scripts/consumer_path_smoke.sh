@@ -14,16 +14,9 @@ VM_SNAPSHOT="${SWIFTPYTHON_VM_SNAPSHOT:-}"
 VM_RESTORE_SECRET="${SWIFTPYTHON_VM_RESTORE_SECRET:-}"
 VM_CLONE_DIR="${SWIFTPYTHON_VM_CLONE_DIR:-}"
 VM_ITERATIONS="${SWIFTPYTHON_VM_ITERATIONS:-20}"
-RELEASE_MANIFEST="${SWIFTPYTHON_RELEASE_MANIFEST:-$REPO_DIR/manifest.json}"
-RELEASE_VERSION="$(
-    python3 - "$RELEASE_MANIFEST" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    print(json.load(handle)["version"])
-PY
-)"
+AUDIO_PROBE_GATE="${SWIFTPYTHON_AUDIO_PROBE_GATE:-off}"
+RELEASE_MANIFEST="${SWIFTPYTHON_RELEASE_MANIFEST:-}"
+RELEASE_VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 export SWIFTPYTHON_RELEASE_VERSION="$RELEASE_VERSION"
 SMOKE_ID_SUFFIX="$(
     basename "$WORK_DIR" \
@@ -31,7 +24,16 @@ SMOKE_ID_SUFFIX="$(
         | tr -cd '[:alnum:]' \
         | tr '[:upper:]' '[:lower:]'
 )"
+DEVELOPER_BUNDLE_IDENTIFIER="ai.bestbyte.sp.d.$SMOKE_ID_SUFFIX"
 SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
+
+case "$AUDIO_PROBE_GATE" in
+    off|containment|ready) ;;
+    *)
+        echo "SWIFTPYTHON_AUDIO_PROBE_GATE must be off, containment, or ready." >&2
+        exit 64
+        ;;
+esac
 
 for required_tool in \
     codesign \
@@ -39,6 +41,7 @@ for required_tool in \
     install_name_tool \
     lipo \
     otool \
+    python3 \
     security \
     swift \
     xcodebuild
@@ -56,13 +59,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# A signed/notarized consumer run is not release evidence unless its exact
+# schema-3 manifest ties every input ZIP, raw executable, five guest helpers,
+# VM image attestation, and the complete distribution back to this checkout.
+if [ -z "$RELEASE_MANIFEST" ]; then
+    echo "Consumer smoke requires SWIFTPYTHON_RELEASE_MANIFEST." >&2
+    exit 64
+fi
+PYTHONDONTWRITEBYTECODE=1 python3 \
+    "$REPO_DIR/scripts/audio_probe_release_contract.py" \
+    --repo "$REPO_DIR" \
+    --expected-version "$RELEASE_VERSION" \
+    --manifest "$RELEASE_MANIFEST"
+
 CODESIGN_TIMESTAMP_ARGS=(--timestamp=none)
 if [ -n "$NOTARY_PROFILE" ]; then
+    if [ "$AUDIO_PROBE_GATE" != ready ]; then
+        echo "Notary mode requires SWIFTPYTHON_AUDIO_PROBE_GATE=ready; containment/notReady evidence is not device readiness." >&2
+        exit 64
+    fi
     if [ -z "$NOTARY_OUTPUT_DIR" ]; then
         echo "Notary mode requires SWIFTPYTHON_NOTARY_OUTPUT_DIR so evidence is retained." >&2
         exit 64
     fi
-    for required_tool in ditto jq spctl xattr xcrun; do
+    for required_tool in ditto jq lsappinfo open spctl xattr xcrun; do
         command -v "$required_tool" >/dev/null \
             || { echo "Required notary tool not found: $required_tool" >&2; exit 69; }
     done
@@ -139,6 +159,33 @@ PYTHON_FRAMEWORK_LOAD_PATH="$(
 )"
 if [ -z "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
     echo "SwiftPythonWorker does not declare a Python 3.13 framework dependency." >&2
+    exit 1
+fi
+AUDIO_PROBE="$REPO_DIR/SwiftPythonAudioProbe"
+if [ ! -x "$AUDIO_PROBE" ] || [ -L "$AUDIO_PROBE" ] || [ ! -f "$AUDIO_PROBE" ]; then
+    echo "Exact regular executable SwiftPythonAudioProbe is missing from the candidate." >&2
+    exit 1
+fi
+AUDIO_PROBE_PYTHON_LOAD_PATH=""
+for probe_architecture in arm64 x86_64; do
+    architecture_python_loads="$(
+        otool -arch "$probe_architecture" -L "$AUDIO_PROBE" \
+            | awk '/Python\.framework\/Versions\/3\.13\/Python/ { print $1 }'
+    )"
+    if [ -z "$architecture_python_loads" ] \
+            || [ "$(printf '%s\n' "$architecture_python_loads" | wc -l | tr -d '[:space:]')" != 1 ]; then
+        echo "SwiftPythonAudioProbe $probe_architecture must declare exactly one Python 3.13 framework dependency." >&2
+        exit 1
+    fi
+    if [ -z "$AUDIO_PROBE_PYTHON_LOAD_PATH" ]; then
+        AUDIO_PROBE_PYTHON_LOAD_PATH="$architecture_python_loads"
+    elif [ "$architecture_python_loads" != "$AUDIO_PROBE_PYTHON_LOAD_PATH" ]; then
+        echo "SwiftPythonAudioProbe slices do not declare the same Python framework dependency." >&2
+        exit 1
+    fi
+done
+if [ "$AUDIO_PROBE_PYTHON_LOAD_PATH" != "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
+    echo "Worker and audio probe do not load the same staged Python framework." >&2
     exit 1
 fi
 ENGINE_FRAMEWORK="$REPO_DIR/SwiftPythonEngine.xcframework/macos-arm64_x86_64/SwiftPythonEngine.framework"
@@ -275,6 +322,7 @@ EOF
 import Foundation
 import CryptoKit
 import Darwin
+@preconcurrency import AVFoundation
 @preconcurrency import Metal
 import SwiftPythonAudioInterop
 import SwiftPythonMetalInterop
@@ -284,12 +332,56 @@ import SwiftPythonRuntime
 enum ConsumerSmoke {
     static func main() async {
         do {
+            try configureBundledPythonHomeIfRequested()
             try await run()
+            try publishLaunchServicesReceiptIfRequested()
         } catch {
             let diagnostic = Data("ConsumerSmoke failed: \(error)\n".utf8)
             try? FileHandle.standardError.write(contentsOf: diagnostic)
             Foundation.exit(EXIT_FAILURE)
         }
+    }
+
+    private static func configureBundledPythonHomeIfRequested() throws {
+        guard ProcessInfo.processInfo.environment[
+            "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME"
+        ] == "1" else {
+            return
+        }
+        guard let frameworks = Bundle.main.privateFrameworksURL else {
+            throw ConsumerFailure.bundledPythonHomeMissing("no private Frameworks URL")
+        }
+        let home = frameworks
+            .appendingPathComponent("Python.framework", isDirectory: true)
+            .appendingPathComponent("Versions/3.13", isDirectory: true)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(
+            atPath: home.path,
+            isDirectory: &isDirectory
+        ), isDirectory.boolValue else {
+            throw ConsumerFailure.bundledPythonHomeMissing(home.path)
+        }
+        guard setenv("PYTHONHOME", home.path, 1) == 0 else {
+            throw ConsumerFailure.pythonHomeEnvironmentFailed(errno)
+        }
+    }
+
+    private static func publishLaunchServicesReceiptIfRequested() throws {
+        guard let nonce = ProcessInfo.processInfo.environment[
+            "SWIFTPYTHON_LAUNCH_SERVICES_RECEIPT_NONCE"
+        ] else {
+            return
+        }
+        let allowed = Set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".utf8
+        )
+        guard (16...128).contains(nonce.utf8.count),
+              nonce.utf8.allSatisfy({ allowed.contains($0) }) else {
+            throw ConsumerFailure.invalidLaunchServicesReceiptNonce(nonce)
+        }
+        try FileHandle.standardOutput.write(
+            contentsOf: Data("swiftpython-launch-services-success=\(nonce)\n".utf8)
+        )
     }
 
     private static func run() async throws {
@@ -371,8 +463,128 @@ enum ConsumerSmoke {
             "optional adapters = \(format.bytesPerFrame) bytes/frame, "
                 + "\(ledger.snapshot.observedBytes) Metal bytes observed"
         )
+        try await runAudioProbeIfConfigured(wireFormat: format)
 
         try await runVMReleaseGateIfConfigured()
+    }
+
+    private enum AudioProbeGate: String {
+        case off
+        case containment
+        case ready
+    }
+
+    private static func runAudioProbeIfConfigured(
+        wireFormat: DuplexAudioFormat
+    ) async throws {
+        let rawGate = ProcessInfo.processInfo.environment[
+            "SWIFTPYTHON_AUDIO_PROBE_GATE"
+        ] ?? "off"
+        guard let gate = AudioProbeGate(rawValue: rawGate) else {
+            throw ConsumerFailure.invalidAudioProbeGate(rawGate)
+        }
+        guard gate != .off else {
+            print("audio helper = embedded/signature contract only (device gate off)")
+            return
+        }
+
+        guard await requestParentMicrophonePermission(),
+              DuplexAudioHardwareProbeLauncher.permissionState == .granted else {
+            throw ConsumerFailure.audioProbePermissionNotGranted
+        }
+        let configuration = try DuplexAudioHardwareProbeConfiguration(
+            wireFormat: wireFormat,
+            durationSeconds: 0.5,
+            timeoutSeconds: 15,
+            requiresNonIdentityCaptureConversion: true
+        )
+        switch try await DuplexAudioHardwareProbeLauncher.run(
+            configuration: configuration
+        ) {
+        case let .ready(report):
+            let metrics = report.metrics
+            guard report.schemaVersion == 1,
+                  report.engineScope == .isolatedChildProcess,
+                  report.sharedEngine,
+                  report.simultaneousCaptureAndPlayback,
+                  report.outputMutedForSafety,
+                  metrics.captureHostTimestampFallbackCount == 0,
+                  metrics.captureClockResetCount == 0,
+                  metrics.captureHostClockResetCount == 0 else {
+                throw ConsumerFailure.audioProbeReadyInvariantFailed
+            }
+            if gate == .ready {
+                print(
+                    "audio helper release-ready = request \(report.requestID), "
+                        + "playback invalid sample times "
+                        + "\(metrics.playbackInvalidSampleTimeCount)"
+                )
+            } else {
+                print(
+                    "audio helper containment observed a ready receipt "
+                        + "(NOT RELEASE-GATE EVIDENCE): request "
+                        + "\(report.requestID)"
+                )
+            }
+        case let .notReady(failure):
+            guard gate == .containment,
+                  isAcceptableContainmentOnlyFailure(failure) else {
+                throw ConsumerFailure.audioProbeNotReady(
+                    String(describing: failure)
+                )
+            }
+            print(
+                "audio helper containment = NOT READY (not release-ready): "
+                    + String(describing: failure)
+            )
+        @unknown default:
+            throw ConsumerFailure.audioProbeUnknownOutcome
+        }
+    }
+
+    private static func isAcceptableContainmentOnlyFailure(
+        _ failure: DuplexAudioHardwareProbeFailure
+    ) -> Bool {
+        switch failure {
+        case .helperTimedOut:
+            return true
+        case let .helperReported(code: code, stage: _, restart: _, context: _):
+            switch code {
+            case .permissionNotGranted,
+                 .noInputDevice,
+                 .noOutputDevice,
+                 .invalidInputFormat,
+                 .invalidOutputFormat,
+                 .captureConversionUnavailable,
+                 .playbackConversionUnavailable,
+                 .engineStartFailed,
+                 .routeChanged,
+                 .captureFailed,
+                 .playbackFailed:
+                return true
+            case .shutdownFailed, .invariantFailed, .internalFailure:
+                return false
+            }
+        default:
+            return false
+        }
+    }
+
+    private static func requestParentMicrophonePermission() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return true
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        case .denied, .restricted:
+            return false
+        @unknown default:
+            return false
+        }
     }
 
     private static func assertPrivateEngineLoadedOnce() throws {
@@ -1021,6 +1233,14 @@ enum ConsumerFailure: Error {
     case missingArenaSnapshot
     case missingApplicationEvent(String)
     case vmGate(String)
+    case invalidAudioProbeGate(String)
+    case audioProbePermissionNotGranted
+    case audioProbeNotReady(String)
+    case audioProbeReadyInvariantFailed
+    case audioProbeUnknownOutcome
+    case bundledPythonHomeMissing(String)
+    case pythonHomeEnvironmentFailed(Int32)
+    case invalidLaunchServicesReceiptNonce(String)
 }
 EOF
 }
@@ -1050,7 +1270,7 @@ write_consumer_package "$XCODE_DIR"
 export SWIFTPYTHON_WORKER_PATH="$REPO_DIR/SwiftPythonWorker"
 
 echo "=== SwiftPM HeadersPath consumer ==="
-swift run --package-path "$SPM_DIR"
+SWIFTPYTHON_AUDIO_PROBE_GATE=off swift run --package-path "$SPM_DIR"
 
 echo "=== xcodebuild slice-root consumer ==="
 (
@@ -1064,6 +1284,7 @@ echo "=== xcodebuild slice-root consumer ==="
         build
 )
 DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK")" \
+    SWIFTPYTHON_AUDIO_PROBE_GATE=off \
     "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
 
 DEVELOPER_ID="$(
@@ -1088,6 +1309,8 @@ cat > "$PARENT_SANDBOX_ENTITLEMENTS" <<'EOF'
   <key>com.apple.security.network.client</key>
   <true/>
   <key>com.apple.security.network.server</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
   <true/>
 </dict>
 </plist>
@@ -1191,11 +1414,105 @@ if observed != expected:
 PY
 }
 
+assert_parent_audio_policy() {
+    local app="$1"
+    local expected_sandbox="$2"
+    python3 - "$app" "$expected_sandbox" <<'PY'
+import pathlib
+import plistlib
+import subprocess
+import sys
+
+app = pathlib.Path(sys.argv[1])
+expected_sandbox = sys.argv[2] == "1"
+with (app / "Contents" / "Info.plist").open("rb") as handle:
+    info = plistlib.load(handle)
+purpose = info.get("NSMicrophoneUsageDescription")
+if not isinstance(purpose, str) or not purpose.strip():
+    raise SystemExit(f"parent microphone purpose string is missing: {app}")
+completed = subprocess.run(
+    ["codesign", "-d", "--entitlements", ":-", str(app)],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+    check=True,
+)
+entitlements = plistlib.loads(completed.stdout)
+observed_sandbox = entitlements.get("com.apple.security.app-sandbox") is True
+if observed_sandbox != expected_sandbox:
+    raise SystemExit(
+        f"parent sandbox state mismatch for {app}: "
+        f"expected={expected_sandbox} observed={observed_sandbox}"
+    )
+if expected_sandbox \
+        and entitlements.get("com.apple.security.device.audio-input") is not True:
+    raise SystemExit(f"sandbox parent lacks audio-input entitlement: {app}")
+PY
+}
+
+assert_nested_probe_identity() {
+    local app="$1"
+    local helper="$app/Contents/MacOS/SwiftPythonAudioProbe"
+    python3 - "$app" "$helper" <<'PY'
+import os
+import pathlib
+import re
+import stat
+import subprocess
+import sys
+
+app = pathlib.Path(sys.argv[1])
+helper = pathlib.Path(sys.argv[2])
+metadata = helper.lstat()
+if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+    raise SystemExit(f"nested audio probe is not one regular non-symlink file: {helper}")
+if not os.access(helper, os.X_OK):
+    raise SystemExit(f"nested audio probe is not executable: {helper}")
+expected_parent = (app / "Contents" / "MacOS").resolve(strict=True)
+if helper.parent.resolve(strict=True) != expected_parent \
+        or helper.name != "SwiftPythonAudioProbe":
+    raise SystemExit(f"nested audio probe is not at the fixed bundle path: {helper}")
+
+def signature(path: pathlib.Path) -> str:
+    return subprocess.run(
+        ["codesign", "-dvv", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=True,
+    ).stdout
+
+def field(details: str, name: str) -> str:
+    match = re.search(rf"^{re.escape(name)}=(.+)$", details, re.MULTILINE)
+    if match is None or not match.group(1).strip():
+        raise SystemExit(f"signed {name} is missing")
+    return match.group(1).strip()
+
+parent_details = signature(app)
+helper_details = signature(helper)
+parent_identifier = field(parent_details, "Identifier")
+helper_identifier = field(helper_details, "Identifier")
+expected_identifier = parent_identifier + ".SwiftPythonAudioProbe"
+if helper_identifier != expected_identifier:
+    raise SystemExit(
+        f"nested audio probe identifier mismatch: "
+        f"expected={expected_identifier} observed={helper_identifier}"
+    )
+parent_team = field(parent_details, "TeamIdentifier")
+helper_team = field(helper_details, "TeamIdentifier")
+if parent_team == "not set" or helper_team != parent_team:
+    raise SystemExit(
+        f"nested audio probe team mismatch: "
+        f"parent={parent_team} helper={helper_team}"
+    )
+PY
+}
+
 make_app() {
     local mode="$1"
     local identity="$2"
     local parent_entitlements="$3"
     local worker_entitlements="$4"
+    local probe_entitlements="$5"
     local app="$WORK_DIR/ConsumerSmoke-$mode.app"
     local macos="$app/Contents/MacOS"
     local frameworks="$app/Contents/Frameworks"
@@ -1203,11 +1520,15 @@ make_app() {
     local embedded_engine="$frameworks/SwiftPythonEngine.framework"
     local embedded_engine_binary="$embedded_engine/Versions/A/SwiftPythonEngine"
     local python_home_for_app="$PYTHON_HOME_DIR"
+    local effective_audio_probe_gate="$AUDIO_PROBE_GATE"
     local mode_identifier=d
     if [ "$mode" = sandbox ]; then
         mode_identifier=s
     elif [ "$mode" = virtualization ]; then
         mode_identifier=v
+        # The VM fixture owns VM behavior only. Developer and sandbox fixtures
+        # exercise the device-bound launcher gate for this same candidate.
+        effective_audio_probe_gate=off
     fi
     local bundle_identifier="ai.bestbyte.sp.$mode_identifier.$SMOKE_ID_SUFFIX"
     local skip_in_process=0
@@ -1219,6 +1540,9 @@ make_app() {
     cp "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke" \
         "$macos/ConsumerSmoke"
     cp "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker"
+    cp "$AUDIO_PROBE" "$macos/SwiftPythonAudioProbe"
+    cmp -s "$AUDIO_PROBE" "$macos/SwiftPythonAudioProbe" \
+        || { echo "Embedded audio probe does not match staged input bytes." >&2; exit 1; }
     ditto "$ENGINE_FRAMEWORK" "$embedded_engine"
     if ! otool -l "$macos/ConsumerSmoke" \
         | grep -F '@executable_path/../Frameworks' >/dev/null; then
@@ -1251,6 +1575,10 @@ make_app() {
             "$PYTHON_FRAMEWORK_LOAD_PATH" \
             "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
             "$macos/SwiftPythonWorker"
+        install_name_tool -change \
+            "$AUDIO_PROBE_PYTHON_LOAD_PATH" \
+            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
+            "$macos/SwiftPythonAudioProbe"
         if otool -L "$embedded_engine_binary" \
             | grep -F "$PYTHON_FRAMEWORK_LOAD_PATH" >/dev/null; then
             install_name_tool -change \
@@ -1294,22 +1622,40 @@ make_app() {
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>SwiftPython verifies bounded duplex audio readiness before starting media.</string>
 </dict>
 </plist>
 EOF
     local worker_identifier="$bundle_identifier.SwiftPythonWorker"
+    local probe_identifier="$bundle_identifier.SwiftPythonAudioProbe"
     codesign --force --sign "$identity" --options runtime \
         --identifier "$worker_identifier" \
         "${CODESIGN_TIMESTAMP_ARGS[@]}" --entitlements "$worker_entitlements" \
         "$macos/SwiftPythonWorker"
     codesign --force --sign "$identity" --options runtime \
+        --identifier "$probe_identifier" \
+        "${CODESIGN_TIMESTAMP_ARGS[@]}" --entitlements "$probe_entitlements" \
+        "$macos/SwiftPythonAudioProbe"
+    codesign --force --sign "$identity" --options runtime \
         "${CODESIGN_TIMESTAMP_ARGS[@]}" \
         --entitlements "$parent_entitlements" "$app"
     codesign --verify --deep --strict --verbose=2 "$app"
+    assert_signed_entitlements_match "$app" "$parent_entitlements"
+    assert_signed_entitlements_match \
+        "$macos/SwiftPythonAudioProbe" \
+        "$probe_entitlements"
+    if [ "$mode" = sandbox ]; then
+        assert_parent_audio_policy "$app" 1
+    else
+        assert_parent_audio_policy "$app" 0
+    fi
+    assert_nested_probe_identity "$app"
     local before_run_digest
     before_run_digest="$(bundle_content_digest "$app")"
     run_with_timeout 90 env \
         SWIFTPYTHON_WORKER_PATH="$macos/SwiftPythonWorker" \
+        SWIFTPYTHON_AUDIO_PROBE_GATE="$effective_audio_probe_gate" \
         SWIFTPYTHON_SKIP_IN_PROCESS="$skip_in_process" \
         PYTHONHOME="$python_home_for_app" \
         PYTHONNOUSERSITE=1 \
@@ -1377,31 +1723,202 @@ notarize_app() {
     cat "$assessment"
 }
 
+launchservices_pid_for_bundle_id() {
+    local bundle_identifier="$1"
+    local asn
+    local details
+    local process_pid
+    asn="$(lsappinfo find "bundleID=$bundle_identifier" 2>/dev/null || true)"
+    [ -n "$asn" ] || return 1
+    details="$(lsappinfo info -only pid "$asn" 2>/dev/null || true)"
+    process_pid="$(
+        sed -n 's/.*"pid"=\([0-9][0-9]*\).*/\1/p' <<<"$details" \
+            | head -1
+    )"
+    case "$process_pid" in
+        ''|*[!0-9]*|0|1) return 1 ;;
+    esac
+    kill -0 "$process_pid" 2>/dev/null || return 1
+    printf '%s\n' "$process_pid"
+}
+
+terminate_launchservices_app() {
+    local bundle_identifier="$1"
+    local open_pid="$2"
+    local app_pid=""
+    app_pid="$(
+        launchservices_pid_for_bundle_id "$bundle_identifier" 2>/dev/null || true
+    )"
+    if [ -n "$app_pid" ]; then
+        kill -TERM "$app_pid" 2>/dev/null || true
+    fi
+    kill -TERM "$open_pid" 2>/dev/null || true
+    sleep 5
+    app_pid="$(
+        launchservices_pid_for_bundle_id "$bundle_identifier" 2>/dev/null || true
+    )"
+    if [ -n "$app_pid" ]; then
+        kill -KILL "$app_pid" 2>/dev/null || true
+    fi
+    kill -KILL "$open_pid" 2>/dev/null || true
+}
+
+run_app_via_launchservices() {
+    local mode="$1"
+    local app="$2"
+    local bundle_identifier="$3"
+    local python_layout="$4"
+    local stdout_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.stdout"
+    local stderr_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.stderr"
+    local receipt_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.receipt"
+    local nonce="$mode-$SMOKE_ID_SUFFIX-$(date +%s)-$$"
+    local expected_receipt="swiftpython-launch-services-success=$nonce"
+    local existing_pid=""
+    local observed_pid=""
+    local current_pid=""
+    local open_pid
+    local open_status=0
+    local receipt_count
+    local deadline
+    local -a open_args=(
+        /usr/bin/env
+        -u SWIFTPYTHON_WORKER_PATH
+        -u SWIFTPYTHON_PACKAGE_PATH
+        -u SWIFTPYTHON_SKIP_IN_PROCESS
+        -u SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME
+        -u PYTHONHOME
+        -u PYTHONPATH
+        /usr/bin/open
+        -W
+        -n
+        -F
+        -g
+        --stdout "$stdout_path"
+        --stderr "$stderr_path"
+        --env "SWIFTPYTHON_AUDIO_PROBE_GATE=$AUDIO_PROBE_GATE"
+        --env "SWIFTPYTHON_LAUNCH_SERVICES_RECEIPT_NONCE=$nonce"
+        --env "PYTHONNOUSERSITE=1"
+        --env "PYTHONDONTWRITEBYTECODE=1"
+    )
+
+    for evidence_path in "$stdout_path" "$stderr_path" "$receipt_path"; do
+        if [ -e "$evidence_path" ]; then
+            echo "Refusing to overwrite LaunchServices evidence: $evidence_path" >&2
+            exit 1
+        fi
+    done
+    existing_pid="$(
+        launchservices_pid_for_bundle_id "$bundle_identifier" 2>/dev/null || true
+    )"
+    if [ -n "$existing_pid" ]; then
+        echo "Refusing LaunchServices gate with an existing exact app instance: bundle=$bundle_identifier pid=$existing_pid" >&2
+        exit 1
+    fi
+
+    case "$python_layout" in
+        external)
+            open_args+=(--env "PYTHONHOME=$PYTHON_HOME_DIR")
+            ;;
+        bundled)
+            open_args+=(
+                --env "SWIFTPYTHON_SKIP_IN_PROCESS=1"
+                --env "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME=1"
+            )
+            ;;
+        *)
+            echo "Unknown LaunchServices Python layout: $python_layout" >&2
+            exit 64
+            ;;
+    esac
+    open_args+=("$app")
+
+    : > "$stdout_path"
+    : > "$stderr_path"
+    "${open_args[@]}" >>"$stdout_path" 2>>"$stderr_path" &
+    open_pid=$!
+    deadline=$((SECONDS + 90))
+    while kill -0 "$open_pid" 2>/dev/null; do
+        current_pid="$(
+            launchservices_pid_for_bundle_id "$bundle_identifier" 2>/dev/null || true
+        )"
+        if [ -n "$current_pid" ]; then
+            observed_pid="$current_pid"
+        fi
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "LaunchServices app timed out: bundle=$bundle_identifier app=$app" >&2
+            terminate_launchservices_app "$bundle_identifier" "$open_pid"
+            wait "$open_pid" 2>/dev/null || true
+            cat "$stderr_path" >&2
+            exit 1
+        fi
+        sleep 0.2
+    done
+    wait "$open_pid" || open_status=$?
+    current_pid="$(
+        launchservices_pid_for_bundle_id "$bundle_identifier" 2>/dev/null || true
+    )"
+    if [ -n "$current_pid" ]; then
+        echo "LaunchServices returned while the exact app is still running: bundle=$bundle_identifier pid=$current_pid" >&2
+        terminate_launchservices_app "$bundle_identifier" "$open_pid"
+        cat "$stderr_path" >&2
+        exit 1
+    fi
+    if [ "$open_status" -ne 0 ]; then
+        cat "$stderr_path" >&2
+        echo "LaunchServices invocation failed: bundle=$bundle_identifier status=$open_status" >&2
+        exit 1
+    fi
+    if [ -z "$observed_pid" ]; then
+        cat "$stderr_path" >&2
+        echo "LaunchServices never reported a live exact app instance: bundle=$bundle_identifier" >&2
+        exit 1
+    fi
+    receipt_count="$(grep -Fxc -- "$expected_receipt" "$stdout_path" || true)"
+    if [ "$receipt_count" != 1 ]; then
+        cat "$stdout_path" >&2
+        cat "$stderr_path" >&2
+        echo "LaunchServices success receipt count is $receipt_count, expected exactly 1" >&2
+        exit 1
+    fi
+    printf '%s\n' "$expected_receipt" > "$receipt_path"
+    echo "LaunchServices consumer passed: $mode (pid $observed_pid)"
+}
+
 echo "=== Developer ID non-sandbox signed consumer ==="
 make_app \
     developer-id \
     "$DEVELOPER_ID" \
     "$REPO_DIR/Entitlements/ConsumerApp.entitlements" \
-    "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+    "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements" \
+    "$REPO_DIR/Entitlements/SwiftPythonAudioProbe.entitlements"
 DEVELOPER_APP="$WORK_DIR/ConsumerSmoke-developer-id.app"
 assert_signed_entitlements_match \
     "$DEVELOPER_APP/Contents/MacOS/SwiftPythonWorker" \
     "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+assert_signed_entitlements_match \
+    "$DEVELOPER_APP/Contents/MacOS/SwiftPythonAudioProbe" \
+    "$REPO_DIR/Entitlements/SwiftPythonAudioProbe.entitlements"
+assert_nested_probe_identity "$DEVELOPER_APP"
 
 echo "=== Developer ID sandbox-inherited signed consumer ==="
 make_app \
     sandbox \
     "$DEVELOPER_ID" \
     "$PARENT_SANDBOX_ENTITLEMENTS" \
-    "$REPO_DIR/Entitlements/SwiftPythonWorker-sandbox.entitlements"
+    "$REPO_DIR/Entitlements/SwiftPythonWorker-sandbox.entitlements" \
+    "$REPO_DIR/Entitlements/SwiftPythonAudioProbe-sandbox.entitlements"
 SANDBOX_APP="$WORK_DIR/ConsumerSmoke-sandbox.app"
 assert_signed_entitlements_match \
     "$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" \
     "$REPO_DIR/Entitlements/SwiftPythonWorker-sandbox.entitlements"
+assert_signed_entitlements_match \
+    "$SANDBOX_APP/Contents/MacOS/SwiftPythonAudioProbe" \
+    "$REPO_DIR/Entitlements/SwiftPythonAudioProbe-sandbox.entitlements"
 test "$(
     codesign -dvv "$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" 2>&1 \
         | sed -n 's/^Identifier=//p'
 )" = "$SANDBOX_BUNDLE_IDENTIFIER.SwiftPythonWorker"
+assert_nested_probe_identity "$SANDBOX_APP"
 
 if [ "$VM_RELEASE_GATE" = 1 ]; then
     echo "=== Developer ID virtualization signed consumer ==="
@@ -1409,23 +1926,27 @@ if [ "$VM_RELEASE_GATE" = 1 ]; then
         virtualization \
         "$DEVELOPER_ID" \
         "$PARENT_VM_ENTITLEMENTS" \
-        "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements"
+        "$REPO_DIR/Entitlements/SwiftPythonWorker.entitlements" \
+        "$REPO_DIR/Entitlements/SwiftPythonAudioProbe.entitlements"
     VM_APP="$WORK_DIR/ConsumerSmoke-virtualization.app"
     assert_signed_entitlements_match \
         "$VM_APP" \
         "$PARENT_VM_ENTITLEMENTS"
+    assert_signed_entitlements_match \
+        "$VM_APP/Contents/MacOS/SwiftPythonAudioProbe" \
+        "$REPO_DIR/Entitlements/SwiftPythonAudioProbe.entitlements"
+    assert_nested_probe_identity "$VM_APP"
 fi
 
 if [ -n "$NOTARY_PROFILE" ]; then
     echo "=== Notarized Developer ID non-sandbox consumer ==="
     notarize_app developer-id
     DEVELOPER_NOTARIZED_DIGEST="$(bundle_content_digest "$DEVELOPER_APP")"
-    run_with_timeout 90 env \
-        SWIFTPYTHON_WORKER_PATH="$DEVELOPER_APP/Contents/MacOS/SwiftPythonWorker" \
-        PYTHONHOME="$PYTHON_HOME_DIR" \
-        PYTHONNOUSERSITE=1 \
-        PYTHONDONTWRITEBYTECODE=1 \
-        "$DEVELOPER_APP/Contents/MacOS/ConsumerSmoke"
+    run_app_via_launchservices \
+        developer-id \
+        "$DEVELOPER_APP" \
+        "$DEVELOPER_BUNDLE_IDENTIFIER" \
+        external
     assert_bundle_remained_sealed "$DEVELOPER_APP"
     assert_bundle_content_unchanged \
         "$DEVELOPER_APP" \
@@ -1434,13 +1955,11 @@ if [ -n "$NOTARY_PROFILE" ]; then
     echo "=== Notarized Developer ID sandbox-inherited consumer ==="
     notarize_app sandbox
     SANDBOX_NOTARIZED_DIGEST="$(bundle_content_digest "$SANDBOX_APP")"
-    run_with_timeout 90 env \
-        SWIFTPYTHON_WORKER_PATH="$SANDBOX_APP/Contents/MacOS/SwiftPythonWorker" \
-        SWIFTPYTHON_SKIP_IN_PROCESS=1 \
-        PYTHONHOME="$SANDBOX_APP/Contents/Frameworks/Python.framework/Versions/3.13" \
-        PYTHONNOUSERSITE=1 \
-        PYTHONDONTWRITEBYTECODE=1 \
-        "$SANDBOX_APP/Contents/MacOS/ConsumerSmoke"
+    run_app_via_launchservices \
+        sandbox \
+        "$SANDBOX_APP" \
+        "$SANDBOX_BUNDLE_IDENTIFIER" \
+        bundled
     assert_bundle_remained_sealed "$SANDBOX_APP"
     assert_bundle_content_unchanged \
         "$SANDBOX_APP" \

@@ -38,6 +38,7 @@ required = [
     "SwiftPythonEngine.xcframework",
     "SwiftPythonAudioInterop.xcframework",
     "SwiftPythonMetalInterop.xcframework",
+    "SwiftPythonAudioProbe",
     "_swiftpython_wire.py",
     "_swiftpython_duplex.py",
     "swiftpython_protocol.py",
@@ -47,6 +48,8 @@ required = [
     "DuplexSession",
     "three app-shaped",
     "20 consecutive positive warm restores",
+    "NSMicrophoneUsageDescription",
+    "SWIFTPYTHON_AUDIO_PROBE_GATE=ready",
     "SWIFTPYTHON_VM_RELEASE_GATE=1",
     'SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>"',
 ]
@@ -121,6 +124,19 @@ release_placeholder_prefixes = tuple(
 
 for path in root.rglob("*"):
     relative = path.relative_to(root)
+    if path.is_dir() and path.name in {
+        ".build",
+        ".swiftpm",
+        ".plan",
+        ".ruff_cache",
+        ".pytest_cache",
+        ".mypy_cache",
+        "Artifacts",
+        "DerivedData",
+        "__pycache__",
+        "build",
+    }:
+        raise SystemExit(f"forbidden generated directory in distribution: {relative}")
     if path.name == ".env" or path.name.startswith(".env."):
         raise SystemExit(f"environment/secrets file in distribution: {relative}")
     if path.is_dir() and path.name.endswith(".dSYM"):
@@ -166,9 +182,23 @@ for path in sorted(root.rglob("*.py")):
     compile(path.read_text(), str(path), "exec")
 PY
 
+PYTHONDONTWRITEBYTECODE=1 \
+    python3 "$REPO_DIR/scripts/test_audio_probe_release_contract.py"
+
 for path in "$REPO_DIR"/Entitlements/*.plist "$REPO_DIR"/Entitlements/*.entitlements; do
     plutil -lint "$path" >/dev/null
 done
+
+audio_probe_audit=(
+    python3
+    "$REPO_DIR/scripts/audio_probe_release_contract.py"
+    --repo "$REPO_DIR"
+    --expected-version "$EXPECTED_VERSION"
+)
+if [ -n "$MANIFEST_PATH" ]; then
+    audio_probe_audit+=(--manifest "$MANIFEST_PATH")
+fi
+"${audio_probe_audit[@]}"
 
 engine_xcframework="$REPO_DIR/SwiftPythonEngine.xcframework"
 require_dir "$engine_xcframework"
@@ -356,6 +386,44 @@ for module in "${modules[@]}"; do
     esac
 done
 
+# These shipped source files are compile-only documentation consumers. Keep
+# them outside the URL package graph so the package retains exactly four
+# binary targets, but type-check them against the candidate interfaces here.
+public_module_flags=()
+for module in "${modules[@]}"; do
+    public_module_flags+=(
+        -I
+        "$REPO_DIR/$module.xcframework/macos-arm64_x86_64/Headers"
+    )
+done
+require_file "$REPO_DIR/Sources/SwiftPythonSmoke/main.swift"
+xcrun swiftc \
+    -typecheck \
+    -parse-as-library \
+    -target arm64-apple-macos15.0 \
+    "${public_module_flags[@]}" \
+    "$REPO_DIR/Sources/SwiftPythonSmoke/main.swift"
+
+documentation_tests=(
+    "$REPO_DIR/Tests/SwiftPythonSmokeTests/PublicDocumentationAPITests.swift"
+    "$REPO_DIR/Tests/SwiftPythonSmokeTests/SwiftPythonSmokeTests.swift"
+)
+for documentation_test in "${documentation_tests[@]}"; do
+    require_file "$documentation_test"
+done
+developer_dir="$(xcode-select -p)"
+xctest_platform="$developer_dir/Platforms/MacOSX.platform/Developer"
+require_dir "$xctest_platform/usr/lib/XCTest.swiftmodule"
+require_dir "$xctest_platform/Library/Frameworks/XCTest.framework"
+xcrun swiftc \
+    -typecheck \
+    -parse-as-library \
+    -target arm64-apple-macos15.0 \
+    -I "$xctest_platform/usr/lib" \
+    -F "$xctest_platform/Library/Frameworks" \
+    "${public_module_flags[@]}" \
+    "${documentation_tests[@]}"
+
 require_file "$REPO_DIR/SwiftPythonWorker"
 
 python3 - "$REPO_DIR" <<'PY'
@@ -411,6 +479,10 @@ required = {
         "DuplexAudioFormat",
         "DuplexAudioCapture",
         "DuplexAudioPlayback",
+        "DuplexAudioHardwareProbeConfiguration",
+        "DuplexAudioHardwareProbeOutcome",
+        "DuplexAudioHardwareProbeReport",
+        "DuplexAudioHardwareProbeLauncher",
     ],
     "SwiftPythonMetalInterop": [
         "DuplexCopyLedger",
@@ -463,81 +535,7 @@ for layout in ("SwiftPythonRuntime.swiftmodule", "Headers/SwiftPythonRuntime.swi
 PY
 
 if [ -n "$MANIFEST_PATH" ]; then
-    require_file "$MANIFEST_PATH"
-    python3 - "$REPO_DIR" "$MANIFEST_PATH" "$EXPECTED_VERSION" <<'PY'
-import hashlib
-import json
-import pathlib
-import sys
-
-root = pathlib.Path(sys.argv[1])
-manifest_path = pathlib.Path(sys.argv[2])
-version = sys.argv[3]
-manifest = json.loads(manifest_path.read_text())
-if manifest.get("version") != version:
-    raise SystemExit(
-        f"manifest version {manifest.get('version')!r} != {version!r}"
-    )
-if manifest.get("sourceTreeState") != "clean":
-    raise SystemExit("release manifest sourceTreeState is not clean")
-protocols = manifest.get("protocols", {})
-if protocols.get("workerWire") != 6:
-    raise SystemExit(f"manifest worker wire is not 6: {protocols}")
-if "vmImage" not in manifest:
-    raise SystemExit("VM release manifest lacks same-version image attestation")
-
-artifacts = manifest.get("artifacts", [])
-records = {(item.get("role"), item.get("name")): item for item in artifacts}
-expected_records = {
-    ("binaryTarget", "SwiftPythonRuntime.xcframework.zip"),
-    ("privateBinaryDependency", "SwiftPythonEngine.xcframework.zip"),
-    ("binaryTarget", "SwiftPythonAudioInterop.xcframework.zip"),
-    ("binaryTarget", "SwiftPythonMetalInterop.xcframework.zip"),
-    ("workerExecutable", "SwiftPythonWorker"),
-    ("completeDistribution", f"SwiftPythonCommercial-{version}.zip"),
-    *(("vmGuestHelper", name) for name in (
-        "_swiftpython_wire.py",
-        "_swiftpython_duplex.py",
-        "swiftpython_protocol.py",
-        "swiftpython_supervisor.py",
-        "swiftpython_worker.py",
-    )),
-}
-if set(records) != expected_records:
-    raise SystemExit(
-        "manifest artifact inventory mismatch: "
-        f"missing={sorted(expected_records - set(records))} "
-        f"extra={sorted(set(records) - expected_records)}"
-    )
-
-for key, record in records.items():
-    path = manifest_path.parent / record.get("path", "")
-    if not path.is_file():
-        raise SystemExit(f"manifest artifact does not exist for {key}: {path}")
-    data = path.read_bytes()
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != record.get("sha256"):
-        raise SystemExit(f"manifest SHA-256 mismatch for {key}")
-    if len(data) != record.get("bytes"):
-        raise SystemExit(f"manifest byte count mismatch for {key}")
-    if key[0] in {"binaryTarget", "privateBinaryDependency"} \
-            and record.get("swiftPMChecksum") != digest:
-        raise SystemExit(f"SwiftPM checksum mismatch for {key}")
-
-for helper in (
-    "_swiftpython_wire.py",
-    "_swiftpython_duplex.py",
-    "swiftpython_protocol.py",
-    "swiftpython_supervisor.py",
-    "swiftpython_worker.py",
-):
-    record = records.get(("vmGuestHelper", helper))
-    if record is None:
-        raise SystemExit(f"manifest lacks helper record for {helper}")
-    data = (root / "VMWorker" / helper).read_bytes()
-    if hashlib.sha256(data).hexdigest() != record.get("sha256"):
-        raise SystemExit(f"manifest helper hash mismatch for {helper}")
-PY
+    echo "manifest-backed release-surface audit passed for $EXPECTED_VERSION"
+else
+    echo "pre-manifest release-surface audit passed for $EXPECTED_VERSION (NOT manifest or release evidence)"
 fi
-
-echo "release-surface audit passed for $EXPECTED_VERSION"
