@@ -4,8 +4,11 @@
 // swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3.3
 @preconcurrency import AVFAudio
 import AudioToolbox
+import CoreAudio
 import Darwin
 import Foundation
+import ObjectiveC
+import Security
 import Swift
 import SwiftPythonRuntime
 import Synchronization
@@ -23,19 +26,25 @@ public struct AudioCaptureBuffering : Swift.Sendable, Swift.Equatable {
   public static let maximumCapacityFrames: Swift.Int
   public static let maximumFramesPerCallback: Swift.Int
   public static let maximumBackingBytes: Swift.Int
+  public static let maximumSlotCount: Swift.Int
+  public static let maximumSlotsPerCallback: Swift.Int
   public let capacityFrames: Swift.Int
   public let maximumFramesPerCallback: Swift.Int
-  public init(capacityFrames: Swift.Int = 48_000, maximumFramesPerCallback: Swift.Int = 1_024)
+  public let framesPerSlot: Swift.Int
+  public init(capacityFrames: Swift.Int = 48000, maximumFramesPerCallback: Swift.Int = 48000)
+  public init(capacityFrames: Swift.Int, maximumFramesPerCallback: Swift.Int, framesPerSlot: Swift.Int)
   public static func == (a: SwiftPythonAudioInterop.AudioCaptureBuffering, b: SwiftPythonAudioInterop.AudioCaptureBuffering) -> Swift.Bool
 }
 public struct AudioPlaybackBuffering : Swift.Sendable, Swift.Equatable {
   public static let maximumCapacityFrames: Swift.Int
   public static let maximumFramesPerBuffer: Swift.Int
   public static let maximumBackingBytes: Swift.Int
+  public static let maximumSlotCount: Swift.Int
+  public static let maximumSlotsPerRenderCallback: Swift.Int
   public let capacityFrames: Swift.Int
   public let maximumFramesPerBuffer: Swift.Int
   public let expectedRenderQuantumFrames: Swift.Int
-  public init(capacityFrames: Swift.Int = 48_000, maximumFramesPerBuffer: Swift.Int = 4_096, expectedRenderQuantumFrames: Swift.Int = 512)
+  public init(capacityFrames: Swift.Int = 48000, maximumFramesPerBuffer: Swift.Int = 4096, expectedRenderQuantumFrames: Swift.Int = 512)
   public static func == (a: SwiftPythonAudioInterop.AudioPlaybackBuffering, b: SwiftPythonAudioInterop.AudioPlaybackBuffering) -> Swift.Bool
 }
 public enum DuplexAudioConfigurationError : Swift.Error, Swift.Sendable, Swift.Equatable {
@@ -43,6 +52,7 @@ public enum DuplexAudioConfigurationError : Swift.Error, Swift.Sendable, Swift.E
   case invalidMaximumFrames(Swift.Int)
   case invalidRenderQuantum(Swift.Int)
   case backingBytesExceedLimit(Swift.Int)
+  case slotCountExceedsLimit(Swift.Int)
   case audioBufferLayout
   case engineFormatUnavailable
   case alreadyRunning
@@ -50,9 +60,12 @@ public enum DuplexAudioConfigurationError : Swift.Error, Swift.Sendable, Swift.E
   case notRunning
   public static func == (a: SwiftPythonAudioInterop.DuplexAudioConfigurationError, b: SwiftPythonAudioInterop.DuplexAudioConfigurationError) -> Swift.Bool
 }
-public enum DuplexAudioLifecycleEvent : Swift.Sendable, Swift.Equatable {
+public enum DuplexAudioLifecycleEvent : Swift.Sendable, Swift.Hashable {
   case routeChanged
   case interrupted
+  case interruptionEnded
+  case mediaServicesLost
+  case mediaServicesReset
   case permissionDenied
   case engineConfigurationChanged
   case appInactive
@@ -65,6 +78,8 @@ public enum DuplexAudioLifecycleEvent : Swift.Sendable, Swift.Equatable {
 }
 public struct DuplexAudioOverflow : Swift.Sendable, Swift.Equatable {
   public let droppedFrames: Swift.UInt64
+  public let droppedBytes: Swift.UInt64
+  public let droppedMediaFrames: Swift.UInt64
   public let duration: Swift.Duration
   public let discontinuitySequence: Swift.UInt64
   public let policy: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy
@@ -78,43 +93,518 @@ public struct DuplexAudioUnderrun : Swift.Sendable, Swift.Equatable {
   public static func == (a: SwiftPythonAudioInterop.DuplexAudioUnderrun, b: SwiftPythonAudioInterop.DuplexAudioUnderrun) -> Swift.Bool
 }
 public enum DuplexAudioAdapterEvent : Swift.Sendable, Swift.Equatable {
+  case captureNegotiated(SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation)
+  case captureStateChanged(SwiftPythonAudioInterop.DuplexAudioAdapterState)
+  case captureRouteChanged(SwiftPythonAudioInterop.DuplexAudioRouteChange)
+  case captureConversionReset(SwiftPythonAudioInterop.DuplexAudioConversionReset)
+  case captureTerminal(SwiftPythonAudioInterop.DuplexAudioCaptureTerminal)
+  case captureFailure(SwiftPythonAudioInterop.DuplexAudioCaptureError)
+  case playbackNegotiated(SwiftPythonAudioInterop.DuplexAudioPlaybackNegotiation)
+  case playbackStateChanged(SwiftPythonAudioInterop.DuplexAudioAdapterState)
+  case playbackRouteChanged(SwiftPythonAudioInterop.DuplexAudioRouteChange)
+  case playbackTerminal(SwiftPythonAudioInterop.DuplexAudioPlaybackTerminal)
+  case playbackFailure(SwiftPythonAudioInterop.DuplexAudioPlaybackError)
   case captureOverflow(SwiftPythonAudioInterop.DuplexAudioOverflow)
   case captureStoppedForOverflow
   case playbackUnderrun(SwiftPythonAudioInterop.DuplexAudioUnderrun)
+  case sourceChange(SwiftPythonAudioInterop.DuplexAudioSourceChange)
   case lifecycle(SwiftPythonAudioInterop.DuplexAudioLifecycleEvent)
+  @available(*, deprecated, message: "Use captureFailure or playbackFailure")
   case failure(Swift.String)
   public static func == (a: SwiftPythonAudioInterop.DuplexAudioAdapterEvent, b: SwiftPythonAudioInterop.DuplexAudioAdapterEvent) -> Swift.Bool
 }
 public struct DuplexAudioCaptureMetrics : Swift.Sendable, Swift.Equatable {
   public let capturedFrames: Swift.UInt64
+  public let capturedBytes: Swift.UInt64
+  public let capturedMediaFrames: Swift.UInt64
+  public let emittedWireFrames: Swift.UInt64
+  public let emittedWireBytes: Swift.UInt64
   public let droppedFrames: Swift.UInt64
+  public let droppedBytes: Swift.UInt64
+  public let droppedMediaFrames: Swift.UInt64
   public let overflowCount: Swift.UInt64
+  public let currentBufferedFrames: Swift.UInt64
   public let highWaterFrames: Swift.UInt64
+  public let conversionResetCount: Swift.UInt64
+  public let terminalCount: Swift.UInt64
   public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureMetrics, b: SwiftPythonAudioInterop.DuplexAudioCaptureMetrics) -> Swift.Bool
 }
 public struct DuplexAudioPlaybackMetrics : Swift.Sendable, Swift.Equatable {
+  public let enqueuedWireFrames: Swift.UInt64
+  public let convertedRenderFrames: Swift.UInt64
   public let renderedFrames: Swift.UInt64
   public let missingFrames: Swift.UInt64
   public let underrunCount: Swift.UInt64
   public let maximumGapFrames: Swift.UInt64
+  public let currentBufferedFrames: Swift.UInt64
   public let highWaterFrames: Swift.UInt64
+  public let conversionResetCount: Swift.UInt64
+  public let callbackFrameLimitViolationCount: Swift.UInt64
+  public let terminalCount: Swift.UInt64
   public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackMetrics, b: SwiftPythonAudioInterop.DuplexAudioPlaybackMetrics) -> Swift.Bool
 }
 @available(macOS 15, iOS 18, tvOS 18, *)
 @available(watchOS, unavailable)
 final public class DuplexAudioCapture : @unchecked Swift.Sendable {
   final public let format: SwiftPythonAudioInterop.DuplexAudioFormat
+  final public let wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
   final public let buffering: SwiftPythonAudioInterop.AudioCaptureBuffering
   final public let overflowPolicy: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy
+  final public let permissionPolicy: SwiftPythonAudioInterop.DuplexAudioPermissionPolicy
+  final public let channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
   final public let events: _Concurrency.AsyncStream<SwiftPythonAudioInterop.DuplexAudioAdapterEvent>
-  public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioCaptureBuffering = AudioCaptureBuffering(), overflow: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy = .dropNewestAndMarkDiscontinuity) throws
+  convenience public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioCaptureBuffering = AudioCaptureBuffering(), overflow: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy = .dropNewestAndMarkDiscontinuity) throws
+  convenience public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioCaptureBuffering = AudioCaptureBuffering(), overflow: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy = .dropNewestAndMarkDiscontinuity, permission: SwiftPythonAudioInterop.DuplexAudioPermissionPolicy, channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy = .automatic) throws
+  public init(source: any SwiftPythonAudioInterop.DuplexAudioCaptureSource, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioCaptureBuffering = AudioCaptureBuffering(), overflow: SwiftPythonAudioInterop.AudioCaptureOverflowPolicy = .dropNewestAndMarkDiscontinuity, permission: SwiftPythonAudioInterop.DuplexAudioPermissionPolicy = .requestIfNeeded, channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy = .automatic) throws
+  final public var state: SwiftPythonAudioInterop.DuplexAudioAdapterState {
+    get
+  }
+  final public var negotiation: SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation? {
+    get
+  }
+  final public var latestStopReport: SwiftPythonAudioInterop.DuplexAudioCaptureStopReport? {
+    get
+  }
+  final public var droppedEventCount: Swift.UInt64 {
+    get
+  }
+  final public var clockMetrics: SwiftPythonAudioInterop.DuplexAudioCaptureClockMetrics {
+    get
+  }
+  final public func terminalReport(for runID: SwiftPythonAudioInterop.DuplexAudioRunID) -> SwiftPythonAudioInterop.DuplexAudioCaptureStopReport?
+  final public func waitForTerminal(of runID: SwiftPythonAudioInterop.DuplexAudioRunID) async -> SwiftPythonAudioInterop.DuplexAudioCaptureStopReport?
+  final public func readiness() -> SwiftPythonAudioInterop.DuplexAudioCaptureReadiness
   final public func start(sendingTo input: SwiftPythonRuntime.DuplexInput) async throws
+  @discardableResult
+  final public func startRun(sendingTo input: any SwiftPythonAudioInterop.DuplexAudioInputSink) async throws -> SwiftPythonAudioInterop.DuplexAudioRunID
+  @discardableResult
+  final public func stop(mode: SwiftPythonAudioInterop.DuplexAudioCaptureStopMode = .discardBuffered(finishInput: false)) async throws -> SwiftPythonAudioInterop.DuplexAudioCaptureStopReport
+  @available(*, deprecated, message: "Use stop(mode:) for typed completion")
   final public func stop(finishInput: Swift.Bool) async
   final public func reportLifecycle(_ event: SwiftPythonAudioInterop.DuplexAudioLifecycleEvent)
   final public var metrics: SwiftPythonAudioInterop.DuplexAudioCaptureMetrics {
     get
   }
   @objc deinit
+}
+public enum DuplexAudioPCMType : Swift.String, Swift.Hashable, Swift.Sendable {
+  case signedInteger16
+  case signedInteger32
+  case float32
+  case float64
+  case otherLinearPCM
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct DuplexAudioDeviceFormat : Swift.Hashable, Swift.Sendable {
+  public let sampleRate: Swift.Double
+  public let channels: Swift.Int
+  public let sampleType: SwiftPythonAudioInterop.DuplexAudioPCMType
+  public let interleaving: SwiftPythonAudioInterop.AudioInterleaving
+  public let bitsPerChannel: Swift.Int
+  public let bytesPerSample: Swift.Int
+  public let bytesPerFrame: Swift.Int
+  public let channelLayoutTag: Swift.UInt32?
+  public init(avAudioFormat format: AVFAudio.AVAudioFormat) throws
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioDeviceFormat, b: SwiftPythonAudioInterop.DuplexAudioDeviceFormat) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioConversionRequirements : Swift.Hashable, Swift.Sendable {
+  public let sampleRate: Swift.Bool
+  public let sampleType: Swift.Bool
+  public let channels: Swift.Bool
+  public let interleaving: Swift.Bool
+  public var isIdentity: Swift.Bool {
+    get
+  }
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioConversionRequirements, b: SwiftPythonAudioInterop.DuplexAudioConversionRequirements) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioChannelMappingPolicy : Swift.Hashable, Swift.Sendable {
+  case automatic
+  case sourceChannel(Swift.Int)
+  case explicit([Swift.Int])
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy, b: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioPermissionState : Swift.String, Swift.Hashable, Swift.Sendable {
+  case undetermined
+  case denied
+  case granted
+  case restricted
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum DuplexAudioPermissionPolicy : Swift.Hashable, Swift.Sendable {
+  case requestIfNeeded
+  case requireGranted
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPermissionPolicy, b: SwiftPythonAudioInterop.DuplexAudioPermissionPolicy) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioRestartRequirement : Swift.String, Swift.Hashable, Swift.Sendable {
+  case none
+  case restartAdapter
+  case reconfigureAudioSessionAndRestart
+  case recreateAudioObjectsAndRestart
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum DuplexAudioRouteChangeReason : Swift.String, Swift.Hashable, Swift.Sendable {
+  case unknown
+  case newDeviceAvailable
+  case oldDeviceUnavailable
+  case categoryChange
+  case override
+  case wakeFromSleep
+  case noSuitableRouteForCategory
+  case routeConfigurationChange
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum DuplexAudioSourceChange : Swift.Hashable, Swift.Sendable {
+  case engineConfigurationChanged
+  case routeChanged
+  case routeChangedWithReason(SwiftPythonAudioInterop.DuplexAudioRouteChangeReason)
+  case interruptionBegan
+  case interruptionEnded(shouldResume: Swift.Bool)
+  case mediaServicesLost
+  case mediaServicesReset
+  public var lifecycleEvent: SwiftPythonAudioInterop.DuplexAudioLifecycleEvent {
+    get
+  }
+  public var restartRequirement: SwiftPythonAudioInterop.DuplexAudioRestartRequirement {
+    get
+  }
+  public var routeChangeReason: SwiftPythonAudioInterop.DuplexAudioRouteChangeReason? {
+    get
+  }
+  public var interruptionShouldResume: Swift.Bool? {
+    get
+  }
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioSourceChange, b: SwiftPythonAudioInterop.DuplexAudioSourceChange) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioEngineOwnership : Swift.String, Swift.Hashable, Swift.Sendable {
+  case alreadyRunningExternally
+  case startedBySwiftPython
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct DuplexAudioErrorContext : Swift.Hashable, Swift.Sendable {
+  public let domain: Swift.String
+  public let code: Swift.Int
+  public let message: Swift.String
+  public init(domain: Swift.String, code: Swift.Int, message: Swift.String)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioErrorContext, b: SwiftPythonAudioInterop.DuplexAudioErrorContext) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioCaptureError : Swift.Error, Swift.Hashable, Swift.Sendable {
+  case startInProgress
+  case alreadyRunning
+  case notRunning
+  case permissionNotDetermined
+  case permissionDenied
+  case permissionRestricted
+  case missingMicrophoneUsageDescription
+  case noInputDevice
+  case noInputDeviceWithContext(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case invalidHardwareFormat(sampleRate: Swift.Double, channels: Swift.Int)
+  case unsupportedHardwareFormat(Swift.String)
+  case configurationArithmeticOverflow
+  case conversionUnavailable(hardware: SwiftPythonAudioInterop.DuplexAudioDeviceFormat, wire: SwiftPythonAudioInterop.DuplexAudioFormat)
+  case invalidChannelMapping(Swift.String)
+  case tapBufferRequestExceedsMaximum(requestedFrames: Swift.Int, maximumFrames: Swift.Int)
+  case realtimeFailure(SwiftPythonAudioInterop.DuplexAudioCaptureRealtimeFailure)
+  case conversionFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case tapInstallationFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case tapRemovalFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case tapOwnershipUncertain(context: SwiftPythonAudioInterop.DuplexAudioErrorContext, restart: SwiftPythonAudioInterop.DuplexAudioRestartRequirement)
+  case engineStartFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case routeChanged(restart: SwiftPythonAudioInterop.DuplexAudioRestartRequirement)
+  case runtimeInputFailure(SwiftPythonRuntime.DuplexFailure)
+  case runtimeInputTerminated(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case stoppedForOverflow
+  case cancelled
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureError, b: SwiftPythonAudioInterop.DuplexAudioCaptureError) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioCaptureRealtimeFailure : Swift.Hashable, Swift.Sendable {
+  case callbackFrameCountExceeded(maximumFrames: Swift.Int)
+  case callbackFormatChanged
+  case invalidBufferLayout
+  case concurrentProducer
+  case mediaOrdinalOverflow
+  case overflowMetadataExhausted
+  case sampleTimeOverflow
+  case counterOverflow
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureRealtimeFailure, b: SwiftPythonAudioInterop.DuplexAudioCaptureRealtimeFailure) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioPlaybackError : Swift.Error, Swift.Hashable, Swift.Sendable {
+  case alreadyRunning
+  case alreadyConsumed
+  case notRunning
+  case noOutputDevice
+  case invalidOutputFormat(sampleRate: Swift.Double, channels: Swift.Int)
+  case unsupportedOutputFormat(Swift.String)
+  case conversionUnavailable(wire: SwiftPythonAudioInterop.DuplexAudioFormat, render: SwiftPythonAudioInterop.DuplexAudioDeviceFormat)
+  case invalidChannelMapping(Swift.String)
+  case partialWirePCMFrame(byteCount: Swift.Int, bytesPerFrame: Swift.Int)
+  case incompatibleWireFormat(expected: SwiftPythonRuntime.DuplexFormat, actual: SwiftPythonRuntime.DuplexFormat)
+  case conversionFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case configurationArithmeticOverflow
+  case graphConfigurationFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case engineStartFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case renderCallbackFrameLimitExceeded(actualFrames: Swift.Int, maximumFrames: Swift.Int)
+  case routeChanged(restart: SwiftPythonAudioInterop.DuplexAudioRestartRequirement)
+  case runtimeOutputFailure(SwiftPythonRuntime.DuplexFailure)
+  case runtimeOutputTerminated(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case cancelled
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackError, b: SwiftPythonAudioInterop.DuplexAudioPlaybackError) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioCaptureNegotiation : Swift.Hashable, Swift.Sendable {
+  public let hardwareFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat
+  public let tapFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat
+  public let wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
+  public let conversion: SwiftPythonAudioInterop.DuplexAudioConversionRequirements
+  public let channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
+  public let converterLeadingFrames: Swift.UInt32
+  public let converterTrailingFrames: Swift.UInt32
+  public let requestedTapBufferFrames: Swift.Int
+  public let maximumHardwareFramesPerCallback: Swift.Int
+  public let maximumWireFramesPerBuffer: Swift.Int
+  public let boundedBackingBytes: Swift.Int
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation, b: SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioPlaybackNegotiation : Swift.Hashable, Swift.Sendable {
+  public let wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
+  public let mixerFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat
+  public let hardwareOutputFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat
+  public let conversion: SwiftPythonAudioInterop.DuplexAudioConversionRequirements
+  public let channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
+  public let converterLeadingFrames: Swift.UInt32
+  public let converterTrailingFrames: Swift.UInt32
+  public let maximumWireFramesPerBuffer: Swift.Int
+  public let maximumRenderFramesPerBuffer: Swift.Int
+  public let boundedBackingBytes: Swift.Int
+  public let engineOwnership: SwiftPythonAudioInterop.DuplexAudioEngineOwnership?
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackNegotiation, b: SwiftPythonAudioInterop.DuplexAudioPlaybackNegotiation) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioCaptureReadiness : Swift.Hashable, Swift.Sendable {
+  case ready(SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation)
+  case permissionRequired(SwiftPythonAudioInterop.DuplexAudioPermissionState, proposed: SwiftPythonAudioInterop.DuplexAudioCaptureNegotiation?)
+  case notReady(SwiftPythonAudioInterop.DuplexAudioCaptureError)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureReadiness, b: SwiftPythonAudioInterop.DuplexAudioCaptureReadiness) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioPlaybackReadiness : Swift.Sendable {
+  case ready(SwiftPythonAudioInterop.DuplexAudioPlaybackNegotiation)
+  case invalidConfiguration(SwiftPythonAudioInterop.DuplexAudioConfigurationError)
+  case notReady(SwiftPythonAudioInterop.DuplexAudioPlaybackError)
+}
+public struct DuplexAudioRunID : Swift.Hashable, Swift.Sendable {
+  public let rawValue: Foundation.UUID
+  public init(rawValue: Foundation.UUID = UUID())
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioRunID, b: SwiftPythonAudioInterop.DuplexAudioRunID) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioAdapterState : Swift.Hashable, Swift.Sendable {
+  case idle
+  case requestingPermission(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case preparing(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case starting(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case running(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case stopping(SwiftPythonAudioInterop.DuplexAudioRunID)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioAdapterState, b: SwiftPythonAudioInterop.DuplexAudioAdapterState) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioCaptureStopMode : Swift.Hashable, Swift.Sendable {
+  case discardBuffered(finishInput: Swift.Bool)
+  case drainBuffered(finishInput: Swift.Bool)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureStopMode, b: SwiftPythonAudioInterop.DuplexAudioCaptureStopMode) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioCaptureTerminal : Swift.Hashable, Swift.Sendable {
+  case stopped(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case inputFinished(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case cancelled(SwiftPythonAudioInterop.DuplexAudioRunID)
+  case failed(SwiftPythonAudioInterop.DuplexAudioRunID, SwiftPythonAudioInterop.DuplexAudioCaptureError)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureTerminal, b: SwiftPythonAudioInterop.DuplexAudioCaptureTerminal) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioCaptureStopReport : Swift.Hashable, Swift.Sendable {
+  public let runID: SwiftPythonAudioInterop.DuplexAudioRunID
+  public let terminal: SwiftPythonAudioInterop.DuplexAudioCaptureTerminal
+  public let discardedHardwareFrames: Swift.UInt64
+  public let inputWasFinished: Swift.Bool
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureStopReport, b: SwiftPythonAudioInterop.DuplexAudioCaptureStopReport) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DuplexAudioPlaybackTerminal : Swift.Hashable, Swift.Sendable {
+  case completed(SwiftPythonAudioInterop.DuplexAudioRunID, consumedThrough: SwiftPythonRuntime.DuplexPosition?)
+  case stopped(SwiftPythonAudioInterop.DuplexAudioRunID, consumedThrough: SwiftPythonRuntime.DuplexPosition?)
+  case cancelled(SwiftPythonAudioInterop.DuplexAudioRunID, consumedThrough: SwiftPythonRuntime.DuplexPosition?)
+  case failed(SwiftPythonAudioInterop.DuplexAudioRunID, SwiftPythonAudioInterop.DuplexAudioPlaybackError, consumedThrough: SwiftPythonRuntime.DuplexPosition?)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackTerminal, b: SwiftPythonAudioInterop.DuplexAudioPlaybackTerminal) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioPlaybackRunReport : Swift.Hashable, Swift.Sendable {
+  public let runID: SwiftPythonAudioInterop.DuplexAudioRunID
+  public let terminal: SwiftPythonAudioInterop.DuplexAudioPlaybackTerminal
+  public let consumedThrough: SwiftPythonRuntime.DuplexPosition?
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport, b: SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioRouteChange : Swift.Hashable, Swift.Sendable {
+  public let previousInputFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat?
+  public let currentInputFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat?
+  public let previousOutputFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat?
+  public let currentOutputFormat: SwiftPythonAudioInterop.DuplexAudioDeviceFormat?
+  public let restart: SwiftPythonAudioInterop.DuplexAudioRestartRequirement
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioRouteChange, b: SwiftPythonAudioInterop.DuplexAudioRouteChange) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioConversionReset : Swift.Hashable, Swift.Sendable {
+  public let droppedHardwareFrames: Swift.UInt64
+  public let skippedMediaFrames: Swift.UInt64
+  public let duration: Swift.Duration
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioConversionReset, b: SwiftPythonAudioInterop.DuplexAudioConversionReset) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioCaptureClockMetrics : Swift.Hashable, Swift.Sendable {
+  public let currentDrift: Swift.Duration
+  public let maximumAbsoluteDrift: Swift.Duration
+  public let hostTimestampFallbackCount: Swift.UInt64
+  public let clockResetCount: Swift.UInt64
+  public let hostClockResetCount: Swift.UInt64
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioCaptureClockMetrics, b: SwiftPythonAudioInterop.DuplexAudioCaptureClockMetrics) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DuplexAudioPlaybackClockMetrics : Swift.Hashable, Swift.Sendable {
+  public let lastRenderHostTime: Swift.UInt64?
+  public let lastRenderSampleTime: Swift.Double?
+  public let invalidSampleTimeCount: Swift.UInt64
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackClockMetrics, b: SwiftPythonAudioInterop.DuplexAudioPlaybackClockMetrics) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+public typealias DuplexAudioCaptureTapHandler = @Sendable (AVFAudio.AVAudioPCMBuffer, AVFAudio.AVAudioTime) -> Swift.Void
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+public protocol DuplexAudioCaptureSource : AnyObject, Swift.Sendable {
+  var permissionState: SwiftPythonAudioInterop.DuplexAudioPermissionState { get }
+  var requiresMicrophoneUsageDescription: Swift.Bool { get }
+  var isRunning: Swift.Bool { get }
+  func requestPermission() async -> SwiftPythonAudioInterop.DuplexAudioPermissionState
+  func hardwareInputFormat() throws -> AVFAudio.AVAudioFormat
+  func captureTapFormat() throws -> AVFAudio.AVAudioFormat
+  func installTap(bufferSize: AVFAudio.AVAudioFrameCount, handler: @escaping SwiftPythonAudioInterop.DuplexAudioCaptureTapHandler) throws
+  func removeTap() throws
+  func start() throws -> SwiftPythonAudioInterop.DuplexAudioEngineOwnership
+  func stopIfOwned()
+  func setConfigurationChangeHandler(_ handler: (@Sendable () -> Swift.Void)?)
+  func setSourceChangeHandler(_ handler: (@Sendable (SwiftPythonAudioInterop.DuplexAudioSourceChange) -> Swift.Void)?)
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+extension SwiftPythonAudioInterop.DuplexAudioCaptureSource {
+  public var permissionState: SwiftPythonAudioInterop.DuplexAudioPermissionState {
+    get
+  }
+  public var requiresMicrophoneUsageDescription: Swift.Bool {
+    get
+  }
+  public func requestPermission() async -> SwiftPythonAudioInterop.DuplexAudioPermissionState
+  public func setConfigurationChangeHandler(_: (@Sendable () -> Swift.Void)?)
+  public func setSourceChangeHandler(_ handler: (@Sendable (SwiftPythonAudioInterop.DuplexAudioSourceChange) -> Swift.Void)?)
 }
 public enum AudioInterleaving : Swift.String, Swift.Hashable, Swift.Sendable {
   case interleaved
@@ -201,26 +691,300 @@ final public class DuplexAudioClockMapper : @unchecked Swift.Sendable {
   }
   @objc deinit
 }
-@available(macOS 15, iOS 18, tvOS 18, *)
+@available(macOS 15, *)
+public struct DuplexAudioHardwareProbeConfiguration : Swift.Hashable, Swift.Sendable {
+  public let wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
+  public let captureChannelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
+  public let playbackChannelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
+  public let durationSeconds: Swift.Double
+  public let timeoutSeconds: Swift.Double
+  public let requiresNonIdentityCaptureConversion: Swift.Bool
+  public init(wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat, captureChannelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy = .automatic, playbackChannelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy = .automatic, durationSeconds: Swift.Double = 2, timeoutSeconds: Swift.Double = 30, requiresNonIdentityCaptureConversion: Swift.Bool = false) throws
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeConfiguration, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeConfiguration) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public struct DuplexAudioHardwareProbeFormat : Swift.Hashable, Swift.Sendable {
+  public let sampleRate: Swift.Double
+  public let channels: Swift.Int
+  public let sampleType: SwiftPythonAudioInterop.DuplexAudioPCMType
+  public let interleaving: SwiftPythonAudioInterop.AudioInterleaving
+  public let bitsPerChannel: Swift.Int
+  public let bytesPerSample: Swift.Int
+  public let bytesPerFrame: Swift.Int
+  public let channelLayoutTag: Swift.UInt32?
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public struct DuplexAudioHardwareProbeMetrics : Swift.Hashable, Swift.Sendable {
+  public let capturedHardwareFrames: Swift.UInt64
+  public let capturedHardwareBytes: Swift.UInt64
+  public let emittedWireFrames: Swift.UInt64
+  public let emittedWireBytes: Swift.UInt64
+  public let loopbackAcceptedChunks: Swift.UInt64
+  public let loopbackDeliveredChunks: Swift.UInt64
+  public let loopbackCurrentRetainedBytes: Swift.Int
+  public let loopbackHighWaterBytes: Swift.Int
+  public let loopbackMaximumRetainedBytes: Swift.Int
+  public let loopbackTimestampRegressionCount: Swift.UInt64
+  public let loopbackTimestampFallbackCount: Swift.UInt64
+  public let droppedHardwareFrames: Swift.UInt64
+  public let droppedMediaFrames: Swift.UInt64
+  public let captureConversionResetCount: Swift.UInt64
+  public let captureHostTimestampFallbackCount: Swift.UInt64
+  public let captureClockResetCount: Swift.UInt64
+  public let captureHostClockResetCount: Swift.UInt64
+  public let captureTerminalCount: Swift.UInt64
+  public let enqueuedWireFrames: Swift.UInt64
+  public let convertedRenderFrames: Swift.UInt64
+  public let renderedFrames: Swift.UInt64
+  public let missingRenderFrames: Swift.UInt64
+  public let playbackUnderrunCount: Swift.UInt64
+  public let playbackCallbackFrameLimitViolationCount: Swift.UInt64
+  public let playbackCurrentBufferedFrames: Swift.UInt64
+  public let playbackInvalidSampleTimeCount: Swift.UInt64
+  public let playbackTerminalCount: Swift.UInt64
+  public let captureBoundedBackingBytes: Swift.Int
+  public let playbackBoundedBackingBytes: Swift.Int
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeMetrics, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeMetrics) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeEngineScope : Swift.String, Swift.Hashable, Swift.Sendable {
+  case isolatedChildProcess
+  public init?(rawValue: Swift.String)
+  @available(macOS 15, *)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@available(macOS 15, *)
+public struct DuplexAudioHardwareProbeReport : Swift.Hashable, Swift.Sendable {
+  public let schemaVersion: Swift.Int
+  public let requestID: Foundation.UUID
+  public let helperBuildIdentifier: Swift.String
+  public let engineScope: SwiftPythonAudioInterop.DuplexAudioHardwareProbeEngineScope
+  public let requestedWireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
+  public let captureHardwareFormat: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat
+  public let captureTapFormat: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat
+  public let playbackMixerFormat: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat
+  public let playbackHardwareOutputFormat: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFormat
+  public let captureConversion: SwiftPythonAudioInterop.DuplexAudioConversionRequirements
+  public let playbackConversion: SwiftPythonAudioInterop.DuplexAudioConversionRequirements
+  public let metrics: SwiftPythonAudioInterop.DuplexAudioHardwareProbeMetrics
+  public let sharedEngine: Swift.Bool
+  public let simultaneousCaptureAndPlayback: Swift.Bool
+  public let outputMutedForSafety: Swift.Bool
+  public let elapsedNanoseconds: Swift.UInt64
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeReport, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeReport) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeStage : Swift.String, Swift.Hashable, Swift.Sendable {
+  case permission
+  case helperLaunch
+  case inputDevice
+  case outputDevice
+  case captureConversion
+  case playbackConversion
+  case engineStart
+  case capture
+  case playback
+  case route
+  case shutdown
+  case invariant
+  public init?(rawValue: Swift.String)
+  @available(macOS 15, *)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeFailureCode : Swift.String, Swift.Hashable, Swift.Sendable {
+  case permissionNotGranted
+  case noInputDevice
+  case noOutputDevice
+  case invalidInputFormat
+  case invalidOutputFormat
+  case captureConversionUnavailable
+  case playbackConversionUnavailable
+  case engineStartFailed
+  case routeChanged
+  case captureFailed
+  case playbackFailed
+  case shutdownFailed
+  case invariantFailed
+  case internalFailure
+  public init?(rawValue: Swift.String)
+  @available(macOS 15, *)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeFailure : Swift.Error, Swift.Hashable, Swift.Sendable {
+  case invalidDuration(Swift.Double)
+  case invalidTimeout(Swift.Double)
+  case invalidCaptureChannelMapping
+  case invalidPlaybackChannelMapping
+  case missingMicrophoneUsageDescription
+  case missingAudioInputEntitlement
+  case permissionNotDetermined
+  case permissionDenied
+  case permissionRestricted
+  case helperNotFound
+  case helperIsSymbolicLink
+  case helperIsNotRegularFile
+  case helperIsNotExecutable
+  case helperPathEscapesApplicationBundle
+  case hostCodeIdentityUnavailable(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case helperSignatureInvalid(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case helperTeamIdentifierMismatch(expected: Swift.String, actual: Swift.String?)
+  case helperSigningIdentifierMismatch(expected: Swift.String, actual: Swift.String?)
+  case helperSandboxInheritanceMismatch
+  case runningHelperIdentityMismatch(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case helperLaunchFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case helperRequestWriteFailed(SwiftPythonAudioInterop.DuplexAudioErrorContext)
+  case helperStandardOutputExceededLimit(Swift.Int)
+  case helperStandardErrorExceededLimit(Swift.Int)
+  case helperCombinedOutputExceededLimit(Swift.Int)
+  case helperRetainedOutputPipe
+  case helperTimedOut(Swift.Double)
+  case helperTerminationUnconfirmed
+  case helperTerminatedBySignal(Swift.Int32)
+  case helperExitedUnexpectedly(Swift.Int32)
+  case malformedHelperReport(Swift.String)
+  case helperProtocolVersionMismatch(expected: Swift.Int, actual: Swift.Int)
+  case helperRequestIdentifierMismatch
+  case helperExitStatusMismatch(expected: Swift.Int32, actual: Swift.Int32)
+  case helperReportInvariantFailed(Swift.String)
+  case helperReported(code: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFailureCode, stage: SwiftPythonAudioInterop.DuplexAudioHardwareProbeStage, restart: SwiftPythonAudioInterop.DuplexAudioRestartRequirement, context: SwiftPythonAudioInterop.DuplexAudioErrorContext?)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFailure, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeFailure) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeOutcome : Swift.Hashable, Swift.Sendable {
+  case ready(SwiftPythonAudioInterop.DuplexAudioHardwareProbeReport)
+  case notReady(SwiftPythonAudioInterop.DuplexAudioHardwareProbeFailure)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioHardwareProbeOutcome, b: SwiftPythonAudioInterop.DuplexAudioHardwareProbeOutcome) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@available(macOS 15, *)
+public enum DuplexAudioHardwareProbeLauncher {
+  public static var permissionState: SwiftPythonAudioInterop.DuplexAudioPermissionState {
+    get
+  }
+  public static func run(configuration: SwiftPythonAudioInterop.DuplexAudioHardwareProbeConfiguration) async throws -> SwiftPythonAudioInterop.DuplexAudioHardwareProbeOutcome
+}
+public struct DuplexAudioPlaybackFrame : Swift.Sendable {
+  public let payload: Foundation.Data
+  public let position: SwiftPythonRuntime.DuplexPosition
+  public let format: SwiftPythonAudioInterop.DuplexAudioFormat
+  public init(payload: Foundation.Data, position: SwiftPythonRuntime.DuplexPosition, format: SwiftPythonAudioInterop.DuplexAudioFormat)
+}
+public struct DuplexAudioPlaybackFrameSource : Swift.Sendable {
+  public init(nextFrame: @escaping @Sendable () async throws -> SwiftPythonAudioInterop.DuplexAudioPlaybackFrame?)
+}
+public enum DuplexAudioPlaybackStartPolicy : Swift.Hashable, Swift.Sendable {
+  case immediate
+  case prebuffer(minimumRenderFrames: Swift.Int)
+  public static func == (a: SwiftPythonAudioInterop.DuplexAudioPlaybackStartPolicy, b: SwiftPythonAudioInterop.DuplexAudioPlaybackStartPolicy) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @available(macOS 15, iOS 18, tvOS 18, *)
 @available(watchOS, unavailable)
 final public class DuplexAudioPlayback : @unchecked Swift.Sendable {
   final public let format: SwiftPythonAudioInterop.DuplexAudioFormat
+  final public let wireFormat: SwiftPythonAudioInterop.DuplexAudioFormat
   final public let buffering: SwiftPythonAudioInterop.AudioPlaybackBuffering
+  final public let channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy
   final public let events: _Concurrency.AsyncStream<SwiftPythonAudioInterop.DuplexAudioAdapterEvent>
-  public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioPlaybackBuffering = AudioPlaybackBuffering()) throws
+  convenience public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioPlaybackBuffering = AudioPlaybackBuffering()) throws
+  public static func readiness(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioPlaybackBuffering = AudioPlaybackBuffering(), channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy = .automatic) -> SwiftPythonAudioInterop.DuplexAudioPlaybackReadiness
+  convenience public init(engine: AVFAudio.AVAudioEngine, format: SwiftPythonAudioInterop.DuplexAudioFormat, buffering: SwiftPythonAudioInterop.AudioPlaybackBuffering = AudioPlaybackBuffering(), channelMapping: SwiftPythonAudioInterop.DuplexAudioChannelMappingPolicy) throws
   final public func run(output: SwiftPythonRuntime.DuplexOutput) async throws
+  @discardableResult
+  final public func runReporting(output: SwiftPythonRuntime.DuplexOutput) async throws -> SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport
+  @discardableResult
+  final public func run(source: SwiftPythonAudioInterop.DuplexAudioPlaybackFrameSource) async throws -> SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport
+  @discardableResult
+  final public func run(source: SwiftPythonAudioInterop.DuplexAudioPlaybackFrameSource, startPolicy: SwiftPythonAudioInterop.DuplexAudioPlaybackStartPolicy) async throws -> SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport
   final public var consumedOutputPosition: SwiftPythonRuntime.DuplexPosition? {
     get
   }
+  final public var state: SwiftPythonAudioInterop.DuplexAudioAdapterState {
+    get
+  }
+  final public var lastRunReport: SwiftPythonAudioInterop.DuplexAudioPlaybackRunReport? {
+    get
+  }
+  @discardableResult
+  final public func stop() async throws -> SwiftPythonRuntime.DuplexPosition?
   @discardableResult
   final public func stopAndAcknowledge(session: SwiftPythonRuntime.PythonDuplexSession) async throws -> SwiftPythonRuntime.DuplexPosition?
   final public func reportLifecycle(_ event: SwiftPythonAudioInterop.DuplexAudioLifecycleEvent)
   final public var metrics: SwiftPythonAudioInterop.DuplexAudioPlaybackMetrics {
     get
   }
+  final public var droppedEventCount: Swift.UInt64 {
+    get
+  }
+  final public var clockMetrics: SwiftPythonAudioInterop.DuplexAudioPlaybackClockMetrics? {
+    get
+  }
+  final public var negotiation: SwiftPythonAudioInterop.DuplexAudioPlaybackNegotiation {
+    get
+  }
+  final public func readiness() -> SwiftPythonAudioInterop.DuplexAudioPlaybackReadiness
   @objc deinit
 }
-extension SwiftPythonAudioInterop.DuplexAudioLifecycleEvent : Swift.Hashable {}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+public protocol DuplexAudioInputSink : Swift.Sendable {
+  func send(_ frame: SwiftPythonRuntime.DuplexInputFrame) async throws
+  func recordDiscontinuity(_ discontinuity: SwiftPythonRuntime.DuplexDiscontinuity) async throws
+  func finish() async throws
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+extension SwiftPythonRuntime.DuplexInput : SwiftPythonAudioInterop.DuplexAudioInputSink {
+}
+extension SwiftPythonAudioInterop.DuplexAudioPCMType : Swift.RawRepresentable {}
+extension SwiftPythonAudioInterop.DuplexAudioPermissionState : Swift.RawRepresentable {}
+extension SwiftPythonAudioInterop.DuplexAudioRestartRequirement : Swift.RawRepresentable {}
+extension SwiftPythonAudioInterop.DuplexAudioRouteChangeReason : Swift.RawRepresentable {}
+extension SwiftPythonAudioInterop.DuplexAudioEngineOwnership : Swift.RawRepresentable {}
 extension SwiftPythonAudioInterop.AudioInterleaving : Swift.RawRepresentable {}
 extension SwiftPythonAudioInterop.DuplexAudioFormat.SampleType : Swift.RawRepresentable {}
 extension SwiftPythonAudioInterop.DuplexAudioClockError : Swift.Hashable {}
+@available(macOS 15, *)
+extension SwiftPythonAudioInterop.DuplexAudioHardwareProbeEngineScope : Swift.RawRepresentable {}
+@available(macOS 15, *)
+extension SwiftPythonAudioInterop.DuplexAudioHardwareProbeStage : Swift.RawRepresentable {}
+@available(macOS 15, *)
+extension SwiftPythonAudioInterop.DuplexAudioHardwareProbeFailureCode : Swift.RawRepresentable {}

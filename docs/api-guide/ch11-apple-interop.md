@@ -74,7 +74,8 @@ and verified with it.
 The parent application owns microphone privacy policy:
 
 - put a nonempty `NSMicrophoneUsageDescription` in the parent `Info.plist`;
-- put `com.apple.security.device.audio-input` on a sandboxed parent;
+- put `com.apple.security.device.audio-input` on the parent (App Sandbox and
+  hardened-runtime prompting both require it);
 - request the first microphone authorization through the app's UI; and
 - run the launcher only when
   `DuplexAudioHardwareProbeLauncher.permissionState == .granted`.

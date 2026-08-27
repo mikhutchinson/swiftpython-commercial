@@ -3,6 +3,11 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- REQUIRED: Hardened-runtime microphone prompting and App Sandbox both
+         require the parent application to carry the audio-input capability. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
     <!-- REQUIRED: Your app links libpython via the XCFramework static lib.
          Homebrew libpython is ad-hoc signed and uses mmap(PROT_EXEC).
          See: https://developer.apple.com/documentation/security/hardened-runtime -->

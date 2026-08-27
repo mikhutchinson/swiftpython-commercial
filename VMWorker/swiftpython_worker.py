@@ -1517,6 +1517,74 @@ class _GuestDuplexSessionManager:
         self.accelerator_lane.shutdown()
 
 
+class _GuestIngressCompletionLedger:
+    """Bounded contiguous watermark plus coalesced completed ranges."""
+
+    def __init__(self):
+        self.completed_through = 0
+        self.pending: list[tuple[int, int]] = []
+
+    def record(
+        self,
+        first: int,
+        last: int,
+        maximum_pending_ranges: int,
+    ) -> bool:
+        maximum_sequence = (1 << 64) - 1
+        if (
+            first <= 0
+            or first > last
+            or last > maximum_sequence
+            or maximum_pending_ranges <= 0
+        ):
+            return False
+        if last <= self.completed_through:
+            return True
+        lower = max(first, self.completed_through + 1)
+        merged_first = lower
+        merged_last = last
+        start = 0
+        while (
+            start < len(self.pending)
+            and self.pending[start][1] + 1 < merged_first
+        ):
+            start += 1
+        end = start
+        while (
+            end < len(self.pending)
+            and merged_last + 1 >= self.pending[end][0]
+        ):
+            merged_first = min(merged_first, self.pending[end][0])
+            merged_last = max(merged_last, self.pending[end][1])
+            end += 1
+        resulting_count = len(self.pending) - (end - start) + 1
+        if resulting_count > maximum_pending_ranges:
+            return False
+        self.pending[start:end] = [(merged_first, merged_last)]
+        self._advance_prefix()
+        return True
+
+    def declare_completed(self, through: int):
+        if through > self.completed_through:
+            self.completed_through = through
+        self._advance_prefix()
+
+    def _advance_prefix(self):
+        maximum_sequence = (1 << 64) - 1
+        while self.pending:
+            first, last = self.pending[0]
+            if last <= self.completed_through:
+                self.pending.pop(0)
+                continue
+            if self.completed_through == maximum_sequence:
+                self.pending.clear()
+                return
+            if first > self.completed_through + 1:
+                return
+            self.completed_through = last
+            self.pending.pop(0)
+
+
 class _GuestDuplexSession:
     def __init__(
         self,
@@ -1553,13 +1621,12 @@ class _GuestDuplexSession:
         self.ingress_bytes = 0
         self.retained_ingress_frames = 0
         self.retained_ingress_bytes = 0
-        self.released_ingress_sequences: set[int] = set()
         self.expected_ingress_sequence = 1
         self.input_accepted_through = 0
-        self.input_processed_through = 0
+        self.processed_ingress_completion = _GuestIngressCompletionLedger()
+        self.released_ingress_completion = _GuestIngressCompletionLedger()
         self.returned_ingress_frames = 0
         self.returned_ingress_bytes = 0
-        self.released_ingress_through = 0
 
         self.available_egress_frames = int(
             configuration["egressCreditFrames"]
@@ -1595,6 +1662,14 @@ class _GuestDuplexSession:
         self.writer_thread = None
         self.reader_thread = None
         self.handler_thread = None
+
+    @property
+    def input_processed_through(self) -> int:
+        return self.processed_ingress_completion.completed_through
+
+    @property
+    def released_ingress_through(self) -> int:
+        return self.released_ingress_completion.completed_through
 
     def start(self):
         self.writer_thread = threading.Thread(
@@ -1921,14 +1996,37 @@ class _GuestDuplexSession:
                     raise _GuestDuplexError(
                         "guest ingress discontinuity sequence mismatch"
                     )
+                previous_processed = self.input_processed_through
+                maximum_pending_ranges = (
+                    int(self.configuration["ingressCreditFrames"]) + 1
+                )
+                if (
+                    self.returned_ingress_frames >= (1 << 64) - 1
+                    or not self.processed_ingress_completion.record(
+                        first,
+                        last,
+                        maximum_pending_ranges,
+                    )
+                    or not self.released_ingress_completion.record(
+                        first,
+                        last,
+                        maximum_pending_ranges,
+                    )
+                ):
+                    raise _GuestDuplexError(
+                        "guest ingress completion ledger exhausted"
+                    )
                 self.expected_ingress_sequence = last + 1
                 self.input_accepted_through = last
-                self.input_processed_through = last
                 self.returned_ingress_frames += 1
-                self.released_ingress_through = last
+                processed = self.input_processed_through
             self._publish_ingress_credit()
             self._send_event(0, {"inputAccepted": {"through": last}})
-            self._send_event(0, {"inputProcessed": {"through": last}})
+            if processed > previous_processed:
+                self._send_event(
+                    0,
+                    {"inputProcessed": {"through": processed}},
+                )
             return
 
         if kind == DUPLEX_MEDIA_ENVELOPE_KINDS["ping"]:
@@ -2108,18 +2206,40 @@ class _GuestDuplexSession:
             }
 
     def _release_python_input(self, sequence: int, byte_count: int):
-        overflow = False
+        accounting_failure = False
         with self.cv:
             if (
-                self.retained_ingress_frames <= 0
+                self.terminal is not None
+                or sequence <= 0
+                or sequence > self.input_accepted_through
+                or byte_count < 0
+                or self.retained_ingress_frames <= 0
                 or self.retained_ingress_bytes < byte_count
                 or self.ingress_bytes < byte_count
             ):
                 return
-            if self.returned_ingress_bytes > (1 << 64) - 1 - byte_count:
-                overflow = True
+            maximum_sequence = (1 << 64) - 1
+            maximum_pending_ranges = (
+                int(self.configuration["ingressCreditFrames"]) + 1
+            )
+            previous_processed = self.input_processed_through
+            if (
+                self.returned_ingress_frames >= maximum_sequence
+                or self.returned_ingress_bytes
+                    > maximum_sequence - byte_count
+                or not self.processed_ingress_completion.record(
+                    sequence,
+                    sequence,
+                    maximum_pending_ranges,
+                )
+                or not self.released_ingress_completion.record(
+                    sequence,
+                    sequence,
+                    maximum_pending_ranges,
+                )
+            ):
+                accounting_failure = True
                 processed = self.input_processed_through
-                previous_processed = processed
                 should_publish = False
             else:
                 self.retained_ingress_frames -= 1
@@ -2127,29 +2247,13 @@ class _GuestDuplexSession:
                 self.ingress_bytes -= byte_count
                 self.returned_ingress_frames += 1
                 self.returned_ingress_bytes += byte_count
-                self.released_ingress_through = max(
-                    self.released_ingress_through,
-                    sequence,
-                )
-                previous_processed = self.input_processed_through
-                if sequence > self.input_processed_through:
-                    self.released_ingress_sequences.add(sequence)
-                    while (
-                        self.input_processed_through < (1 << 64) - 1
-                        and self.input_processed_through + 1
-                            in self.released_ingress_sequences
-                    ):
-                        self.input_processed_through += 1
-                        self.released_ingress_sequences.remove(
-                            self.input_processed_through
-                        )
                 processed = self.input_processed_through
-                should_publish = self.terminal is None
+                should_publish = True
                 self.cv.notify_all()
-        if overflow:
+        if accounting_failure:
             self.fail(
                 "mediaProtocol",
-                "duplex input return byte counter exhausted",
+                "duplex input completion accounting exhausted",
             )
             return
         if should_publish:
@@ -2286,13 +2390,12 @@ class _GuestDuplexSession:
         if processed is not None:
             with self.cv:
                 if processed > self.input_processed_through:
-                    self.input_processed_through = processed
-                    self.released_ingress_sequences = {
-                        value
-                        for value in self.released_ingress_sequences
-                        if value > processed
-                    }
-                    declared_processed = processed
+                    previous_processed = self.input_processed_through
+                    self.processed_ingress_completion.declare_completed(
+                        processed
+                    )
+                    if self.input_processed_through > previous_processed:
+                        declared_processed = self.input_processed_through
         if declared_processed is not None:
             self._send_event(
                 0,

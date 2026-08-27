@@ -18,12 +18,16 @@ AUDIO_PROBE_GATE="${SWIFTPYTHON_AUDIO_PROBE_GATE:-off}"
 RELEASE_MANIFEST="${SWIFTPYTHON_RELEASE_MANIFEST:-}"
 RELEASE_VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 export SWIFTPYTHON_RELEASE_VERSION="$RELEASE_VERSION"
-SMOKE_ID_SUFFIX="$(
+SMOKE_ID_SUFFIX="${SWIFTPYTHON_SMOKE_ID_SUFFIX:-$(
     basename "$WORK_DIR" \
         | sed 's/.*\.//' \
         | tr -cd '[:alnum:]' \
         | tr '[:upper:]' '[:lower:]'
-)"
+)}"
+if [[ ! "$SMOKE_ID_SUFFIX" =~ ^[a-z0-9]{4,32}$ ]]; then
+    echo "SWIFTPYTHON_SMOKE_ID_SUFFIX must be 4-32 lowercase ASCII letters or digits." >&2
+    exit 64
+fi
 DEVELOPER_BUNDLE_IDENTIFIER="ai.bestbyte.sp.d.$SMOKE_ID_SUFFIX"
 SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
 
@@ -563,6 +567,8 @@ enum ConsumerSmoke {
                  .playbackFailed:
                 return true
             case .shutdownFailed, .invariantFailed, .internalFailure:
+                return false
+            @unknown default:
                 return false
             }
         default:
@@ -1417,7 +1423,8 @@ PY
 assert_parent_audio_policy() {
     local app="$1"
     local expected_sandbox="$2"
-    python3 - "$app" "$expected_sandbox" <<'PY'
+    local expected_audio_input="$3"
+    python3 - "$app" "$expected_sandbox" "$expected_audio_input" <<'PY'
 import pathlib
 import plistlib
 import subprocess
@@ -1425,6 +1432,7 @@ import sys
 
 app = pathlib.Path(sys.argv[1])
 expected_sandbox = sys.argv[2] == "1"
+expected_audio_input = sys.argv[3] == "1"
 with (app / "Contents" / "Info.plist").open("rb") as handle:
     info = plistlib.load(handle)
 purpose = info.get("NSMicrophoneUsageDescription")
@@ -1443,9 +1451,14 @@ if observed_sandbox != expected_sandbox:
         f"parent sandbox state mismatch for {app}: "
         f"expected={expected_sandbox} observed={observed_sandbox}"
     )
-if expected_sandbox \
-        and entitlements.get("com.apple.security.device.audio-input") is not True:
-    raise SystemExit(f"sandbox parent lacks audio-input entitlement: {app}")
+observed_audio_input = (
+    entitlements.get("com.apple.security.device.audio-input") is True
+)
+if observed_audio_input != expected_audio_input:
+    raise SystemExit(
+        f"parent audio-input state mismatch for {app}: "
+        f"expected={expected_audio_input} observed={observed_audio_input}"
+    )
 PY
 }
 
@@ -1645,11 +1658,11 @@ EOF
     assert_signed_entitlements_match \
         "$macos/SwiftPythonAudioProbe" \
         "$probe_entitlements"
-    if [ "$mode" = sandbox ]; then
-        assert_parent_audio_policy "$app" 1
-    else
-        assert_parent_audio_policy "$app" 0
-    fi
+    case "$mode" in
+        sandbox) assert_parent_audio_policy "$app" 1 1 ;;
+        virtualization) assert_parent_audio_policy "$app" 0 0 ;;
+        *) assert_parent_audio_policy "$app" 0 1 ;;
+    esac
     assert_nested_probe_identity "$app"
     local before_run_digest
     before_run_digest="$(bundle_content_digest "$app")"

@@ -348,7 +348,7 @@ public struct MLXResidencyPolicy : Swift.Sendable, Swift.Equatable {
   public var maximumResidentBytes: Swift.Int
   public var maximumSimultaneousLeases: Swift.Int
   public var defaultIdleTTL: Swift.Duration
-  public init(maximumModels: Swift.Int = 4, maximumResidentBytes: Swift.Int = 2 * 1_024 * 1_024 * 1_024, maximumSimultaneousLeases: Swift.Int = 8, defaultIdleTTL: Swift.Duration = .seconds(300))
+  public init(maximumModels: Swift.Int = 4, maximumResidentBytes: Swift.Int = 2 * 1024 * 1024 * 1024, maximumSimultaneousLeases: Swift.Int = 8, defaultIdleTTL: Swift.Duration = .seconds(300))
   public static let `default`: SwiftPythonRuntime.MLXResidencyPolicy
   public static func == (a: SwiftPythonRuntime.MLXResidencyPolicy, b: SwiftPythonRuntime.MLXResidencyPolicy) -> Swift.Bool
 }
@@ -360,7 +360,7 @@ public struct MLXAdmissionPolicy : Swift.Sendable, Swift.Equatable {
   public var schedulingWeight: Swift.Int
   public var maximumStateItems: Swift.Int
   public var maximumStateBytes: Swift.Int
-  public init(maximumQueuedStepsPerSession: Swift.Int = 8, maximumActiveSessions: Swift.Int = 8, maximumProcessLanes: Swift.Int = 1, startupStressProbe: Swift.String? = nil, schedulingWeight: Swift.Int = 1, maximumStateItems: Swift.Int = 4_096, maximumStateBytes: Swift.Int = 64 * 1_024 * 1_024)
+  public init(maximumQueuedStepsPerSession: Swift.Int = 8, maximumActiveSessions: Swift.Int = 8, maximumProcessLanes: Swift.Int = 1, startupStressProbe: Swift.String? = nil, schedulingWeight: Swift.Int = 1, maximumStateItems: Swift.Int = 4096, maximumStateBytes: Swift.Int = 64 * 1024 * 1024)
   public static let `default`: SwiftPythonRuntime.MLXAdmissionPolicy
   public static func == (a: SwiftPythonRuntime.MLXAdmissionPolicy, b: SwiftPythonRuntime.MLXAdmissionPolicy) -> Swift.Bool
 }
@@ -418,7 +418,7 @@ public struct AcceleratorResidencyPolicy : Swift.Sendable, Swift.Equatable {
   public var maximumResidentBytes: Swift.Int
   public var maximumSimultaneousLeases: Swift.Int
   public var defaultIdleTTL: Swift.Duration
-  public init(maximumModels: Swift.Int = 1, maximumResidentBytes: Swift.Int = 8 * 1_024 * 1_024 * 1_024, maximumSimultaneousLeases: Swift.Int = 4, defaultIdleTTL: Swift.Duration = .seconds(300))
+  public init(maximumModels: Swift.Int = 1, maximumResidentBytes: Swift.Int = 8 * 1024 * 1024 * 1024, maximumSimultaneousLeases: Swift.Int = 4, defaultIdleTTL: Swift.Duration = .seconds(300))
   public static let `default`: SwiftPythonRuntime.AcceleratorResidencyPolicy
   public static func == (a: SwiftPythonRuntime.AcceleratorResidencyPolicy, b: SwiftPythonRuntime.AcceleratorResidencyPolicy) -> Swift.Bool
 }
@@ -430,7 +430,7 @@ public struct AcceleratorAdmissionPolicy : Swift.Sendable, Swift.Equatable {
   public var schedulingWeight: Swift.Int
   public var maximumStateItems: Swift.Int
   public var maximumStateBytes: Swift.Int
-  public init(maximumQueuedStepsPerSession: Swift.Int = 8, maximumActiveSessions: Swift.Int = 4, maximumProcessLanes: Swift.Int = 1, startupStressProbe: Swift.String? = nil, schedulingWeight: Swift.Int = 1, maximumStateItems: Swift.Int = 32_768, maximumStateBytes: Swift.Int = 512 * 1_024 * 1_024)
+  public init(maximumQueuedStepsPerSession: Swift.Int = 8, maximumActiveSessions: Swift.Int = 4, maximumProcessLanes: Swift.Int = 1, startupStressProbe: Swift.String? = nil, schedulingWeight: Swift.Int = 1, maximumStateItems: Swift.Int = 32768, maximumStateBytes: Swift.Int = 512 * 1024 * 1024)
   public static let `default`: SwiftPythonRuntime.AcceleratorAdmissionPolicy
   public static func == (a: SwiftPythonRuntime.AcceleratorAdmissionPolicy, b: SwiftPythonRuntime.AcceleratorAdmissionPolicy) -> Swift.Bool
 }
@@ -463,7 +463,7 @@ public struct DuplexLimits : Swift.Sendable, Swift.Equatable {
   public var maximumUnacknowledgedOutputFrames: Swift.Int
   public var maximumControlBytes: Swift.Int
   public var cancellationGrace: Swift.Duration
-  public init(maximumFrameBytes: Swift.Int = 16 * 1_024, maximumLogicalMessageBytes: Swift.Int = 64 * 1_024 * 1_024, preferredMessageChunkBytes: Swift.Int = 16 * 1_024, maximumOutstandingMessages: Swift.Int = 16, inputCreditBytes: Swift.Int = 64 * 1_024, inputCreditFrames: Swift.Int = 8, outputCreditBytes: Swift.Int = 64 * 1_024, outputCreditFrames: Swift.Int = 8, maximumUnacknowledgedOutputBytes: Swift.Int = 64 * 1_024, maximumUnacknowledgedOutputFrames: Swift.Int = 8, maximumControlBytes: Swift.Int = 64 * 1_024, cancellationGrace: Swift.Duration = .seconds(2))
+  public init(maximumFrameBytes: Swift.Int = 16 * 1024, maximumLogicalMessageBytes: Swift.Int = 64 * 1024 * 1024, preferredMessageChunkBytes: Swift.Int = 16 * 1024, maximumOutstandingMessages: Swift.Int = 16, inputCreditBytes: Swift.Int = 64 * 1024, inputCreditFrames: Swift.Int = 8, outputCreditBytes: Swift.Int = 64 * 1024, outputCreditFrames: Swift.Int = 8, maximumUnacknowledgedOutputBytes: Swift.Int = 64 * 1024, maximumUnacknowledgedOutputFrames: Swift.Int = 8, maximumControlBytes: Swift.Int = 64 * 1024, cancellationGrace: Swift.Duration = .seconds(2))
   public static let `default`: SwiftPythonRuntime.DuplexLimits
   public static func == (a: SwiftPythonRuntime.DuplexLimits, b: SwiftPythonRuntime.DuplexLimits) -> Swift.Bool
 }
@@ -578,7 +578,7 @@ public struct DuplexSessionProfile : Swift.Sendable, Swift.Equatable {
   public let acceleratorBackend: SwiftPythonRuntime.AcceleratorBackendID?
   public static func == (a: SwiftPythonRuntime.DuplexSessionProfile, b: SwiftPythonRuntime.DuplexSessionProfile) -> Swift.Bool
 }
-public enum DuplexFailureCode : Swift.String, Swift.Sendable, Swift.Equatable {
+public enum DuplexFailureCode : Swift.String, Swift.Sendable, Swift.Equatable, Swift.Hashable {
   case featureUnavailable
   case admissionRejected
   case handlerSetup
@@ -600,7 +600,7 @@ public enum DuplexFailureCode : Swift.String, Swift.Sendable, Swift.Equatable {
     get
   }
 }
-public enum DuplexFailureOrigin : Swift.Sendable, Swift.Equatable {
+public enum DuplexFailureOrigin : Swift.Sendable, Swift.Equatable, Swift.Hashable {
   case host
   case python
   case runtime
@@ -613,7 +613,7 @@ public enum DuplexFailureOrigin : Swift.Sendable, Swift.Equatable {
     get
   }
 }
-public struct DuplexFailure : Swift.Error, Swift.Sendable, Swift.Equatable {
+public struct DuplexFailure : Swift.Error, Swift.Sendable, Swift.Equatable, Swift.Hashable {
   public let code: SwiftPythonRuntime.DuplexFailureCode
   public let origin: SwiftPythonRuntime.DuplexFailureOrigin
   public let message: Swift.String
@@ -623,6 +623,10 @@ public struct DuplexFailure : Swift.Error, Swift.Sendable, Swift.Equatable {
   public let outputAcknowledgedThrough: SwiftPythonRuntime.DuplexPosition?
   public init(code: SwiftPythonRuntime.DuplexFailureCode, origin: SwiftPythonRuntime.DuplexFailureOrigin, message: Swift.String, inputAcceptedThrough: Swift.UInt64? = nil, inputProcessedThrough: Swift.UInt64? = nil, outputProducedThrough: Swift.UInt64? = nil, outputAcknowledgedThrough: SwiftPythonRuntime.DuplexPosition? = nil)
   public static func == (a: SwiftPythonRuntime.DuplexFailure, b: SwiftPythonRuntime.DuplexFailure) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
 }
 public enum DuplexTerminalState : Swift.Sendable, Swift.Equatable {
   case completed
@@ -905,6 +909,10 @@ public enum PoolEvent : Swift.Sendable {
   case memoryPressureChanged(level: SwiftPythonRuntime.PoolEvent.MemoryPressureLevel)
   case resourcePressureSampled(snapshot: SwiftPythonRuntime.ResourceSnapshot)
   case callbackOrphaned(workerID: Swift.Int, callID: Swift.UInt64, callbackName: Swift.String, kind: SwiftPythonRuntime.PoolEvent.CallbackKind, streamChannelID: Swift.UInt32?)
+  case hostAsyncCallbackQuiescenceTimedOut(workerID: Swift.Int, activeTaskCount: Swift.Int)
+  case workerLifecycleQuiescenceTimedOut(workerIDs: [Swift.Int])
+  case workerTransportCleanupTimedOut(workerIDs: [Swift.Int])
+  case workerTransportCleanupFailed(workerIDs: [Swift.Int], messages: [Swift.String])
   case eventsDropped(count: Swift.Int)
   public enum CallbackKind : Swift.Sendable, Swift.Equatable {
     case regular
@@ -1050,6 +1058,7 @@ public enum PythonWorkerError : Swift.Error, Swift.Sendable {
   case addWorkersFailed(succeededWorkerIDs: [Swift.Int], failedWorkerID: Swift.Int, underlying: Swift.String)
   case poolShuttingDown
   case poolDrained
+  case drainTimedOut(inFlight: Swift.Int, seconds: Swift.Double)
   case backpressure(inFlight: Swift.Int, maxInFlight: Swift.Int)
   case streamChannelOverflow(workerID: Swift.Int, channelID: Swift.UInt32, capacity: Swift.Int)
   case invalidConfiguration(Swift.String)
@@ -1205,7 +1214,7 @@ public struct ManagedTensorConfiguration : Swift.Sendable, Swift.Equatable {
   public var preset: SwiftPythonRuntime.ManagedTensorConfiguration.Preset
   public var initialCapacityBytes: Swift.Int
   public var maximumCapacityBytes: Swift.Int?
-  public init(preset: SwiftPythonRuntime.ManagedTensorConfiguration.Preset = .balanced, initialCapacityBytes: Swift.Int = 256 * 1_024 * 1_024, maximumCapacityBytes: Swift.Int? = nil)
+  public init(preset: SwiftPythonRuntime.ManagedTensorConfiguration.Preset = .balanced, initialCapacityBytes: Swift.Int = 256 * 1024 * 1024, maximumCapacityBytes: Swift.Int? = nil)
   public static let `default`: SwiftPythonRuntime.ManagedTensorConfiguration
   public static func == (a: SwiftPythonRuntime.ManagedTensorConfiguration, b: SwiftPythonRuntime.ManagedTensorConfiguration) -> Swift.Bool
 }
@@ -1981,6 +1990,7 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func warmup(_ code: Swift.String, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
   public func drain(timeout: Swift.Duration? = .seconds(30)) async throws
   public func shedIdleWorkers(force: Swift.Bool = false)
+  public func shedIdleWorkersAndWait(force: Swift.Bool = false) async
   public func resume()
   public func shutdown(timeout: Swift.Duration = .seconds(5)) async
   public func shutdown(timeout: Swift.Duration, preserveRuntimeState: Swift.Bool) async
@@ -2639,11 +2649,11 @@ internal func remoteKwargsDictionary(from pairs: [SwiftPythonRuntime.RemoteKwarg
     values.mapValues { .python($0) }
 }
 @_hasMissingDesignatedInitializers public actor ResourceMonitor {
+  @objc deinit
   public func start(config: SwiftPythonRuntime.ResourceMonitorConfig, workerPIDs: @escaping @Sendable () async -> [Swift.Int : _DarwinFoundation2.pid_t], onPressureDrop: (@Sendable () async -> Swift.Void)? = nil, onSample: (@Sendable (SwiftPythonRuntime.ResourceSnapshot) -> Swift.Void)? = nil)
   public func stop()
   public func snapshot() -> SwiftPythonRuntime.ResourceSnapshot?
   public func injectForTesting(_ snapshot: SwiftPythonRuntime.ResourceSnapshot, config: SwiftPythonRuntime.ResourceMonitorConfig? = nil) async
-  @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
     get
@@ -3748,9 +3758,7 @@ extension SwiftPythonRuntime.DuplexInterruptionDisposition : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexInterruptionDisposition : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.DuplexNegotiatedAcceleratorKind : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexNegotiatedAcceleratorKind : Swift.RawRepresentable {}
-extension SwiftPythonRuntime.DuplexFailureCode : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexFailureCode : Swift.RawRepresentable {}
-extension SwiftPythonRuntime.DuplexFailureOrigin : Swift.Hashable {}
 extension SwiftPythonRuntime.DuplexUsageError : Swift.Hashable {}
 extension SwiftPythonRuntime.ManagedBufferAlignment : Swift.Hashable {}
 extension SwiftPythonRuntime.ManagedBufferConfiguration.Preset : Swift.Hashable {}
