@@ -16,6 +16,23 @@ import zipfile
 import audio_probe_release_contract as contract
 
 
+class ConsumerTimeoutWrapperTests(unittest.TestCase):
+    def test_success_path_watchdog_has_no_orphanable_sleep_child(self) -> None:
+        script = pathlib.Path(__file__).with_name("consumer_path_smoke.sh")
+        source = script.read_text(encoding="utf-8")
+        timeout_wrapper = source.split("run_with_timeout() {", 1)[1].split(
+            "\n}\n", 1
+        )[0]
+
+        self.assertIn(
+            'python3 - "$timeout_seconds" "$process_pid"',
+            timeout_wrapper,
+        )
+        self.assertNotIn('sleep "$timeout_seconds"', timeout_wrapper)
+        self.assertIn('kill "$watchdog_pid"', timeout_wrapper)
+        self.assertIn('wait "$watchdog_pid"', timeout_wrapper)
+
+
 class AudioProbeReleaseContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(

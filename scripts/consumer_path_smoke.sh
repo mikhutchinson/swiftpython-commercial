@@ -45,6 +45,7 @@ for required_tool in \
     install_name_tool \
     lipo \
     otool \
+    pgrep \
     python3 \
     security \
     swift \
@@ -204,21 +205,55 @@ run_with_timeout() {
     shift
     "$@" &
     local process_pid=$!
-    (
-        sleep "$timeout_seconds"
-        if kill -0 "$process_pid" 2>/dev/null; then
-            echo "Timed out after ${timeout_seconds}s: $*" >&2
-            for child_pid in $(pgrep -P "$process_pid" 2>/dev/null || true); do
-                kill -TERM "$child_pid" 2>/dev/null || true
-            done
-            kill -TERM "$process_pid" 2>/dev/null || true
-            sleep 5
-            for child_pid in $(pgrep -P "$process_pid" 2>/dev/null || true); do
-                kill -KILL "$child_pid" 2>/dev/null || true
-            done
-            kill -KILL "$process_pid" 2>/dev/null || true
-        fi
-    ) &
+    # Keep the watchdog as one process. A shell subshell whose body starts
+    # `sleep` leaves that child orphaned when the subshell is killed after a
+    # successful command; the orphan retains inherited release-log pipes until
+    # the full timeout expires.
+    python3 - "$timeout_seconds" "$process_pid" <<'PY' &
+import os
+import signal
+import subprocess
+import sys
+import time
+
+timeout_seconds = float(sys.argv[1])
+process_pid = int(sys.argv[2])
+time.sleep(timeout_seconds)
+
+try:
+    os.kill(process_pid, 0)
+except ProcessLookupError:
+    raise SystemExit(0)
+
+print(
+    f"Timed out after {timeout_seconds:g}s: process {process_pid}",
+    file=sys.stderr,
+    flush=True,
+)
+
+
+def signal_process_and_children(sig: signal.Signals) -> None:
+    result = subprocess.run(
+        ["pgrep", "-P", str(process_pid)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    for child_pid_text in result.stdout.split():
+        try:
+            os.kill(int(child_pid_text), sig)
+        except ProcessLookupError:
+            pass
+    try:
+        os.kill(process_pid, sig)
+    except ProcessLookupError:
+        pass
+
+
+signal_process_and_children(signal.SIGTERM)
+time.sleep(5)
+signal_process_and_children(signal.SIGKILL)
+PY
     local watchdog_pid=$!
     local exit_code=0
     wait "$process_pid" || exit_code=$?
