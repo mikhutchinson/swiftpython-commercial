@@ -173,9 +173,16 @@ let rounded: Double = try await worker.invokeResult(
 try await pool.warmup("import numpy as np")
 let health: [Bool] = try await pool.healthCheck()
 
-try await pool.drain(timeout: .seconds(30))
+do {
+    try await pool.drain(timeout: .seconds(30))
+} catch PythonWorkerError.drainTimedOut(let inFlight, let seconds) {
+    logger.warning("drain still has \(inFlight) operations after \(seconds)s")
+    // Admission remains closed. Explicitly resume, await later completion,
+    // or shut down; do not infer that the pool drained.
+}
 pool.resume()
 
+await pool.shedIdleWorkersAndWait(force: true)
 try await pool.respawnWorker(0, reason: .userInitiated, force: true)
 await pool.shutdown()
 ```
@@ -184,11 +191,25 @@ await pool.shutdown()
 |-----|-----|
 | `warmup` | Run setup code on every worker |
 | `healthCheck` | Confirm workers respond |
-| `drain` | Stop accepting new work and wait for in-flight work |
+| `drain` | Stop accepting new work and wait for authoritative in-flight work; timeout fails only that wait |
 | `resume` | Leave drained mode |
+| `shedIdleWorkers` | Start an idle shed while preserving the existing synchronous compatibility entry point |
+| `shedIdleWorkersAndWait` | Shed idle workers and await exact custom-transport endpoint release |
 | `respawnWorker` | Replace a worker, optionally force-killing it |
 | `addWorkers` | Add local process-backed workers through the same configuration path |
 | `shutdown` | Stop all workers |
+
+A `drain(timeout:)` timeout throws
+`PythonWorkerError.drainTimedOut(inFlight:seconds:)`. It does not reopen
+admission or claim that the outstanding work stopped: the pool remains in
+`.draining` until the authoritative count reaches zero, or until the caller
+explicitly resumes or shuts down. Cancelling the drain waiter has the same
+waiter-only scope.
+
+The synchronous `shedIdleWorkers(force:)` remains source compatible. For a
+custom transport its endpoint release can continue after that call returns.
+Use `shedIdleWorkersAndWait(force:)` when subsequent work depends on exact
+release completion. Neither form sheds a busy worker, even with `force: true`.
 
 ## Events
 
@@ -203,6 +224,14 @@ Task {
             logger.warning("worker \(id) respawned as \(newPID): \(String(describing: reason))")
         case .workerDied(let id, let reason):
             logger.error("worker \(id) died: \(String(describing: reason))")
+        case .hostAsyncCallbackQuiescenceTimedOut(let id, let activeCount):
+            logger.warning("worker \(id) retained \(activeCount) callback tasks")
+        case .workerLifecycleQuiescenceTimedOut(let ids):
+            logger.warning("worker lifecycle still retiring: \(ids)")
+        case .workerTransportCleanupTimedOut(let ids):
+            logger.warning("transport cleanup still owned in background: \(ids)")
+        case .workerTransportCleanupFailed(let ids, let messages):
+            logger.error("transport cleanup failed for \(ids): \(messages)")
         case .eventsDropped(let count):
             logger.warning("missed \(count) pool events")
         case .poolStateChanged(_, .shutdown):
@@ -216,7 +245,18 @@ Task {
 
 Event cases cover worker spawn/respawn/death, worker state changes,
 quarantine, idle shedding, pool state changes, drain completion, resource
-pressure, orphaned callbacks, and dropped subscriber events.
+pressure, orphaned callbacks, lifecycle quiescence, transport cleanup, and
+dropped subscriber events.
+
+`hostAsyncCallbackQuiescenceTimedOut`,
+`workerLifecycleQuiescenceTimedOut`, and
+`workerTransportCleanupTimedOut` can accompany a bounded shutdown that has
+already transitioned the public pool state to `.shutdown`. Exact invalidated
+operations and endpoints remain owned by their retirement receipts; these
+events are not permission to signal a numeric PID, retry a destructive
+operation, or attach an old endpoint to a new generation.
+`workerTransportCleanupFailed` means retirement completed but at least one
+endpoint or managed-backend cleanup step reported an error.
 
 ## Structured Telemetry
 
@@ -385,6 +425,7 @@ teardown.
 | `.timeout(workerID:seconds:)` | Worker did not respond within the configured timeout |
 | `.workerCrashed(workerID:exitCode:)` | Worker exited during a command |
 | `.workerForciblyRespawned(workerID:)` | Caller killed the worker explicitly |
+| `.drainTimedOut(inFlight:seconds:)` | This bounded drain wait expired; admission remains closed in `.draining` |
 | `.staleHandle(handleID:workerID:)` | Handle belonged to an older worker generation |
 | `.workerNotFound(searchedPaths:)` | `SwiftPythonWorker` could not be located |
 | `.protocolError(String)` | Runtime and sidecar protocol mismatch |

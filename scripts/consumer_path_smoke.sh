@@ -5,6 +5,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
 LOCAL_PACKAGE_DIR="$WORK_DIR/swiftpython-commercial-local"
 PYTHON_LIB_DIR="${SWIFTPYTHON_PYTHON_LIB_DIR:-}"
+CANONICAL_PYTHON_LOAD_COMMAND="@rpath/Python.framework/Versions/3.13/Python"
+EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH="@executable_path/../Frameworks"
 NOTARY_PROFILE="${SWIFTPYTHON_NOTARY_PROFILE:-}"
 NOTARY_OUTPUT_DIR="${SWIFTPYTHON_NOTARY_OUTPUT_DIR:-}"
 KEEP_WORK_DIR="${SWIFTPYTHON_KEEP_WORK_DIR:-0}"
@@ -15,21 +17,10 @@ VM_RESTORE_SECRET="${SWIFTPYTHON_VM_RESTORE_SECRET:-}"
 VM_CLONE_DIR="${SWIFTPYTHON_VM_CLONE_DIR:-}"
 VM_ITERATIONS="${SWIFTPYTHON_VM_ITERATIONS:-20}"
 AUDIO_PROBE_GATE="${SWIFTPYTHON_AUDIO_PROBE_GATE:-off}"
+AUDIO_TCC_BOOTSTRAP="${SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP:-0}"
 RELEASE_MANIFEST="${SWIFTPYTHON_RELEASE_MANIFEST:-}"
 RELEASE_VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 export SWIFTPYTHON_RELEASE_VERSION="$RELEASE_VERSION"
-SMOKE_ID_SUFFIX="${SWIFTPYTHON_SMOKE_ID_SUFFIX:-$(
-    basename "$WORK_DIR" \
-        | sed 's/.*\.//' \
-        | tr -cd '[:alnum:]' \
-        | tr '[:upper:]' '[:lower:]'
-)}"
-if [[ ! "$SMOKE_ID_SUFFIX" =~ ^[a-z0-9]{4,32}$ ]]; then
-    echo "SWIFTPYTHON_SMOKE_ID_SUFFIX must be 4-32 lowercase ASCII letters or digits." >&2
-    exit 64
-fi
-DEVELOPER_BUNDLE_IDENTIFIER="ai.bestbyte.sp.d.$SMOKE_ID_SUFFIX"
-SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
 
 case "$AUDIO_PROBE_GATE" in
     off|containment|ready) ;;
@@ -39,6 +30,74 @@ case "$AUDIO_PROBE_GATE" in
         ;;
 esac
 
+validate_audio_tcc_bootstrap_mode() {
+    case "$AUDIO_TCC_BOOTSTRAP" in
+        0) return ;;
+        1) ;;
+        *)
+            echo "SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP must be 0 or 1." >&2
+            return 64
+            ;;
+    esac
+    if [ -n "$NOTARY_PROFILE" ]; then
+        echo "Audio TCC bootstrap is a separate non-notary operation; unset SWIFTPYTHON_NOTARY_PROFILE." >&2
+        return 64
+    fi
+    if [ "$AUDIO_PROBE_GATE" != ready ]; then
+        echo "Audio TCC bootstrap requires SWIFTPYTHON_AUDIO_PROBE_GATE=ready." >&2
+        return 64
+    fi
+    if [ "$VM_RELEASE_GATE" != 0 ]; then
+        echo "Audio TCC bootstrap does not run the VM release gate." >&2
+        return 64
+    fi
+}
+
+validate_audio_tcc_bootstrap_mode
+
+select_smoke_id_suffix() {
+    local requested="${SWIFTPYTHON_SMOKE_ID_SUFFIX:-}"
+    local selected="$requested"
+    local requires_stable=0
+    if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
+        requires_stable=1
+    elif [ -n "$NOTARY_PROFILE" ] && [ "$AUDIO_PROBE_GATE" = ready ]; then
+        requires_stable=1
+    fi
+    if [ "$requires_stable" = 1 ] && [ -z "$requested" ]; then
+        echo "Audio TCC bootstrap and notary ready mode require an explicit stable SWIFTPYTHON_SMOKE_ID_SUFFIX; reuse the same release-test value across builds." >&2
+        return 64
+    fi
+    if [ -z "$selected" ]; then
+        selected="$(
+            basename "$WORK_DIR" \
+                | sed 's/.*\.//' \
+                | tr -cd '[:alnum:]' \
+                | tr '[:upper:]' '[:lower:]'
+        )"
+    fi
+    if [[ ! "$selected" =~ ^[a-z0-9]{4,32}$ ]]; then
+        echo "SWIFTPYTHON_SMOKE_ID_SUFFIX must be 4-32 lowercase ASCII letters or digits." >&2
+        return 64
+    fi
+    printf '%s' "$selected"
+}
+
+select_audio_permission_policy() {
+    if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
+        printf '%s' request-if-needed
+    elif [ -n "$NOTARY_PROFILE" ] && [ "$AUDIO_PROBE_GATE" = ready ]; then
+        printf '%s' require-granted
+    else
+        printf '%s' request-if-needed
+    fi
+}
+
+SMOKE_ID_SUFFIX="$(select_smoke_id_suffix)"
+AUDIO_PERMISSION_POLICY="$(select_audio_permission_policy)"
+DEVELOPER_BUNDLE_IDENTIFIER="ai.bestbyte.sp.d.$SMOKE_ID_SUFFIX"
+SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"
+
 for required_tool in \
     codesign \
     ditto \
@@ -47,6 +106,7 @@ for required_tool in \
     otool \
     pgrep \
     python3 \
+    rsync \
     security \
     swift \
     xcodebuild
@@ -54,6 +114,12 @@ do
     command -v "$required_tool" >/dev/null \
         || { echo "Required tool not found: $required_tool" >&2; exit 69; }
 done
+if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
+    for required_tool in lsappinfo open; do
+        command -v "$required_tool" >/dev/null \
+            || { echo "Required TCC bootstrap tool not found: $required_tool" >&2; exit 69; }
+    done
+fi
 
 cleanup() {
     if [ "$KEEP_WORK_DIR" = 1 ]; then
@@ -154,43 +220,20 @@ fi
 PYTHON_HOME_DIR="$(cd "$PYTHON_LIB_DIR/.." && pwd)"
 PYTHON_FRAMEWORK_DIR="$(cd "$PYTHON_HOME_DIR/../.." && pwd)"
 PYTHON_FRAMEWORK_BINARY="$PYTHON_HOME_DIR/Python"
-if [ ! -f "$PYTHON_FRAMEWORK_BINARY" ]; then
-    echo "Python framework binary not found at $PYTHON_FRAMEWORK_BINARY." >&2
-    exit 1
-fi
-PYTHON_FRAMEWORK_LOAD_PATH="$(
-    otool -L "$REPO_DIR/SwiftPythonWorker" \
-        | awk '/Python\.framework\/Versions\/3\.13\/Python/ { print $1; exit }'
-)"
-if [ -z "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
-    echo "SwiftPythonWorker does not declare a Python 3.13 framework dependency." >&2
-    exit 1
-fi
-AUDIO_PROBE="$REPO_DIR/SwiftPythonAudioProbe"
-if [ ! -x "$AUDIO_PROBE" ] || [ -L "$AUDIO_PROBE" ] || [ ! -f "$AUDIO_PROBE" ]; then
-    echo "Exact regular executable SwiftPythonAudioProbe is missing from the candidate." >&2
-    exit 1
-fi
-AUDIO_PROBE_PYTHON_LOAD_PATH=""
-for probe_architecture in arm64 x86_64; do
-    architecture_python_loads="$(
-        otool -arch "$probe_architecture" -L "$AUDIO_PROBE" \
-            | awk '/Python\.framework\/Versions\/3\.13\/Python/ { print $1 }'
-    )"
-    if [ -z "$architecture_python_loads" ] \
-            || [ "$(printf '%s\n' "$architecture_python_loads" | wc -l | tr -d '[:space:]')" != 1 ]; then
-        echo "SwiftPythonAudioProbe $probe_architecture must declare exactly one Python 3.13 framework dependency." >&2
-        exit 1
-    fi
-    if [ -z "$AUDIO_PROBE_PYTHON_LOAD_PATH" ]; then
-        AUDIO_PROBE_PYTHON_LOAD_PATH="$architecture_python_loads"
-    elif [ "$architecture_python_loads" != "$AUDIO_PROBE_PYTHON_LOAD_PATH" ]; then
-        echo "SwiftPythonAudioProbe slices do not declare the same Python framework dependency." >&2
+for required_python_path in \
+    "$PYTHON_FRAMEWORK_BINARY" \
+    "$PYTHON_HOME_DIR/lib/python3.13" \
+    "$PYTHON_HOME_DIR/lib/python3.13/lib-dynload" \
+    "$PYTHON_HOME_DIR/Resources/Info.plist"
+do
+    if [ ! -e "$required_python_path" ]; then
+        echo "Complete Python framework input is missing: $required_python_path" >&2
         exit 1
     fi
 done
-if [ "$AUDIO_PROBE_PYTHON_LOAD_PATH" != "$PYTHON_FRAMEWORK_LOAD_PATH" ]; then
-    echo "Worker and audio probe do not load the same staged Python framework." >&2
+AUDIO_PROBE="$REPO_DIR/SwiftPythonAudioProbe"
+if [ ! -x "$AUDIO_PROBE" ] || [ -L "$AUDIO_PROBE" ] || [ ! -f "$AUDIO_PROBE" ]; then
+    echo "Exact regular executable SwiftPythonAudioProbe is missing from the candidate." >&2
     exit 1
 fi
 ENGINE_FRAMEWORK="$REPO_DIR/SwiftPythonEngine.xcframework/macos-arm64_x86_64/SwiftPythonEngine.framework"
@@ -260,6 +303,128 @@ PY
     kill "$watchdog_pid" 2>/dev/null || true
     wait "$watchdog_pid" 2>/dev/null || true
     return "$exit_code"
+}
+
+copy_complete_python_framework() {
+    local destination="$1"
+    mkdir -p "$destination"
+    # Bytecode caches are generated state, not runtime distribution inputs.
+    # Everything else, including site-packages metadata and native extensions,
+    # is copied from the same framework distribution as the libpython core.
+    # Some distributions use relative symlinks from the framework into another
+    # directory in that same installation prefix. Materialize only those links
+    # that would escape the embedded framework while preserving its internal
+    # framework symlinks. CPython's regression-test package is development
+    # material, not part of the production runtime; among other fixtures, it
+    # contains intentionally malformed/sparse archives that cannot be
+    # notarized as an issue-free application payload.
+    rsync -a \
+        --copy-unsafe-links \
+        --exclude '__pycache__/' \
+        --exclude '*.pyc' \
+        --exclude '/Versions/*/lib/python*/test/' \
+        "$PYTHON_FRAMEWORK_DIR/" \
+        "$destination/"
+    for required_relative in \
+        Versions/3.13/Python \
+        Versions/3.13/lib/python3.13 \
+        Versions/3.13/lib/python3.13/lib-dynload \
+        Versions/3.13/Resources/Info.plist
+    do
+        if [ ! -e "$destination/$required_relative" ]; then
+            echo "Embedded Python framework is incomplete: $destination/$required_relative" >&2
+            exit 1
+        fi
+    done
+    assert_embedded_python_framework_is_self_contained "$destination"
+}
+
+assert_embedded_python_framework_is_self_contained() {
+    local framework="$1"
+    python3 - "$framework" <<'PY'
+import os
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1]).resolve(strict=True)
+failures = []
+for directory, directories, files in os.walk(root, followlinks=False):
+    for name in directories + files:
+        path = pathlib.Path(directory) / name
+        if not path.is_symlink():
+            continue
+        link_text = os.readlink(path)
+        if os.path.isabs(link_text):
+            failures.append(f"{path} -> {link_text}: absolute symlink")
+            continue
+        try:
+            target = path.resolve(strict=True)
+        except (OSError, RuntimeError) as error:
+            failures.append(f"{path}: unresolved symlink ({error})")
+            continue
+        try:
+            target.relative_to(root)
+        except ValueError:
+            failures.append(
+                f"{path} -> {link_text} resolves outside {root}: {target}"
+            )
+
+if failures:
+    print(
+        "Embedded Python framework is not a self-contained distribution:",
+        file=sys.stderr,
+    )
+    for failure in failures:
+        print(f"- {failure}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
+assert_python_loader_contract() {
+    local executable="$1"
+    local artifact_name="$2"
+    PYTHONDONTWRITEBYTECODE=1 python3 - \
+        "$REPO_DIR/scripts" "$executable" "$artifact_name" <<'PY'
+import pathlib
+import sys
+
+sys.path.insert(0, sys.argv[1])
+import audio_probe_release_contract as contract
+
+contract.inspect_python_runtime(pathlib.Path(sys.argv[2]), sys.argv[3])
+PY
+}
+
+rebase_consumer_python_load_command() {
+    local executable="$1"
+    local python_loads
+    python_loads="$(
+        otool -L "$executable" \
+            | awk '/[Pp]ython\.framework|libpython/ { print $1 }'
+    )"
+    if [ "$(printf '%s\n' "$python_loads" | sed '/^$/d' | wc -l | tr -d '[:space:]')" != 1 ]; then
+        echo "Consumer executable must contain exactly one Python load command: $executable" >&2
+        exit 1
+    fi
+    if [ "$python_loads" != "$CANONICAL_PYTHON_LOAD_COMMAND" ]; then
+        case "$python_loads" in
+            /*) ;;
+            *)
+                echo "Consumer executable has a noncanonical relative Python load command: $python_loads" >&2
+                exit 1
+                ;;
+        esac
+        install_name_tool -change \
+            "$python_loads" \
+            "$CANONICAL_PYTHON_LOAD_COMMAND" \
+            "$executable"
+    fi
+    if ! otool -L "$executable" \
+        | awk '{ print $1 }' \
+        | grep -Fx "$CANONICAL_PYTHON_LOAD_COMMAND" >/dev/null; then
+        echo "Consumer executable does not use the canonical Python load command: $executable" >&2
+        exit 1
+    fi
 }
 
 mkdir -p "$WORK_DIR/Sources/ConsumerSmoke"
@@ -513,6 +678,11 @@ enum ConsumerSmoke {
         case ready
     }
 
+    private enum ParentMicrophonePermissionPolicy: String {
+        case requestIfNeeded = "request-if-needed"
+        case requireGranted = "require-granted"
+    }
+
     private static func runAudioProbeIfConfigured(
         wireFormat: DuplexAudioFormat
     ) async throws {
@@ -527,7 +697,7 @@ enum ConsumerSmoke {
             return
         }
 
-        guard await requestParentMicrophonePermission(),
+        guard await acquireParentMicrophonePermission(),
               DuplexAudioHardwareProbeLauncher.permissionState == .granted else {
             throw ConsumerFailure.audioProbePermissionNotGranted
         }
@@ -611,11 +781,19 @@ enum ConsumerSmoke {
         }
     }
 
-    private static func requestParentMicrophonePermission() async -> Bool {
+    private static func acquireParentMicrophonePermission() async -> Bool {
+        let rawPolicy = ProcessInfo.processInfo.environment[
+            "SWIFTPYTHON_AUDIO_PERMISSION_POLICY"
+        ] ?? "require-granted"
+        let policy = ParentMicrophonePermissionPolicy(rawValue: rawPolicy)
+            ?? .requireGranted
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             return true
         case .notDetermined:
+            guard policy == .requestIfNeeded else {
+                return false
+            }
             return await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
                     continuation.resume(returning: granted)
@@ -1308,10 +1486,21 @@ write_local_binary_package
 write_consumer_package "$SPM_DIR"
 write_consumer_package "$XCODE_DIR"
 
-export SWIFTPYTHON_WORKER_PATH="$REPO_DIR/SwiftPythonWorker"
+assert_python_loader_contract "$REPO_DIR/SwiftPythonWorker" SwiftPythonWorker
+assert_python_loader_contract "$AUDIO_PROBE" SwiftPythonAudioProbe
+LOCAL_RUNTIME_DIR="$WORK_DIR/local-runtime"
+mkdir -p "$LOCAL_RUNTIME_DIR/MacOS"
+cp "$REPO_DIR/SwiftPythonWorker" "$LOCAL_RUNTIME_DIR/MacOS/SwiftPythonWorker"
+copy_complete_python_framework \
+    "$LOCAL_RUNTIME_DIR/Frameworks/Python.framework"
+export SWIFTPYTHON_WORKER_PATH="$LOCAL_RUNTIME_DIR/MacOS/SwiftPythonWorker"
+LOCAL_RUNTIME_PYTHON_HOME="$LOCAL_RUNTIME_DIR/Frameworks/Python.framework/Versions/3.13"
 
 echo "=== SwiftPM HeadersPath consumer ==="
-SWIFTPYTHON_AUDIO_PROBE_GATE=off swift run --package-path "$SPM_DIR"
+PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME" \
+    SWIFTPYTHON_AUDIO_PROBE_GATE=off \
+    SWIFTPYTHON_SKIP_IN_PROCESS=1 \
+    swift run --package-path "$SPM_DIR"
 
 echo "=== xcodebuild slice-root consumer ==="
 (
@@ -1325,7 +1514,9 @@ echo "=== xcodebuild slice-root consumer ==="
         build
 )
 DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK")" \
+    PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME" \
     SWIFTPYTHON_AUDIO_PROBE_GATE=off \
+    SWIFTPYTHON_SKIP_IN_PROCESS=1 \
     "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
 
 DEVELOPER_ID="$(
@@ -1566,8 +1757,7 @@ make_app() {
     local frameworks="$app/Contents/Frameworks"
     local python_framework="$frameworks/Python.framework"
     local embedded_engine="$frameworks/SwiftPythonEngine.framework"
-    local embedded_engine_binary="$embedded_engine/Versions/A/SwiftPythonEngine"
-    local python_home_for_app="$PYTHON_HOME_DIR"
+    local python_home_for_app="$python_framework/Versions/3.13"
     local effective_audio_probe_gate="$AUDIO_PROBE_GATE"
     local mode_identifier=d
     if [ "$mode" = sandbox ]; then
@@ -1578,84 +1768,57 @@ make_app() {
         # exercise the device-bound launcher gate for this same candidate.
         effective_audio_probe_gate=off
     fi
+    local direct_audio_probe_gate="$effective_audio_probe_gate"
+    if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
+        # TCC attributes consent through the responsible LaunchServices app.
+        # The bootstrap's preliminary direct execution must not request it.
+        direct_audio_probe_gate=off
+    fi
     local bundle_identifier="ai.bestbyte.sp.$mode_identifier.$SMOKE_ID_SUFFIX"
     local skip_in_process=0
     if [ "$mode" = sandbox ]; then
         skip_in_process=1
-        python_home_for_app="$frameworks/Python.framework/Versions/3.13"
     fi
     mkdir -p "$macos"
     cp "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke" \
         "$macos/ConsumerSmoke"
     cp "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker"
     cp "$AUDIO_PROBE" "$macos/SwiftPythonAudioProbe"
+    cmp -s "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker" \
+        || { echo "Embedded worker does not match staged input bytes." >&2; exit 1; }
     cmp -s "$AUDIO_PROBE" "$macos/SwiftPythonAudioProbe" \
         || { echo "Embedded audio probe does not match staged input bytes." >&2; exit 1; }
     ditto "$ENGINE_FRAMEWORK" "$embedded_engine"
+    copy_complete_python_framework "$python_framework"
     if ! otool -l "$macos/ConsumerSmoke" \
-        | grep -F '@executable_path/../Frameworks' >/dev/null; then
+        | grep -F "$EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH" >/dev/null; then
         install_name_tool -add_rpath \
-            '@executable_path/../Frameworks' \
+            "$EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH" \
             "$macos/ConsumerSmoke"
     fi
-    if [ "$mode" = sandbox ]; then
-        mkdir -p "$python_home_for_app/lib"
-        cp "$PYTHON_FRAMEWORK_BINARY" "$python_home_for_app/Python"
-        mkdir -p "$python_home_for_app/Resources"
-        cp "$PYTHON_FRAMEWORK_DIR/Versions/3.13/Resources/Info.plist" \
-            "$python_home_for_app/Resources/Info.plist"
-        ln -s 3.13 "$python_framework/Versions/Current"
-        ln -s Versions/Current/Python "$python_framework/Python"
-        ln -s Versions/Current/Resources "$python_framework/Resources"
-        rsync -a \
-            --exclude site-packages \
-            --exclude config-3.13-darwin \
-            --exclude test \
-            --exclude __pycache__ \
-            --exclude '*.pyc' \
-            "$PYTHON_HOME_DIR/lib/python3.13/" \
-            "$python_home_for_app/lib/python3.13/"
-        install_name_tool -change \
-            "$PYTHON_FRAMEWORK_LOAD_PATH" \
-            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
-            "$macos/ConsumerSmoke"
-        install_name_tool -change \
-            "$PYTHON_FRAMEWORK_LOAD_PATH" \
-            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
-            "$macos/SwiftPythonWorker"
-        install_name_tool -change \
-            "$AUDIO_PROBE_PYTHON_LOAD_PATH" \
-            "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
-            "$macos/SwiftPythonAudioProbe"
-        if otool -L "$embedded_engine_binary" \
-            | grep -F "$PYTHON_FRAMEWORK_LOAD_PATH" >/dev/null; then
-            install_name_tool -change \
-                "$PYTHON_FRAMEWORK_LOAD_PATH" \
-                "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python" \
-                "$embedded_engine_binary"
+    rebase_consumer_python_load_command "$macos/ConsumerSmoke"
+    assert_python_loader_contract "$macos/SwiftPythonWorker" SwiftPythonWorker
+    assert_python_loader_contract "$macos/SwiftPythonAudioProbe" SwiftPythonAudioProbe
+
+    # Library validation accepts the embedded interpreter and extension
+    # modules because every Mach-O is signed by the app's own team.
+    while IFS= read -r -d '' nested_binary; do
+        if file "$nested_binary" | grep -q 'Mach-O'; then
+            codesign --force --sign "$identity" --options runtime \
+                "${CODESIGN_TIMESTAMP_ARGS[@]}" "$nested_binary"
         fi
+    done < <(find "$python_home_for_app" -type f -print0)
 
-        # Library validation accepts the embedded interpreter and extension
-        # modules because every Mach-O is signed by the app's own team.
-        while IFS= read -r -d '' nested_binary; do
-            if file "$nested_binary" | grep -q 'Mach-O'; then
-                codesign --force --sign "$identity" --options runtime \
-                    "${CODESIGN_TIMESTAMP_ARGS[@]}" "$nested_binary"
-            fi
-        done < <(find "$python_home_for_app" -type f -print0)
+    # Gatekeeper evaluates executable-bit payloads in quarantined bundles as
+    # code. Normalize plain-text helpers before sealing the framework/app.
+    while IFS= read -r -d '' executable_payload; do
+        if ! file "$executable_payload" | grep -q 'Mach-O'; then
+            chmod a-x "$executable_payload"
+        fi
+    done < <(find "$python_home_for_app" -type f -perm -111 -print0)
 
-        # Gatekeeper evaluates executable-bit payloads in quarantined bundles
-        # as code. Python installs contain plain-text helper scripts with that
-        # bit set, so normalize them before sealing the framework/app.
-        while IFS= read -r -d '' executable_payload; do
-            if ! file "$executable_payload" | grep -q 'Mach-O'; then
-                chmod a-x "$executable_payload"
-            fi
-        done < <(find "$python_home_for_app" -type f -perm -111 -print0)
-
-        codesign --force --sign "$identity" --options runtime \
-            "${CODESIGN_TIMESTAMP_ARGS[@]}" "$python_framework"
-    fi
+    codesign --force --sign "$identity" --options runtime \
+        "${CODESIGN_TIMESTAMP_ARGS[@]}" "$python_framework"
     codesign --force --sign "$identity" --options runtime \
         "${CODESIGN_TIMESTAMP_ARGS[@]}" "$embedded_engine"
     cat > "$app/Contents/Info.plist" <<EOF
@@ -1703,7 +1866,8 @@ EOF
     before_run_digest="$(bundle_content_digest "$app")"
     run_with_timeout 90 env \
         SWIFTPYTHON_WORKER_PATH="$macos/SwiftPythonWorker" \
-        SWIFTPYTHON_AUDIO_PROBE_GATE="$effective_audio_probe_gate" \
+        SWIFTPYTHON_AUDIO_PROBE_GATE="$direct_audio_probe_gate" \
+        SWIFTPYTHON_AUDIO_PERMISSION_POLICY="$AUDIO_PERMISSION_POLICY" \
         SWIFTPYTHON_SKIP_IN_PROCESS="$skip_in_process" \
         PYTHONHOME="$python_home_for_app" \
         PYTHONNOUSERSITE=1 \
@@ -1816,9 +1980,10 @@ run_app_via_launchservices() {
     local app="$2"
     local bundle_identifier="$3"
     local python_layout="$4"
-    local stdout_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.stdout"
-    local stderr_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.stderr"
-    local receipt_path="$NOTARY_OUTPUT_DIR/ConsumerSmoke-$mode-launchservices.receipt"
+    local output_dir="$5"
+    local stdout_path="$output_dir/ConsumerSmoke-$mode-launchservices.stdout"
+    local stderr_path="$output_dir/ConsumerSmoke-$mode-launchservices.stderr"
+    local receipt_path="$output_dir/ConsumerSmoke-$mode-launchservices.receipt"
     local nonce="$mode-$SMOKE_ID_SUFFIX-$(date +%s)-$$"
     local expected_receipt="swiftpython-launch-services-success=$nonce"
     local existing_pid=""
@@ -1828,6 +1993,7 @@ run_app_via_launchservices() {
     local open_status=0
     local receipt_count
     local deadline
+    mkdir -p "$output_dir"
     local -a open_args=(
         /usr/bin/env
         -u SWIFTPYTHON_WORKER_PATH
@@ -1844,6 +2010,7 @@ run_app_via_launchservices() {
         --stdout "$stdout_path"
         --stderr "$stderr_path"
         --env "SWIFTPYTHON_AUDIO_PROBE_GATE=$AUDIO_PROBE_GATE"
+        --env "SWIFTPYTHON_AUDIO_PERMISSION_POLICY=$AUDIO_PERMISSION_POLICY"
         --env "SWIFTPYTHON_LAUNCH_SERVICES_RECEIPT_NONCE=$nonce"
         --env "PYTHONNOUSERSITE=1"
         --env "PYTHONDONTWRITEBYTECODE=1"
@@ -1864,14 +2031,11 @@ run_app_via_launchservices() {
     fi
 
     case "$python_layout" in
-        external)
-            open_args+=(--env "PYTHONHOME=$PYTHON_HOME_DIR")
-            ;;
         bundled)
-            open_args+=(
-                --env "SWIFTPYTHON_SKIP_IN_PROCESS=1"
-                --env "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME=1"
-            )
+            open_args+=(--env "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME=1")
+            if [ "$mode" = sandbox ]; then
+                open_args+=(--env "SWIFTPYTHON_SKIP_IN_PROCESS=1")
+            fi
             ;;
         *)
             echo "Unknown LaunchServices Python layout: $python_layout" >&2
@@ -1986,6 +2150,36 @@ if [ "$VM_RELEASE_GATE" = 1 ]; then
     assert_nested_probe_identity "$VM_APP"
 fi
 
+if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
+    echo "=== One-time LaunchServices microphone consent bootstrap ==="
+    TCC_BOOTSTRAP_OUTPUT_DIR="$WORK_DIR/tcc-bootstrap"
+    DEVELOPER_BOOTSTRAP_DIGEST="$(bundle_content_digest "$DEVELOPER_APP")"
+    run_app_via_launchservices \
+        developer-id \
+        "$DEVELOPER_APP" \
+        "$DEVELOPER_BUNDLE_IDENTIFIER" \
+        bundled \
+        "$TCC_BOOTSTRAP_OUTPUT_DIR"
+    assert_bundle_remained_sealed "$DEVELOPER_APP"
+    assert_bundle_content_unchanged \
+        "$DEVELOPER_APP" \
+        "$DEVELOPER_BOOTSTRAP_DIGEST"
+
+    SANDBOX_BOOTSTRAP_DIGEST="$(bundle_content_digest "$SANDBOX_APP")"
+    run_app_via_launchservices \
+        sandbox \
+        "$SANDBOX_APP" \
+        "$SANDBOX_BUNDLE_IDENTIFIER" \
+        bundled \
+        "$TCC_BOOTSTRAP_OUTPUT_DIR"
+    assert_bundle_remained_sealed "$SANDBOX_APP"
+    assert_bundle_content_unchanged \
+        "$SANDBOX_APP" \
+        "$SANDBOX_BOOTSTRAP_DIGEST"
+    echo "LaunchServices microphone consent bootstrap passed for both stable app identities."
+    exit 0
+fi
+
 if [ -n "$NOTARY_PROFILE" ]; then
     echo "=== Notarized Developer ID non-sandbox consumer ==="
     notarize_app developer-id
@@ -1994,7 +2188,8 @@ if [ -n "$NOTARY_PROFILE" ]; then
         developer-id \
         "$DEVELOPER_APP" \
         "$DEVELOPER_BUNDLE_IDENTIFIER" \
-        external
+        bundled \
+        "$NOTARY_OUTPUT_DIR"
     assert_bundle_remained_sealed "$DEVELOPER_APP"
     assert_bundle_content_unchanged \
         "$DEVELOPER_APP" \
@@ -2007,7 +2202,8 @@ if [ -n "$NOTARY_PROFILE" ]; then
         sandbox \
         "$SANDBOX_APP" \
         "$SANDBOX_BUNDLE_IDENTIFIER" \
-        bundled
+        bundled \
+        "$NOTARY_OUTPUT_DIR"
     assert_bundle_remained_sealed "$SANDBOX_APP"
     assert_bundle_content_unchanged \
         "$SANDBOX_APP" \
@@ -2025,7 +2221,7 @@ if [ -n "$NOTARY_PROFILE" ]; then
             SWIFTPYTHON_VM_RESTORE_SECRET="$VM_RESTORE_SECRET" \
             SWIFTPYTHON_VM_CLONE_DIR="$VM_CLONE_DIR" \
             SWIFTPYTHON_VM_ITERATIONS="$VM_ITERATIONS" \
-            PYTHONHOME="$PYTHON_HOME_DIR" \
+            PYTHONHOME="$VM_APP/Contents/Frameworks/Python.framework/Versions/3.13" \
             PYTHONNOUSERSITE=1 \
             PYTHONDONTWRITEBYTECODE=1 \
             "$VM_APP/Contents/MacOS/ConsumerSmoke"

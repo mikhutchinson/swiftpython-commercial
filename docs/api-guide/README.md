@@ -1,6 +1,7 @@
 # SwiftPython Public API Guide
 
-This guide documents the public binary API shipped by `swiftpython-commercial`.
+This guide documents the public binary API shipped by
+`swiftpython-commercial` `0.6.0-duplex.8.1`.
 It is written for application authors who need to embed Python execution in a
 macOS app, worker service, or sandboxed tool without access to the private
 SwiftPython source tree.
@@ -50,6 +51,7 @@ the five-file `VMWorker/` set, and the entitlement templates.
 | Stream from a worker without holding its IPC socket | `startOutputStream` + `ManagedOutputBuffer` |
 | Share an opaque managed tensor across host and workers | `createManagedTensor`, `withManagedTensor`, `copyToManagedTensor` |
 | Observe worker lifecycle | `pool.events()` |
+| Await exact custom-transport release after idle shedding | `shedIdleWorkersAndWait(force:)` |
 | Run shell commands inside a Linux VM tenant | `SandboxPool.execShell` |
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
 | Require accelerated isolated startup | `SandboxConfiguration.startup` plus `tenant.startupMode` |

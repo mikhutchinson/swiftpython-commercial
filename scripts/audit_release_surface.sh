@@ -86,6 +86,48 @@ for chapter in ("ch10-full-duplex.md", "ch11-apple-interop.md"):
     if chapter not in guide or not (root / "docs/api-guide" / chapter).is_file():
         raise SystemExit(f"API guide does not index {chapter}")
 
+process_pool_guide = (root / "docs/api-guide/ch4-process-pool.md").read_text()
+for public_name in (
+    "shedIdleWorkersAndWait(force:)",
+    "drainTimedOut(inFlight:seconds:)",
+    "hostAsyncCallbackQuiescenceTimedOut",
+    "workerLifecycleQuiescenceTimedOut",
+    "workerTransportCleanupTimedOut",
+    "workerTransportCleanupFailed",
+):
+    if public_name not in process_pool_guide:
+        raise SystemExit(
+            f"ProcessPool API guide missing current public name: {public_name}"
+        )
+
+duplex_guide = (root / "docs/api-guide/ch10-full-duplex.md").read_text()
+for public_name in (
+    "DuplexFailure",
+    "DuplexFailureCode",
+    "DuplexFailureOrigin",
+    "Hashable",
+):
+    if public_name not in duplex_guide:
+        raise SystemExit(
+            f"duplex API guide missing current public shape: {public_name}"
+        )
+
+audio_guide = (root / "docs/api-guide/ch11-apple-interop.md").read_text()
+for public_name in (
+    "DuplexAudioCaptureNegotiation",
+    "DuplexAudioPlaybackNegotiation",
+    "startRun(sendingTo:)",
+    "stop(mode:)",
+    "runReporting(output:)",
+    "DuplexAudioCaptureError",
+    "DuplexAudioPlaybackError",
+    "DuplexAudioRestartRequirement",
+):
+    if public_name not in audio_guide:
+        raise SystemExit(
+            f"Audio API guide missing current public name: {public_name}"
+        )
+
 package = (root / "Package.swift").read_text()
 for product in (
     "SwiftPythonRuntime",
@@ -189,16 +231,19 @@ for path in "$REPO_DIR"/Entitlements/*.plist "$REPO_DIR"/Entitlements/*.entitlem
     plutil -lint "$path" >/dev/null
 done
 
-audio_probe_audit=(
+# This contract audits both raw Python-linked executables. Each must carry the
+# canonical @rpath Python load command and embedded-framework LC_RPATH; any
+# absolute Python.framework load fails before the remaining release checks.
+python_runtime_audit=(
     python3
     "$REPO_DIR/scripts/audio_probe_release_contract.py"
     --repo "$REPO_DIR"
     --expected-version "$EXPECTED_VERSION"
 )
 if [ -n "$MANIFEST_PATH" ]; then
-    audio_probe_audit+=(--manifest "$MANIFEST_PATH")
+    python_runtime_audit+=(--manifest "$MANIFEST_PATH")
 fi
-"${audio_probe_audit[@]}"
+"${python_runtime_audit[@]}"
 
 engine_xcframework="$REPO_DIR/SwiftPythonEngine.xcframework"
 require_dir "$engine_xcframework"

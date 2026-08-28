@@ -252,6 +252,11 @@ safe points.
 failed terminal. Sessions remain pinned, never migrate or replay, and resolve
 once with final accepted, processed, produced, and acknowledged watermarks.
 
+`DuplexFailure`, `DuplexFailureCode`, and `DuplexFailureOrigin` are `Hashable`
+as well as `Equatable` in `0.6.0-duplex.8`. Applications can deduplicate or
+group the complete structured value without parsing `message` or a rendered
+error description. Equality is still observation, not replay authority.
+
 ## Backend-neutral accelerator policy
 
 Accelerator use is explicit. Existing MLX consumers may continue to use

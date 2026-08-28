@@ -7,8 +7,11 @@ import copy
 import dataclasses
 import hashlib
 import json
+import os
 import pathlib
 import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -17,9 +20,13 @@ import audio_probe_release_contract as contract
 
 
 class ConsumerTimeoutWrapperTests(unittest.TestCase):
-    def test_success_path_watchdog_has_no_orphanable_sleep_child(self) -> None:
+    @staticmethod
+    def source() -> str:
         script = pathlib.Path(__file__).with_name("consumer_path_smoke.sh")
-        source = script.read_text(encoding="utf-8")
+        return script.read_text(encoding="utf-8")
+
+    def test_success_path_watchdog_has_no_orphanable_sleep_child(self) -> None:
+        source = self.source()
         timeout_wrapper = source.split("run_with_timeout() {", 1)[1].split(
             "\n}\n", 1
         )[0]
@@ -31,6 +38,379 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
         self.assertNotIn('sleep "$timeout_seconds"', timeout_wrapper)
         self.assertIn('kill "$watchdog_pid"', timeout_wrapper)
         self.assertIn('wait "$watchdog_pid"', timeout_wrapper)
+
+    def run_shell_selector(
+        self,
+        function_name: str,
+        *,
+        notary_profile: str,
+        audio_probe_gate: str,
+        smoke_id_suffix: str | None = None,
+        audio_tcc_bootstrap: str = "0",
+        vm_release_gate: str = "0",
+    ) -> subprocess.CompletedProcess[str]:
+        function = self.source().split(f"{function_name}() {{", 1)[1].split(
+            "\n}\n", 1
+        )[0]
+        script = f"{function_name}() {{{function}\n}}\n{function_name}\n"
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "NOTARY_PROFILE": notary_profile,
+                "AUDIO_PROBE_GATE": audio_probe_gate,
+                "AUDIO_TCC_BOOTSTRAP": audio_tcc_bootstrap,
+                "VM_RELEASE_GATE": vm_release_gate,
+                "WORK_DIR": (
+                    "/tmp/swiftpython-consumer-path-smoke.Random123"
+                ),
+            }
+        )
+        if smoke_id_suffix is None:
+            environment.pop("SWIFTPYTHON_SMOKE_ID_SUFFIX", None)
+        else:
+            environment["SWIFTPYTHON_SMOKE_ID_SUFFIX"] = smoke_id_suffix
+        return subprocess.run(
+            ["/bin/bash", "-c", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+
+    def test_notary_ready_requires_explicit_stable_smoke_identity(self) -> None:
+        missing = self.run_shell_selector(
+            "select_smoke_id_suffix",
+            notary_profile="configured-profile",
+            audio_probe_gate="ready",
+        )
+        self.assertEqual(missing.returncode, 64)
+        self.assertIn("require an explicit stable", missing.stderr)
+
+        selected = self.run_shell_selector(
+            "select_smoke_id_suffix",
+            notary_profile="configured-profile",
+            audio_probe_gate="ready",
+            smoke_id_suffix="releasegate",
+        )
+        self.assertEqual(selected.returncode, 0)
+        self.assertEqual(selected.stdout, "releasegate")
+
+    def test_tcc_bootstrap_requires_explicit_stable_smoke_identity(self) -> None:
+        missing = self.run_shell_selector(
+            "select_smoke_id_suffix",
+            notary_profile="",
+            audio_probe_gate="ready",
+            audio_tcc_bootstrap="1",
+        )
+        self.assertEqual(missing.returncode, 64)
+        self.assertIn("require an explicit stable", missing.stderr)
+
+        selected = self.run_shell_selector(
+            "select_smoke_id_suffix",
+            notary_profile="",
+            audio_probe_gate="ready",
+            smoke_id_suffix="releasegate",
+            audio_tcc_bootstrap="1",
+        )
+        self.assertEqual(selected.returncode, 0)
+        self.assertEqual(selected.stdout, "releasegate")
+
+    def test_ordinary_smoke_retains_random_identity_fallback(self) -> None:
+        selected = self.run_shell_selector(
+            "select_smoke_id_suffix",
+            notary_profile="",
+            audio_probe_gate="ready",
+        )
+        self.assertEqual(selected.returncode, 0)
+        self.assertEqual(selected.stdout, "random123")
+
+    def test_notary_ready_uses_require_granted_without_prompt_policy(self) -> None:
+        release_policy = self.run_shell_selector(
+            "select_audio_permission_policy",
+            notary_profile="configured-profile",
+            audio_probe_gate="ready",
+        )
+        self.assertEqual(release_policy.returncode, 0)
+        self.assertEqual(release_policy.stdout, "require-granted")
+
+        bootstrap_policy = self.run_shell_selector(
+            "select_audio_permission_policy",
+            notary_profile="",
+            audio_probe_gate="ready",
+            smoke_id_suffix="releasegate",
+            audio_tcc_bootstrap="1",
+        )
+        self.assertEqual(bootstrap_policy.returncode, 0)
+        self.assertEqual(bootstrap_policy.stdout, "request-if-needed")
+
+    def test_tcc_bootstrap_mode_is_separate_and_bounded(self) -> None:
+        valid = self.run_shell_selector(
+            "validate_audio_tcc_bootstrap_mode",
+            notary_profile="",
+            audio_probe_gate="ready",
+            smoke_id_suffix="releasegate",
+            audio_tcc_bootstrap="1",
+        )
+        self.assertEqual(valid.returncode, 0)
+
+        invalid_cases = (
+            {"notary_profile": "configured-profile"},
+            {"audio_probe_gate": "containment"},
+            {"vm_release_gate": "1"},
+        )
+        for overrides in invalid_cases:
+            with self.subTest(overrides=overrides):
+                arguments = {
+                    "notary_profile": "",
+                    "audio_probe_gate": "ready",
+                    "smoke_id_suffix": "releasegate",
+                    "audio_tcc_bootstrap": "1",
+                    "vm_release_gate": "0",
+                }
+                arguments.update(overrides)
+                result = self.run_shell_selector(
+                    "validate_audio_tcc_bootstrap_mode", **arguments
+                )
+                self.assertEqual(result.returncode, 64)
+
+    def test_release_identity_and_permission_policy_are_wired_to_each_app(
+        self,
+    ) -> None:
+        source = self.source()
+        self.assertIn(
+            'DEVELOPER_BUNDLE_IDENTIFIER="ai.bestbyte.sp.d.$SMOKE_ID_SUFFIX"',
+            source,
+        )
+        self.assertIn(
+            'SANDBOX_BUNDLE_IDENTIFIER="ai.bestbyte.sp.s.$SMOKE_ID_SUFFIX"',
+            source,
+        )
+        make_app = source.split("make_app() {", 1)[1].split(
+            "\n}\n\nnotarize_app()", 1
+        )[0]
+        self.assertIn("mode_identifier=s", make_app)
+        self.assertIn("mode_identifier=v", make_app)
+        self.assertIn(
+            'SWIFTPYTHON_AUDIO_PERMISSION_POLICY="$AUDIO_PERMISSION_POLICY"',
+            make_app,
+        )
+        self.assertIn('direct_audio_probe_gate=off', make_app)
+        self.assertIn(
+            'SWIFTPYTHON_AUDIO_PROBE_GATE="$direct_audio_probe_gate"', make_app
+        )
+        launch_services = source.split("run_app_via_launchservices() {", 1)[1]
+        self.assertIn(
+            '--env "SWIFTPYTHON_AUDIO_PERMISSION_POLICY=$AUDIO_PERMISSION_POLICY"',
+            launch_services,
+        )
+        bootstrap = source.split(
+            'echo "=== One-time LaunchServices microphone consent bootstrap ==="',
+            1,
+        )[1].split('\nif [ -n "$NOTARY_PROFILE" ]; then', 1)[0]
+        self.assertIn('TCC_BOOTSTRAP_OUTPUT_DIR="$WORK_DIR/tcc-bootstrap"', bootstrap)
+        self.assertEqual(bootstrap.count("run_app_via_launchservices"), 2)
+        self.assertIn(
+            'run_app_via_launchservices \\\n'
+            '        developer-id \\\n'
+            '        "$DEVELOPER_APP" \\\n'
+            '        "$DEVELOPER_BUNDLE_IDENTIFIER" \\\n'
+            '        bundled \\\n'
+            '        "$TCC_BOOTSTRAP_OUTPUT_DIR"',
+            bootstrap,
+        )
+        self.assertIn(
+            'run_app_via_launchservices \\\n'
+            '        sandbox \\\n'
+            '        "$SANDBOX_APP" \\\n'
+            '        "$SANDBOX_BUNDLE_IDENTIFIER" \\\n'
+            '        bundled \\\n'
+            '        "$TCC_BOOTSTRAP_OUTPUT_DIR"',
+            bootstrap,
+        )
+        self.assertIn("exit 0", bootstrap)
+
+        generated_swift = source.split(
+            'cat > "$destination/Sources/ConsumerSmoke/ConsumerSmoke.swift"', 1
+        )[1].split("\nEOF", 1)[0]
+        self.assertIn('case requestIfNeeded = "request-if-needed"', generated_swift)
+        self.assertIn('case requireGranted = "require-granted"', generated_swift)
+        self.assertIn('] ?? "require-granted"', generated_swift)
+        not_determined = generated_swift.split("case .notDetermined:", 1)[1].split(
+            "case .denied, .restricted:", 1
+        )[0]
+        self.assertIn("guard policy == .requestIfNeeded", not_determined)
+        self.assertIn("AVCaptureDevice.requestAccess", not_determined)
+        self.assertLess(
+            not_determined.index("guard policy == .requestIfNeeded"),
+            not_determined.index("AVCaptureDevice.requestAccess"),
+        )
+        self.assertEqual(generated_swift.count("AVCaptureDevice.requestAccess"), 1)
+
+    def test_readme_documents_stable_one_time_tcc_bootstrap(self) -> None:
+        readme = pathlib.Path(__file__).parents[1].joinpath("README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Notary `ready` mode requires an explicit stable", readme)
+        self.assertIn("SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate", readme)
+        self.assertIn("Bootstrap the two grants once", readme)
+        self.assertIn("never open a TCC prompt", readme)
+        self.assertIn("SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP=1", readme)
+        self.assertIn("through LaunchServices", readme)
+        self.assertIn("directly does not provision", readme)
+
+    def test_every_packaged_app_embeds_complete_python_without_sidecar_rewrite(
+        self,
+    ) -> None:
+        copy_framework = self.source().split(
+            "copy_complete_python_framework() {", 1
+        )[1].split("\n}\n\nassert_embedded_python_framework_is_self_contained()", 1)[0]
+        make_app = self.source().split("make_app() {", 1)[1].split(
+            "\n}\n\nnotarize_app()", 1
+        )[0]
+        self.assertIn("--copy-unsafe-links", copy_framework)
+        self.assertIn(
+            "--exclude '/Versions/*/lib/python*/test/'", copy_framework
+        )
+        self.assertIn(
+            'assert_embedded_python_framework_is_self_contained "$destination"',
+            copy_framework,
+        )
+        self.assertIn('copy_complete_python_framework "$python_framework"', make_app)
+        self.assertIn(
+            'cmp -s "$REPO_DIR/SwiftPythonWorker" "$macos/SwiftPythonWorker"',
+            make_app,
+        )
+        self.assertIn(
+            'assert_python_loader_contract "$macos/SwiftPythonWorker"', make_app
+        )
+        self.assertIn(
+            'assert_python_loader_contract "$macos/SwiftPythonAudioProbe"', make_app
+        )
+        self.assertNotIn("install_name_tool -change", make_app)
+
+    def test_embedded_python_framework_rejects_broken_or_escaping_symlinks(
+        self,
+    ) -> None:
+        validator = self.source().split(
+            "assert_embedded_python_framework_is_self_contained() {", 1
+        )[1].split("\n}\n\nassert_python_loader_contract()", 1)[0]
+        self.assertIn("os.walk(root, followlinks=False)", validator)
+        self.assertIn("os.path.isabs(link_text)", validator)
+        self.assertIn("path.resolve(strict=True)", validator)
+        self.assertIn("target.relative_to(root)", validator)
+        self.assertIn("raise SystemExit(1)", validator)
+
+    def test_embedded_python_framework_symlink_validator_behaves_fail_closed(
+        self,
+    ) -> None:
+        validator = self.source().split(
+            "assert_embedded_python_framework_is_self_contained() {", 1
+        )[1].split("<<'PY'\n", 1)[1].split("\nPY\n}", 1)[0]
+
+        def validate(root: pathlib.Path) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, "-c", validator, str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            (root / "target").write_text("runtime data", encoding="utf-8")
+            (root / "internal").symlink_to("target")
+            self.assertEqual(validate(root).returncode, 0)
+
+        failure_cases = ("absolute", "broken", "escaping", "cyclic")
+        for failure_case in failure_cases:
+            with self.subTest(failure_case=failure_case):
+                with tempfile.TemporaryDirectory() as temporary:
+                    base = pathlib.Path(temporary)
+                    root = base / "Python.framework"
+                    root.mkdir()
+                    target = root / "target"
+                    target.write_text("runtime data", encoding="utf-8")
+                    if failure_case == "absolute":
+                        (root / "unsafe").symlink_to(target)
+                    elif failure_case == "broken":
+                        (root / "unsafe").symlink_to("missing")
+                    elif failure_case == "escaping":
+                        outside = base / "outside"
+                        outside.write_text("external data", encoding="utf-8")
+                        (root / "unsafe").symlink_to("../outside")
+                    else:
+                        (root / "unsafe-a").symlink_to("unsafe-b")
+                        (root / "unsafe-b").symlink_to("unsafe-a")
+                    result = validate(root)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(
+                        "not a self-contained distribution", result.stderr
+                    )
+
+    def test_release_surface_routes_worker_and_probe_through_python_contract(
+        self,
+    ) -> None:
+        audit = pathlib.Path(__file__).with_name("audit_release_surface.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("python_runtime_audit=(", audit)
+        self.assertIn("audio_probe_release_contract.py", audit)
+        self.assertIn("absolute Python.framework load fails", audit)
+
+    def test_raw_consumer_smokes_use_the_worker_framework_home(self) -> None:
+        source = self.source()
+        self.assertIn(
+            'LOCAL_RUNTIME_PYTHON_HOME="$LOCAL_RUNTIME_DIR/Frameworks/'
+            'Python.framework/Versions/3.13"',
+            source,
+        )
+        self.assertGreaterEqual(
+            source.count('PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME"'), 2
+        )
+        self.assertGreaterEqual(source.count("SWIFTPYTHON_SKIP_IN_PROCESS=1"), 2)
+
+
+class PythonRuntimeContractTests(unittest.TestCase):
+    def test_canonical_loader_relative_contract_passes(self) -> None:
+        observed = contract.validate_python_runtime_contract(
+            "fixture",
+            ["/usr/lib/libSystem.B.dylib", contract.PYTHON_LOAD_COMMAND],
+            [
+                "/usr/lib/swift",
+                contract.EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH,
+                "@loader_path",
+            ],
+        )
+        self.assertEqual(observed, (contract.PYTHON_LOAD_COMMAND,))
+
+    def test_absolute_python_framework_from_any_prefix_is_rejected(self) -> None:
+        for prefix in ("/Library", "/opt/homebrew", "/usr/local", "/arbitrary/root"):
+            with self.subTest(prefix=prefix), self.assertRaisesRegex(
+                contract.ContractError, "absolute Python load command"
+            ):
+                contract.validate_python_runtime_contract(
+                    "fixture",
+                    [f"{prefix}/Python.framework/Versions/3.13/Python"],
+                    [contract.EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH],
+                )
+
+    def test_noncanonical_relative_python_load_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            contract.ContractError, "noncanonical Python load command"
+        ):
+            contract.validate_python_runtime_contract(
+                "fixture",
+                ["@executable_path/../Frameworks/Python.framework/Versions/3.13/Python"],
+                [contract.EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH],
+            )
+
+    def test_embedded_framework_run_path_is_required(self) -> None:
+        with self.assertRaisesRegex(contract.ContractError, "missing LC_RPATH"):
+            contract.validate_python_runtime_contract(
+                "fixture",
+                [contract.PYTHON_LOAD_COMMAND],
+                ["/usr/lib/swift", "@loader_path"],
+            )
 
 
 class AudioProbeReleaseContractTests(unittest.TestCase):
@@ -72,12 +452,14 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
             load_commands=(
                 "/System/Library/Frameworks/AVFAudio.framework/Versions/A/AVFAudio",
                 "/System/Library/Frameworks/AudioToolbox.framework/Versions/A/AudioToolbox",
-                "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/Python",
+                contract.PYTHON_LOAD_COMMAND,
             ),
-            run_paths=("/usr/lib/swift", "@loader_path"),
-            python_load_commands=(
-                "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/Python",
+            run_paths=(
+                "/usr/lib/swift",
+                contract.EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH,
+                "@loader_path",
             ),
+            python_load_commands=(contract.PYTHON_LOAD_COMMAND,),
             signing_identifier=contract.PROBE_IDENTIFIER,
             signature_kind="developerIDApplication",
             signature_authorities=("Developer ID Application: Test (TEAMID)",),
@@ -338,6 +720,11 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
         assert isinstance(artifacts, list)
         return next(item for item in artifacts if item["role"] == contract.PROBE_ROLE)
 
+    def worker_record(self, manifest: dict[str, object]) -> dict[str, object]:
+        artifacts = manifest["artifacts"]
+        assert isinstance(artifacts, list)
+        return next(item for item in artifacts if item["role"] == "workerExecutable")
+
     def distribution_record(self, manifest: dict[str, object]) -> dict[str, object]:
         artifacts = manifest["artifacts"]
         assert isinstance(artifacts, list)
@@ -458,6 +845,18 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
         self.probe_record(candidate)["inventedField"] = "not allowed"
         with self.assertRaisesRegex(contract.ContractError, "missing or extra fields"):
             self.validate(candidate)
+
+    def test_worker_inventory_is_closed(self) -> None:
+        candidate = copy.deepcopy(self.manifest)
+        self.worker_record(candidate)["inventedField"] = "not allowed"
+        with self.assertRaisesRegex(contract.ContractError, "missing or extra fields"):
+            self.validate(candidate)
+
+    def test_worker_manifest_keeps_schema_3_base_record(self) -> None:
+        self.assertEqual(
+            set(self.worker_record(self.manifest)),
+            {"name", "path", "role", "bytes", "sha256"},
+        )
 
     def test_probe_inventory_must_equal_staged_executable(self) -> None:
         candidate = copy.deepcopy(self.manifest)

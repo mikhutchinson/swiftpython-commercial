@@ -40,6 +40,27 @@ final class PublicDocumentationAPITests: XCTestCase {
         )
         XCTAssertEqual(duplex.requirements, .managedBuffers)
 
+        let failure = DuplexFailure(
+            code: .timeout,
+            origin: .runtime,
+            message: "documentation shape"
+        )
+        let failures: Set<DuplexFailure> = [failure]
+        let failureCodes: Set<DuplexFailureCode> = [.timeout]
+        let failureOrigins: Set<DuplexFailureOrigin> = [.runtime]
+        XCTAssertTrue(failures.contains(failure))
+        XCTAssertTrue(failureCodes.contains(.timeout))
+        XCTAssertTrue(failureOrigins.contains(.runtime))
+
+        let _: PythonWorkerError = .drainTimedOut(inFlight: 2, seconds: 0.5)
+        let lifecycleEvents: [PoolEvent] = [
+            .hostAsyncCallbackQuiescenceTimedOut(workerID: 0, activeTaskCount: 1),
+            .workerLifecycleQuiescenceTimedOut(workerIDs: [0]),
+            .workerTransportCleanupTimedOut(workerIDs: [0]),
+            .workerTransportCleanupFailed(workerIDs: [0], messages: ["failed"]),
+        ]
+        XCTAssertEqual(lifecycleEvents.count, 4)
+
         let sandbox = SandboxConfiguration(
             runtimeAsset: URL(fileURLWithPath: "/tmp/base.img"),
             storageDirectory: URL(fileURLWithPath: "/tmp/sandboxes"),
@@ -76,6 +97,8 @@ final class PublicDocumentationAPITests: XCTestCase {
         sandbox: SandboxPool,
         tenant: SandboxTenant,
         session: PythonDuplexSession,
+        capture: DuplexAudioCapture,
+        playback: DuplexAudioPlayback,
         shared: PyHandle,
         model: OwnedPyHandle
     ) async throws {
@@ -97,6 +120,7 @@ final class PublicDocumentationAPITests: XCTestCase {
             reason: .userInitiated,
             force: true
         )
+        await pool.shedIdleWorkersAndWait(force: true)
         _ = try await pool.addWorkers(1)
 
         let stream: CancellableStream<Int> = try await pool.evalStream(
@@ -160,6 +184,23 @@ final class PublicDocumentationAPITests: XCTestCase {
         )
 
         #if os(macOS)
+            _ = capture.readiness()
+            let captureRun = try await capture.startRun(sendingTo: session.input)
+            let captureReport = try await capture.stop(
+                mode: .drainBuffered(finishInput: true)
+            )
+            _ = capture.terminalReport(for: captureRun)
+            _ = captureReport
+
+            _ = playback.readiness()
+            let playbackReport = try await playback.runReporting(
+                output: session.output
+            )
+            _ = playback.lastRunReport
+            _ = playbackReport
+            let _: DuplexAudioRestartRequirement =
+                .reconfigureAudioSessionAndRestart
+
             let format = try DuplexAudioFormat(
                 sampleRate: 24_000,
                 channels: 1,

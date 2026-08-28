@@ -33,6 +33,8 @@ MANIFEST_SCHEMA_VERSION = 3
 NON_SANDBOX_ENTITLEMENTS = "SwiftPythonAudioProbe.entitlements"
 SANDBOX_ENTITLEMENTS = "SwiftPythonAudioProbe-sandbox.entitlements"
 EXPECTED_PUBLIC_ARCHITECTURES = ("arm64", "x86_64")
+PYTHON_LOAD_COMMAND = "@rpath/Python.framework/Versions/3.13/Python"
+EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH = "@executable_path/../Frameworks"
 EXPECTED_VM_IMAGE_VERSION = 1
 EXPECTED_VM_DISTRO = "ubuntu-24.04-arm64"
 EXPECTED_PROTOCOLS = {
@@ -124,11 +126,23 @@ EXPECTED_SANDBOX_ENTITLEMENTS = {
     "com.apple.security.app-sandbox": True,
     "com.apple.security.inherit": True,
 }
-ALLOWED_RUN_PATHS = {"/usr/lib/swift", "@loader_path"}
+ALLOWED_RUN_PATHS = {
+    "/usr/lib/swift",
+    "@loader_path",
+    EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH,
+}
 
 
 class ContractError(RuntimeError):
     """A fail-closed release-contract violation."""
+
+
+@dataclass(frozen=True)
+class PythonRuntimeInventory:
+    architectures: tuple[str, ...]
+    load_commands: tuple[str, ...]
+    run_paths: tuple[str, ...]
+    python_load_commands: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -231,18 +245,22 @@ def verify_entitlement_templates(repo: pathlib.Path) -> None:
     )
 
 
-def probe_architectures(probe: pathlib.Path) -> tuple[str, ...]:
-    values = tuple(sorted(run(["lipo", "-archs", str(probe)]).stdout.split()))
-    require(values, "audio probe has an empty architecture inventory")
+def executable_architectures(
+    executable: pathlib.Path, artifact_name: str
+) -> tuple[str, ...]:
+    values = tuple(sorted(run(["lipo", "-archs", str(executable)]).stdout.split()))
+    require(values, f"{artifact_name} has an empty architecture inventory")
     require(
         len(values) == len(set(values)),
-        "audio probe architecture inventory is duplicated",
+        f"{artifact_name} architecture inventory is duplicated",
     )
     return values
 
 
-def otool_lines(probe: pathlib.Path, architecture: str) -> list[str]:
-    return run(["otool", "-arch", architecture, "-l", str(probe)]).stdout.splitlines()
+def otool_lines(executable: pathlib.Path, architecture: str) -> list[str]:
+    return run(
+        ["otool", "-arch", architecture, "-l", str(executable)]
+    ).stdout.splitlines()
 
 
 def build_version(lines: Sequence[str], architecture: str) -> tuple[str, str, str]:
@@ -278,7 +296,9 @@ def build_version(lines: Sequence[str], architecture: str) -> tuple[str, str, st
     return versions[0]
 
 
-def run_paths(lines: Sequence[str], architecture: str) -> tuple[str, ...]:
+def run_paths(
+    lines: Sequence[str], architecture: str, artifact_name: str = "audio probe"
+) -> tuple[str, ...]:
     values: list[str] = []
     expects_path = False
     for line in lines:
@@ -289,32 +309,121 @@ def run_paths(lines: Sequence[str], architecture: str) -> tuple[str, ...]:
         if expects_path and field.startswith("path "):
             value = field.removeprefix("path ").split(" (offset ", 1)[0]
             require(
-                value != "", f"audio probe {architecture} has an unreadable LC_RPATH"
+                value != "",
+                f"{artifact_name} {architecture} has an unreadable LC_RPATH",
             )
             values.append(value)
             expects_path = False
     require(
         len(values) == len(set(values)),
-        "audio probe contains duplicate LC_RPATH entries",
-    )
-    unexpected = set(values) - ALLOWED_RUN_PATHS
-    require(
-        not unexpected,
-        f"audio probe contains unapproved LC_RPATH entries: {sorted(unexpected)}",
+        f"{artifact_name} contains duplicate LC_RPATH entries",
     )
     return tuple(sorted(values))
 
 
-def load_commands(probe: pathlib.Path, architecture: str) -> tuple[str, ...]:
-    output = run(["otool", "-arch", architecture, "-L", str(probe)]).stdout
+def load_commands(
+    executable: pathlib.Path, architecture: str, artifact_name: str = "audio probe"
+) -> tuple[str, ...]:
+    output = run(
+        ["otool", "-arch", architecture, "-L", str(executable)]
+    ).stdout
     values = []
     for line in output.splitlines()[1:]:
         stripped = line.strip()
         if stripped:
             values.append(stripped.split(" (", 1)[0])
     values.sort()
-    require(values, "audio probe has an empty dynamic-load inventory")
+    require(values, f"{artifact_name} has an empty dynamic-load inventory")
     return tuple(values)
+
+
+def is_python_load_command(command: str) -> bool:
+    lowercased = command.lower()
+    if "python.framework" in lowercased:
+        return True
+    basename = pathlib.PurePosixPath(command).name.lower()
+    return basename == "python" or basename.startswith("libpython")
+
+
+def validate_python_runtime_contract(
+    artifact_name: str,
+    load_inventory: Sequence[str],
+    run_path_inventory: Sequence[str],
+) -> tuple[str, ...]:
+    python_loads = tuple(
+        command for command in load_inventory if is_python_load_command(command)
+    )
+    require(
+        len(python_loads) == 1,
+        f"{artifact_name} must contain exactly one Python load command; "
+        f"found {list(python_loads)}",
+    )
+    observed = python_loads[0]
+    if observed != PYTHON_LOAD_COMMAND:
+        classification = (
+            "absolute Python load command"
+            if pathlib.PurePosixPath(observed).is_absolute()
+            else "noncanonical Python load command"
+        )
+        raise ContractError(
+            f"{artifact_name} contains an {classification}: {observed}; "
+            f"expected {PYTHON_LOAD_COMMAND}"
+        )
+    require(
+        len(run_path_inventory) == len(set(run_path_inventory)),
+        f"{artifact_name} contains duplicate LC_RPATH entries",
+    )
+    require(
+        EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH in run_path_inventory,
+        f"{artifact_name} is missing LC_RPATH "
+        f"{EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH}",
+    )
+    unexpected = set(run_path_inventory) - ALLOWED_RUN_PATHS
+    require(
+        not unexpected,
+        f"{artifact_name} contains nonportable or unapproved LC_RPATH entries: "
+        f"{sorted(unexpected)}",
+    )
+    return python_loads
+
+
+def inspect_python_runtime(
+    executable: pathlib.Path, artifact_name: str
+) -> PythonRuntimeInventory:
+    try:
+        metadata = executable.lstat()
+    except OSError as error:
+        raise ContractError(f"missing {artifact_name}: {executable}") from error
+    require(not stat.S_ISLNK(metadata.st_mode), f"{artifact_name} must not be a symlink")
+    require(stat.S_ISREG(metadata.st_mode), f"{artifact_name} must be a regular file")
+    require(os.access(executable, os.X_OK), f"{artifact_name} must be executable")
+
+    architectures = executable_architectures(executable, artifact_name)
+    per_arch_loads = tuple(
+        load_commands(executable, architecture, artifact_name)
+        for architecture in architectures
+    )
+    per_arch_run_paths = tuple(
+        run_paths(otool_lines(executable, architecture), architecture, artifact_name)
+        for architecture in architectures
+    )
+    require(
+        len(set(per_arch_loads)) == 1,
+        f"{artifact_name} slices have different load commands",
+    )
+    require(
+        len(set(per_arch_run_paths)) == 1,
+        f"{artifact_name} slices have different run paths",
+    )
+    loads = per_arch_loads[0]
+    paths = per_arch_run_paths[0]
+    python_loads = validate_python_runtime_contract(artifact_name, loads, paths)
+    return PythonRuntimeInventory(
+        architectures=architectures,
+        load_commands=loads,
+        run_paths=paths,
+        python_load_commands=python_loads,
+    )
 
 
 def embedded_info(probe: pathlib.Path, architecture: str) -> dict[str, Any]:
@@ -361,42 +470,20 @@ def signed_entitlements(probe: pathlib.Path) -> dict[str, bool]:
 
 def inspect_probe(repo: pathlib.Path) -> ProbeInventory:
     probe = repo / PROBE_NAME
-    try:
-        metadata = probe.lstat()
-    except OSError as error:
-        raise ContractError(f"missing audio probe: {probe}") from error
-    require(
-        not stat.S_ISLNK(metadata.st_mode),
-        "audio probe final path must not be a symlink",
-    )
-    require(
-        stat.S_ISREG(metadata.st_mode), "audio probe final path must be a regular file"
-    )
-    require(os.access(probe, os.X_OK), "audio probe final path must be executable")
-
-    architectures = probe_architectures(probe)
+    runtime_inventory = inspect_python_runtime(probe, "audio probe")
+    architectures = runtime_inventory.architectures
     require(
         architectures == EXPECTED_PUBLIC_ARCHITECTURES,
         "public audio probe architecture inventory must be exactly "
         f"{list(EXPECTED_PUBLIC_ARCHITECTURES)}, found {list(architectures)}",
     )
     versions = []
-    per_arch_loads = []
-    per_arch_rpaths = []
     per_arch_info = []
     for architecture in architectures:
         lines = otool_lines(probe, architecture)
         versions.append(build_version(lines, architecture))
-        per_arch_loads.append(load_commands(probe, architecture))
-        per_arch_rpaths.append(run_paths(lines, architecture))
         per_arch_info.append(embedded_info(probe, architecture))
     require(len(set(versions)) == 1, "audio probe slices have different build versions")
-    require(
-        len(set(per_arch_loads)) == 1, "audio probe slices have different load commands"
-    )
-    require(
-        len(set(per_arch_rpaths)) == 1, "audio probe slices have different run paths"
-    )
     encoded_info = [plistlib.dumps(value, sort_keys=True) for value in per_arch_info]
     require(
         len(set(encoded_info)) == 1,
@@ -410,35 +497,13 @@ def inspect_probe(repo: pathlib.Path) -> ProbeInventory:
     require(
         minimum_os_version == "15.0", "audio probe minimum macOS version must be 15.0"
     )
-    loads = per_arch_loads[0]
+    loads = runtime_inventory.load_commands
     for framework in ("AVFAudio.framework", "AudioToolbox.framework"):
         require(
             any(framework in command for command in loads),
             f"audio probe is missing required {framework} load command",
         )
-    python_loads = tuple(
-        command
-        for command in loads
-        if "python.framework" in command.lower() or "libpython" in command.lower()
-    )
-    require(
-        len(python_loads) == 1,
-        "current audio probe must contain exactly one explicit Python load command",
-    )
-    python_dependency = pathlib.Path(python_loads[0])
-    require(
-        python_dependency.is_absolute() and python_dependency.is_file(),
-        "audio probe Python load command does not resolve to a regular file: "
-        f"{python_dependency}",
-    )
-    python_architectures = set(
-        run(["lipo", "-archs", str(python_dependency)]).stdout.split()
-    )
-    require(
-        set(architectures).issubset(python_architectures),
-        "audio probe Python dependency does not cover every probe architecture: "
-        f"probe={list(architectures)} python={sorted(python_architectures)}",
-    )
+    python_loads = runtime_inventory.python_load_commands
     for command in loads:
         require(
             "/Users/" not in command
@@ -448,7 +513,7 @@ def inspect_probe(repo: pathlib.Path) -> ProbeInventory:
         )
         is_system = command.startswith(("/System/Library/", "/usr/lib/"))
         require(
-            is_system or command in python_loads,
+            is_system or command == PYTHON_LOAD_COMMAND,
             f"audio probe contains an unapproved dynamic-load command: {command}",
         )
 
@@ -517,7 +582,7 @@ def inspect_probe(repo: pathlib.Path) -> ProbeInventory:
         minimum_os_version=minimum_os_version,
         sdk_version=sdk_version,
         load_commands=loads,
-        run_paths=per_arch_rpaths[0],
+        run_paths=runtime_inventory.run_paths,
         python_load_commands=python_loads,
         signing_identifier=signing_identifier,
         signature_kind="developerIDApplication",
@@ -1381,6 +1446,7 @@ def main(arguments: Iterable[str] | None = None) -> int:
     repo = options.repo.resolve()
     try:
         verify_entitlement_templates(repo)
+        inspect_python_runtime(repo / "SwiftPythonWorker", "SwiftPythonWorker")
         inventory = inspect_probe(repo)
         if options.manifest is not None:
             manifest_path = options.manifest.resolve()

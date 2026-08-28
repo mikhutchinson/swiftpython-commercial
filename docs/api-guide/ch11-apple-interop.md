@@ -60,6 +60,46 @@ Lifecycle notifications are observations. The application decides whether an
 audio interruption should finish input, interrupt model output, cancel, or
 reopen a later session.
 
+## Typed readiness and terminal ownership
+
+The requested `DuplexAudioFormat` is the wire contract, not a hardware-format
+request. Capture readiness reports a `DuplexAudioCaptureNegotiation` containing
+the hardware, tap, and wire formats plus conversion and channel-mapping facts.
+Playback readiness reports a `DuplexAudioPlaybackNegotiation` containing wire,
+mixer, and hardware-output formats. Treat either negotiation as belonging to
+that adapter and route observation; activation revalidates it.
+
+Capture is reusable after exact terminal cleanup. Prefer
+`startRun(sendingTo:)` and the typed stop surface:
+
+```swift
+let runID = try await capture.startRun(sendingTo: session.input)
+
+// Later, after the application has chosen its lifecycle policy:
+let report = try await capture.stop(
+    mode: .drainBuffered(finishInput: true)
+)
+precondition(report.runID == runID)
+```
+
+`latestStopReport`, `terminalReport(for:)`, and
+`waitForTerminal(of:)` retain exact completion independently of the bounded
+best-effort `events` stream. `droppedEventCount` reports displaced event
+observations. The deprecated `stop(finishInput:)` wrapper cannot return typed
+finish failure; new code should use `stop(mode:)`.
+
+Playback remains single-run because `DuplexOutput` admits one consumer. Use
+`runReporting(output:)` when the caller needs the exact
+`DuplexAudioPlaybackRunReport`; `lastRunReport` and the typed state, terminal,
+and failure events expose the same lifecycle without turning event delivery
+into completion authority.
+
+Typed `DuplexAudioCaptureError` and `DuplexAudioPlaybackError` distinguish
+permission, device/route, conversion, engine, overflow/underrun, cancellation,
+and runtime failures. Route changes, interruptions, and media-services events
+carry a `DuplexAudioRestartRequirement`; SwiftPython does not restart an audio
+session or replay media on the application's behalf.
+
 ## Bounded macOS hardware readiness
 
 `DuplexAudioHardwareProbeLauncher` is macOS-only. It launches one fresh helper
@@ -67,9 +107,9 @@ engine at the fixed path
 `Bundle.main.bundleURL/Contents/MacOS/SwiftPythonAudioProbe`; it never searches
 `PATH`, discovers a worker or build product, autobuilds, accepts a caller path,
 uses XPC, or falls back to an in-process engine. Published
-`0.6.0-duplex.7` predates this helper. A newer candidate exposing the launcher
-is complete only when the exact matching raw helper is embedded, re-signed,
-and verified with it.
+`0.6.0-duplex.7` predates this helper. Published `0.6.0-duplex.8` ships the
+launcher and matching raw helper; an application must embed and re-sign those
+exact helper bytes before using the launcher.
 
 The parent application owns microphone privacy policy:
 

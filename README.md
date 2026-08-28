@@ -4,10 +4,10 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.8`
+Current release: `0.6.0-duplex.8.1`
 
 The preceding `0.6.0-duplex.7` tag predates the raw audio-readiness helper and
-does not contain it. This candidate carries the complete distribution contract
+does not contain it. This release carries the complete distribution contract
 for `DuplexAudioHardwareProbeLauncher`.
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
@@ -44,13 +44,13 @@ same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
 release version. Worker wire v6 is not compatible with the published v0.5
 worker wire v5.
 
-The `SwiftPythonCommercial-0.6.0-duplex.8.zip` asset contains this complete
+The `SwiftPythonCommercial-0.6.0-duplex.8.1.zip` asset contains this complete
 checkout. The four XCFramework zips are individual binary-target assets. Its
 `manifest.json` is a separate asset and attests all four zips, the worker, the
 audio probe, all five VM helpers, the complete distribution, and the
 same-version VM image used for the VM gate.
 
-A launcher-bearing candidate uses manifest schema 3 and adds exactly one
+A launcher-bearing release uses manifest schema 3 and adds exactly one
 `audioHardwareProbeExecutable` record for `SwiftPythonAudioProbe`, plus
 `protocols.audioHardwareProbe: 1`. Its complete distribution must contain the
 same helper bytes and both probe entitlement templates. The raw helper is not a
@@ -79,7 +79,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.8"
+        exact: "0.6.0-duplex.8.1"
     )
 ]
 ```
@@ -289,8 +289,9 @@ the certificate class:
 Each inherited nested-code template contains exactly
 `com.apple.security.app-sandbox` and `com.apple.security.inherit`.
 Capabilities belong on the parent. For a sandboxed distribution, bundle
-Python, rewrite the host, worker, and probe load commands to the bundle-local
-framework, and same-team-sign all native code. Sign the probe with the exact
+Python at `Contents/Frameworks/Python.framework`, verify the worker and probe
+retain the published app-relative load contract, and same-team-sign all native
+code. Sign the probe with the exact
 identifier `<parent signing identifier>.SwiftPythonAudioProbe` at the fixed
 path before signing the outer app.
 
@@ -341,10 +342,40 @@ receipt files are part of the gate evidence. All three app-shaped fixtures
 embed and re-sign the helper; the virtualization fixture does not make a
 redundant device claim.
 
-For a human-operated microphone gate, set a stable 4-32 character lowercase
-alphanumeric `SWIFTPYTHON_SMOKE_ID_SUFFIX`. This keeps the two throwaway bundle
-identifiers stable across an initial consent run and the exact repeated gate;
-it does not bypass TCC or grant permission itself.
+Notary `ready` mode requires an explicit stable 4-32 character lowercase
+alphanumeric `SWIFTPYTHON_SMOKE_ID_SUFFIX`; release automation uses
+`releasegate`. That produces distinct, version-independent Developer ID,
+sandbox, and virtualization test identities. The Developer ID and sandbox apps
+each need one initial microphone grant for the release-machine user. Later
+notary runs use a require-granted policy and never open a TCC prompt: missing,
+denied, or reset permission fails the gate before notarization. The VM fixture
+does not access the microphone.
+
+Bootstrap the two grants once, interactively, without a notary profile. The
+explicit bootstrap mode runs its preliminary direct smoke with the audio gate
+off, then launches the stable Developer ID and sandbox apps through
+LaunchServices with `request-if-needed`. Its receipts live under the disposable
+smoke work directory and are not release evidence. Use the exact stable suffix
+that later release runs use:
+
+```bash
+env -u SWIFTPYTHON_NOTARY_PROFILE \
+  SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
+  SWIFTPYTHON_AUDIO_PROBE_GATE=ready \
+  SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP=1 \
+  SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate \
+  SWIFTPYTHON_VM_RELEASE_GATE=0 \
+  scripts/consumer_path_smoke.sh
+```
+
+Executing `Contents/MacOS/ConsumerSmoke` directly does not provision the app's
+LaunchServices/TCC identity and is not a substitute for this bootstrap. The
+bootstrap reuses macOS's normal signed-app update identity; it does not bypass
+TCC or make the retained permission release evidence. Every candidate still
+needs its own fresh helper receipt, notarization, staple, quarantine,
+Gatekeeper, LaunchServices, and sealed-bundle checks. Do not derive the suffix
+from a release version, path, machine, timestamp, or artifact hash, and do not
+reuse a production application's bundle identifier.
 
 ## Build and run public evidence
 
@@ -372,6 +403,8 @@ SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>" \
 SWIFTPYTHON_NOTARY_OUTPUT_DIR="$PWD/notarization" \
 SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
 SWIFTPYTHON_AUDIO_PROBE_GATE=ready \
+SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP=0 \
+SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate \
 SWIFTPYTHON_VM_RELEASE_GATE=1 \
 SWIFTPYTHON_VM_BASE_IMAGE=/absolute/path/to/base-ubuntu.img \
 SWIFTPYTHON_VM_SNAPSHOT=/absolute/path/to/snapshot \
@@ -403,11 +436,34 @@ preserved rather than collapsed to `0.6.0`.
 
 ## Release notes
 
+### 0.6.0-duplex.8.1
+
+- Rebased `SwiftPythonWorker` and `SwiftPythonAudioProbe` onto the standard
+  `@rpath/Python.framework/Versions/3.13/Python` contract. Packaged helpers no
+  longer encode a machine-wide Python installation path.
+- Added fail-fast worker startup validation for the loaded CPython core,
+  framework metadata, standard library, and native standard-library extension
+  origins. A mixed runtime is rejected before user Python executes.
+- Added release gates that reject absolute Python framework dependencies and a
+  neutral two-root async-callback relocation stress. Public Swift APIs, worker
+  wire v6, and duplex media v1 are unchanged.
+- Consumers must embed one coherent Python framework at
+  `Contents/Frameworks/Python.framework` and re-sign the final nested code.
+  Fresh artifacts require no downstream rewrite and consumers must not rely on
+  one; a defensive audit/repair may remain as defense in depth if it rejects
+  leftovers. Remove any conflicting `PYTHONHOME`.
+
 ### 0.6.0-duplex.8
 
 - Added the raw `SwiftPythonAudioProbe` distribution contract, schema-3
   manifest audit, entitlement templates, and signed app-shaped containment/
   readiness fixtures. Published `0.6.0-duplex.7` remains unchanged.
+- Added `PythonProcessPool.shedIdleWorkersAndWait(force:)`, typed
+  `PythonWorkerError.drainTimedOut(inFlight:seconds:)`, and explicit callback,
+  worker-lifecycle, and transport-cleanup uncertainty events. These are
+  source-additive and do not change worker wire v6.
+- Made `DuplexFailure`, `DuplexFailureCode`, and `DuplexFailureOrigin`
+  `Hashable` for structured failure grouping without parsing descriptions.
 
 ### 0.6.0-duplex.7
 
