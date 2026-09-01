@@ -114,8 +114,8 @@ Common deployment patterns:
 
 | Pattern | Use |
 |---------|-----|
-| Homebrew Python | Developer tools and internal apps |
-| Bundled framework/venv | Apps that must run without a system package manager |
+| Commercial private Python framework | Every app consuming this package |
+| Additional bundled site packages | Third-party Python dependencies not present in the sealed standard library |
 | VM tenant image | Isolated Linux tools, untrusted jobs, or per-tenant dependencies |
 
 Make sure the same environment is visible to:
@@ -124,9 +124,9 @@ Make sure the same environment is visible to:
 - `SwiftPythonWorker` for process pools,
 - VM images if you use `SandboxPool`.
 
-For Finder/Dock apps, set `PYTHONHOME` and any required `PATH`/package search
-paths in the launcher or app bootstrap. Terminal shell state is not inherited by
-Finder launches.
+Finder/Dock launches use the same private framework as Terminal launches. Do
+not add `PYTHONHOME`, `PATH`, Homebrew discovery, or linker setup to the app;
+bundle any additional Python packages as application-owned resources.
 
 ## Numeric Packages
 

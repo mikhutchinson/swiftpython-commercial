@@ -54,8 +54,9 @@ Convenience module properties include `sys`, `os`, `asyncio`, `builtins`,
 `json`, `io`, `re`, `math`, `datetime`, `pathlib`, and `collections`. For any
 other package, use `Python.import("package_name")`.
 
-The package must be importable by the Python 3.13 runtime your app launches
-with. See the root README for `PYTHONHOME`, app bundle, and linker setup.
+The standard library is supplied by the commercial package's private Python
+3.13 runtime. Additional third-party packages must be bundled for that same
+runtime; no host Python or `PYTHONHOME` setup is used.
 
 ## `PyObjectRef`
 
@@ -147,7 +148,7 @@ reason and are already inside a GIL-held scope.
 | Issue | Fix |
 |-------|-----|
 | CPython operation performed outside a GIL/executor scope | Retain the reference if identity matters, but perform the operation inside `Python.run`, `PythonExecutor`, or `withGIL` |
-| Import works in Terminal but not Finder launch | Set `PYTHONHOME` and app launch environment for the bundled/Homebrew Python |
-| Python package missing at runtime | Install or bundle it for the same Python 3.13 environment the app uses |
+| Import works in Terminal but not Finder launch | Remove host-environment assumptions and bundle the dependency for the private commercial runtime |
+| Python package missing at runtime | Bundle it for the private Python 3.13 runtime shipped with the app |
 | CPU-bound code blocks the app process | Move it to `PythonProcessPool` |
 | Native extension crash takes down the app | Run that workload in a worker process or VM tenant |

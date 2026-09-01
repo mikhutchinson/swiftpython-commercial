@@ -214,7 +214,7 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
             '        developer-id \\\n'
             '        "$DEVELOPER_APP" \\\n'
             '        "$DEVELOPER_BUNDLE_IDENTIFIER" \\\n'
-            '        bundled \\\n'
+            '        packaged \\\n'
             '        "$TCC_BOOTSTRAP_OUTPUT_DIR"',
             bootstrap,
         )
@@ -223,7 +223,7 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
             '        sandbox \\\n'
             '        "$SANDBOX_APP" \\\n'
             '        "$SANDBOX_BUNDLE_IDENTIFIER" \\\n'
-            '        bundled \\\n'
+            '        packaged \\\n'
             '        "$TCC_BOOTSTRAP_OUTPUT_DIR"',
             bootstrap,
         )
@@ -267,10 +267,10 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
         make_app = self.source().split("make_app() {", 1)[1].split(
             "\n}\n\nnotarize_app()", 1
         )[0]
-        self.assertIn("--copy-unsafe-links", copy_framework)
         self.assertIn(
-            "--exclude '/Versions/*/lib/python*/test/'", copy_framework
+            'ditto "$PYTHON_FRAMEWORK_DIR" "$destination"', copy_framework
         )
+        self.assertNotIn("rsync", copy_framework)
         self.assertIn(
             'assert_embedded_python_framework_is_self_contained "$destination"',
             copy_framework,
@@ -355,19 +355,72 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
         )
         self.assertIn("python_runtime_audit=(", audit)
         self.assertIn("audio_probe_release_contract.py", audit)
-        self.assertIn("absolute Python.framework load fails", audit)
+        self.assertIn("canonical app-relative Python load command", audit)
+        self.assertIn("Python-selecting LC_RPATH fails", audit)
 
-    def test_raw_consumer_smokes_use_the_worker_framework_home(self) -> None:
+    def test_raw_consumer_smokes_need_no_python_configuration(self) -> None:
         source = self.source()
+        self.assertIn('PYTHON_XCFRAMEWORK="$REPO_DIR/Python.xcframework"', source)
+        self.assertGreaterEqual(
+            source.count("PYTHONHOME=/swiftpython-host-environment-must-not-win"),
+            4,
+        )
+        self.assertNotIn("SWIFTPYTHON_PYTHON_LIB_DIR", source)
+        self.assertNotIn("SWIFTPYTHON_SKIP_IN_PROCESS", source)
+        self.assertNotIn("SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME", source)
+        self.assertNotIn("-lpython3.13", source)
         self.assertIn(
-            'LOCAL_RUNTIME_PYTHON_HOME="$LOCAL_RUNTIME_DIR/Frameworks/'
-            'Python.framework/Versions/3.13"',
+            'env PYTHONHOME=/swiftpython-host-environment-must-not-win PYTHONPATH= \\\n'
+            '    DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK"):'
+            '$(dirname "$PYTHON_FRAMEWORK_DIR")"',
             source,
         )
-        self.assertGreaterEqual(
-            source.count('PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME"'), 2
+
+    def test_local_binary_package_includes_private_python_target(self) -> None:
+        source = self.source()
+        local_package = source.split("write_local_binary_package() {", 1)[1].split(
+            "\n}\n\nwrite_consumer_package()", 1
+        )[0]
+        consumer_package = source.split("write_consumer_package() {", 1)[1].split(
+            "cat > \"$destination/Sources", 1
+        )[0]
+        self.assertIn('"Python",', local_package)
+        self.assertIn("        Python \\", local_package)
+        self.assertNotIn("linkerSettings", consumer_package)
+
+    def test_iris_example_builder_embeds_private_runtime(self) -> None:
+        repo = pathlib.Path(__file__).resolve().parent.parent
+        script = (
+            repo / "Examples/IrisDemo/scripts/build_app.sh"
+        ).read_text(encoding="utf-8")
+        readme = (
+            repo / "Examples/IrisDemo/README.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "for framework in SwiftPythonEngine.framework Python.framework",
+            script,
         )
-        self.assertGreaterEqual(source.count("SWIFTPYTHON_SKIP_IN_PROCESS=1"), 2)
+        self.assertIn("$APP_DIR/Contents/Frameworks/$framework", script)
+        self.assertIn("-add_rpath '@executable_path/../Frameworks'", script)
+        self.assertIn('codesign --force --sign - "$STAGED_BINARY"', script)
+        self.assertIn('codesign --verify --strict "$STAGED_BINARY"', script)
+        self.assertIn('chmod 0755 "$STAGED_BINARY"', script)
+        self.assertIn('cp "$STAGED_BINARY" "$APP_BINARY"', script)
+        self.assertIn(
+            '"$APP_DIR/Contents/Frameworks/Python.framework"',
+            script,
+        )
+        self.assertNotIn("does not bundle a Python framework", readme)
+        self.assertIn("needs no Homebrew, system Python", readme)
+
+    def test_example_commands_only_name_declared_products(self) -> None:
+        repo = pathlib.Path(__file__).resolve().parent.parent
+        public_docs = "\n".join(
+            (repo / relative).read_text(encoding="utf-8")
+            for relative in ("README.md", "Examples/README.md")
+        )
+        self.assertNotIn("swift run swiftpython-smoke", public_docs)
 
 
 class PythonRuntimeContractTests(unittest.TestCase):
@@ -400,17 +453,17 @@ class PythonRuntimeContractTests(unittest.TestCase):
         ):
             contract.validate_python_runtime_contract(
                 "fixture",
-                ["@executable_path/../Frameworks/Python.framework/Versions/3.13/Python"],
+                ["@rpath/Python.framework/Versions/3.13/Python"],
                 [contract.EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH],
             )
 
-    def test_embedded_framework_run_path_is_required(self) -> None:
-        with self.assertRaisesRegex(contract.ContractError, "missing LC_RPATH"):
-            contract.validate_python_runtime_contract(
-                "fixture",
-                [contract.PYTHON_LOAD_COMMAND],
-                ["/usr/lib/swift", "@loader_path"],
-            )
+    def test_direct_python_load_needs_no_framework_run_path(self) -> None:
+        observed = contract.validate_python_runtime_contract(
+            "fixture",
+            [contract.PYTHON_LOAD_COMMAND],
+            ["/usr/lib/swift", "@loader_path"],
+        )
+        self.assertEqual(observed, (contract.PYTHON_LOAD_COMMAND,))
 
 
 class AudioProbeReleaseContractTests(unittest.TestCase):
@@ -628,6 +681,7 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
         for role, name in (
             ("binaryTarget", "SwiftPythonRuntime.xcframework.zip"),
             ("privateBinaryDependency", "SwiftPythonEngine.xcframework.zip"),
+            ("privateBinaryDependency", "Python.xcframework.zip"),
             ("binaryTarget", "SwiftPythonAudioInterop.xcframework.zip"),
             ("binaryTarget", "SwiftPythonMetalInterop.xcframework.zip"),
         ):
@@ -802,11 +856,10 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
         with self.assertRaisesRegex(contract.ContractError, "root has missing"):
             self.validate(candidate)
 
-    def test_vm_image_attestation_cannot_be_null(self) -> None:
+    def test_vm_image_attestation_can_explicitly_be_null(self) -> None:
         candidate = copy.deepcopy(self.manifest)
         candidate["vmImage"] = None
-        with self.assertRaisesRegex(contract.ContractError, "must be one object"):
-            self.validate(candidate)
+        self.validate(candidate)
 
     def test_vm_image_helper_hashes_must_match_artifacts(self) -> None:
         candidate = copy.deepcopy(self.manifest)

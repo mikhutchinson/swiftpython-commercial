@@ -4,11 +4,11 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.8.1`
+Current release: `0.6.0-duplex.8.3`
 
-The preceding `0.6.0-duplex.7` tag predates the raw audio-readiness helper and
-does not contain it. This release carries the complete distribution contract
-for `DuplexAudioHardwareProbeLauncher`.
+The preceding public commercial artifact is `0.6.0-duplex.8.1`. This release
+adds the self-contained Python runtime and carries the complete distribution
+contract for `DuplexAudioHardwareProbeLauncher`.
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -28,47 +28,46 @@ Read [LICENSE](LICENSE) before distributing an application.
 |---|---|
 | `SwiftPythonRuntime.xcframework` | Library-evolved consumer API surface |
 | `SwiftPythonEngine.xcframework` | Private code-only dependency; no product or textual Swift module |
+| `Python.xcframework` | Private self-contained CPython runtime linked by every public product |
 | `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
 | `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
-| `SwiftPythonWorker` | Matched arm64 local ProcessPool sidecar |
+| `SwiftPythonWorker` | Matched universal local ProcessPool sidecar |
 | `SwiftPythonAudioProbe` | Fixed-path, kill/reap-bounded macOS hardware-readiness helper |
 | `VMWorker/` | Matched five-file generated protocol/helper/supervisor/worker set |
 | `Entitlements/` | Parent, worker, audio-probe, inherited-sandbox, and virtualization templates |
 | `Examples/` | Standalone packages compiled against this public distribution |
 | `docs/api-guide/` | Public API and deployment guide |
-| `manifest.json` release asset | Version, source revision, protocols, byte sizes, and SHA-256 records |
+| `manifest.json` release asset | Version, source revision, protocols, byte sizes, SHA-256 records, and an explicit VM-image attestation or `null` |
 
-The four XCFrameworks are universal macOS binaries. The prebuilt
-`SwiftPythonWorker` sidecar is arm64; an Intel ProcessPool deployment needs a
-same-source x86_64 worker. Keep every binary, helper, image, and snapshot on one
-release version. Worker wire v6 is not compatible with the published v0.5
-worker wire v5.
+The five XCFrameworks and prebuilt `SwiftPythonWorker` sidecar are universal
+macOS binaries with matched arm64 and x86_64 slices. Keep every binary, helper,
+image, and snapshot on one release version. Worker wire v6 is not compatible
+with the published v0.5 worker wire v5.
 
-The `SwiftPythonCommercial-0.6.0-duplex.8.1.zip` asset contains this complete
-checkout. The four XCFramework zips are individual binary-target assets. Its
-`manifest.json` is a separate asset and attests all four zips, the worker, the
-audio probe, all five VM helpers, the complete distribution, and the
-same-version VM image used for the VM gate.
+The `SwiftPythonCommercial-0.6.0-duplex.8.3.zip` asset contains this complete
+checkout. The five XCFramework zips are individual binary-target assets. Its
+`manifest.json` is a separate asset and attests all five zips, the worker, the
+audio probe, all five VM helpers, and the complete distribution. Its `vmImage`
+field contains the same-version VM-image attestation when that gate runs, or
+explicit `null` for a scoped non-VM release.
 
 A launcher-bearing release uses manifest schema 3 and adds exactly one
 `audioHardwareProbeExecutable` record for `SwiftPythonAudioProbe`, plus
 `protocols.audioHardwareProbe: 1`. Its complete distribution must contain the
 same helper bytes and both probe entitlement templates. The raw helper is not a
-fifth SwiftPM binary target: the package continues to declare exactly the four
-XCFramework targets above.
+SwiftPM binary target; `Python` is the fifth target and remains private.
 
 ## Requirements
 
 - macOS 15 or newer
 - Swift 6 / Xcode command-line tools
-- Python 3.13 and development libraries
-- Apple Silicon for the shipped ProcessPool sidecar
+- Apple Silicon or Intel for the matched universal ProcessPool sidecar
 - Virtualization.framework entitlement and Apple Silicon for VM/Sandbox use
 
-The package linker settings discover Homebrew Python 3.13 on Apple Silicon or
-Intel. Set `SWIFTPYTHON_PYTHON_LIB_DIR`, `PYTHON_HOME`, or `PYTHONHOME`
-for a custom layout. A distributable sandboxed app must bundle Python; Finder
-and Dock launches do not inherit shell environment variables.
+The package carries its own Python 3.13 runtime. Consumers do not install
+Python, Homebrew, python.org packages, `uv`, or custom linker paths, and do not
+set `PYTHON_HOME`/`PYTHONHOME`. App launch performs no runtime download or
+extraction.
 
 ## Swift Package Manager
 
@@ -79,7 +78,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.8.1"
+        exact: "0.6.0-duplex.8.3"
     )
 ]
 ```
@@ -104,7 +103,8 @@ Choose only the products the application uses:
 `SwiftPythonAudioInterop` and `SwiftPythonMetalInterop` are independent
 optional products. A core-only consumer does not link AVFAudio or Metal through
 those adapters. `SwiftPythonEngine` is intentionally not a product and must not
-be imported. SwiftPM links it as a private dependency of each public product.
+be imported. SwiftPM links it and the private `Python` binary target as
+dependencies of each public product.
 
 ## In-process and ProcessPool smoke
 
@@ -130,6 +130,10 @@ For an app bundle, copy `SwiftPythonWorker` into
 app. Worker discovery also accepts `SWIFTPYTHON_WORKER_PATH` or the explicit
 `workerExecutablePath:` initializer argument.
 
+`Python.xcframework` is already a private dependency of every public product.
+Xcode links and embeds `Python.framework` through the normal package graph; do
+not add Python linker flags or select a host interpreter.
+
 ## App Bundle Layout
 
 ```text
@@ -137,7 +141,7 @@ YourApp.app/
   Contents/
     Frameworks/
       SwiftPythonEngine.framework/ # required private runtime code, embed once
-      Python.framework/        # required for self-contained/sandboxed apps
+      Python.framework/        # embedded from the private package target
     MacOS/
       YourApp
       SwiftPythonAudioProbe
@@ -148,15 +152,15 @@ YourApp.app/
 Embed the supplied signed `SwiftPythonEngine.framework` exactly once. The
 application executable must resolve its `@rpath` install name through
 `@executable_path/../Frameworks`; do not copy Engine into multiple nested
-locations. The worker, Engine, and host must load the same bundled Python when the app cannot rely
-on Homebrew. Copying a sidecar is not a signing or notarization step; use the
+locations. The worker, Engine, and host load the same package-owned Python.
+Copying a sidecar is not a signing or notarization step; use the
 distribution-specific rules below.
 
 The public audio launcher resolves only
 `Bundle.main.bundleURL/Contents/MacOS/SwiftPythonAudioProbe`. A URL-based
 SwiftPM dependency does not auto-embed that raw executable. Copy the helper
-from the exact matching complete distribution or commercial checkout, relocate
-its Python load command when the app bundles Python, re-sign it as nested code,
+from the exact matching complete distribution or commercial checkout, keep its
+direct app-relative Python load command unchanged, re-sign it as nested code,
 and then sign the containing app. Do not add a PATH, build-directory, worker,
 caller-supplied-path, XPC, autobuild, or in-process fallback.
 
@@ -224,7 +228,7 @@ See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
 `0.6.0-duplex.5` includes the isolated Sandbox surface. Its certified gate uses
 the same source revision for:
 
-- all four XCFrameworks and the local sidecar;
+- all five XCFrameworks and the local sidecar;
 - `_swiftpython_wire.py`, `_swiftpython_duplex.py`,
   `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and
   `swiftpython_worker.py`;
@@ -382,7 +386,6 @@ reuse a production application's bundle identifier.
 ```bash
 swift build
 swift test
-swift run swiftpython-smoke
 swift run --package-path Examples/CoreRuntimeSmoke
 swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
@@ -423,18 +426,34 @@ preserved rather than collapsed to `0.6.0`.
 
 | Symptom | Check |
 |---|---|
-| `Library not loaded: libpython3.13.dylib` | Bundle/select the same Python 3.13 layout used at link time |
+| `Library not loaded: Python.framework` | Verify the exact commercial package is pinned and Xcode embedded its private `Python.framework`; do not install or discover a host Python |
 | `workerNotFound` | Copy the matched sidecar or set its explicit path |
 | `helperNotFound` or helper identity failure | Embed the exact `SwiftPythonAudioProbe` at the fixed app path and re-sign it with the parent team and derived identifier |
 | microphone preflight failure | Put the purpose string and `com.apple.security.device.audio-input` on the parent, obtain permission there, then launch |
 | protocol/helper/media skew | Compare the release tag and `manifest.json`; never mix helpers |
-| `Bad CPU type` for the worker | The shipped sidecar is arm64; build a matched x86_64 worker for Intel |
+| `Bad CPU type` for the worker | Verify the worker and private Python framework came from the same tag; both shipped slices are arm64 and x86_64 |
 | duplex `featureUnavailable` | Inspect live capabilities and put requirements on the open |
 | arena requirement rejected in VM | Expected: shared arena ingress is local UDS only |
 | VM image/snapshot rejected | Rebuild all five helpers, image, and snapshot from this release |
 | SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
 
 ## Release notes
+
+### 0.6.0-duplex.8.3
+
+- Added a private, pruned `Python.xcframework` dependency to every public
+  product. Applications install no Python, Homebrew, python.org package, `uv`,
+  linker path, `PYTHONHOME`, download, or extraction step.
+- Bound the host, worker, and audio probe to the embedded framework and
+  initialized CPython through explicit `PyConfig` state without trusting or
+  mutating process `PYTHONHOME`.
+- Shipped a universal worker with exact worker/Python architecture parity and
+  added zero-configuration hostile-environment, native-stdlib, asyncio timeout,
+  callback, relocation, and cold-start release gates.
+- Included the 8.2 asyncio import-order repair so `current_task()`,
+  `asyncio.timeout`, and `asyncio.wait_for` use one coherent native registry in
+  packaged workers. Public Swift APIs, worker wire v6, and duplex media v1 are
+  unchanged.
 
 ### 0.6.0-duplex.8.1
 
@@ -451,7 +470,8 @@ preserved rather than collapsed to `0.6.0`.
   `Contents/Frameworks/Python.framework` and re-sign the final nested code.
   Fresh artifacts require no downstream rewrite and consumers must not rely on
   one; a defensive audit/repair may remain as defense in depth if it rejects
-  leftovers. Remove any conflicting `PYTHONHOME`.
+  leftovers. A conflicting process `PYTHONHOME` cannot redirect the packaged
+  runtime; SwiftPython supplies its embedded root directly through `PyConfig`.
 
 ### 0.6.0-duplex.8
 

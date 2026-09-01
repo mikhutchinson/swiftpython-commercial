@@ -36,6 +36,7 @@ required = [
     f"Current release: `{version}`",
     "SwiftPythonRuntime.xcframework",
     "SwiftPythonEngine.xcframework",
+    "Python.xcframework",
     "SwiftPythonAudioInterop.xcframework",
     "SwiftPythonMetalInterop.xcframework",
     "SwiftPythonAudioProbe",
@@ -138,8 +139,12 @@ for product in (
         raise SystemExit(f"Package.swift does not expose binary product {product}")
 if package.count('.binaryTarget(\n            name: "SwiftPythonEngine"') != 1:
     raise SystemExit("Package.swift must declare exactly one private Engine binary target")
+if package.count('.binaryTarget(\n            name: "Python"') != 1:
+    raise SystemExit("Package.swift must declare exactly one private Python binary target")
 if '.library(name: "SwiftPythonEngine"' in package:
     raise SystemExit("SwiftPythonEngine must not be exposed as a product")
+if '.library(name: "Python"' in package:
+    raise SystemExit("Python must not be exposed as a product")
 
 expected_helpers = {
     "_swiftpython_wire.py",
@@ -161,7 +166,7 @@ if actual_helpers != expected_helpers:
 
 release_placeholder_prefixes = tuple(
     "__" + product + "_XCFRAMEWORK_"
-    for product in ("RUNTIME", "ENGINE", "AUDIO", "METAL")
+    for product in ("RUNTIME", "ENGINE", "PYTHON", "AUDIO", "METAL")
 )
 
 for path in root.rglob("*"):
@@ -232,8 +237,8 @@ for path in "$REPO_DIR"/Entitlements/*.plist "$REPO_DIR"/Entitlements/*.entitlem
 done
 
 # This contract audits both raw Python-linked executables. Each must carry the
-# canonical @rpath Python load command and embedded-framework LC_RPATH; any
-# absolute Python.framework load fails before the remaining release checks.
+# canonical app-relative Python load command; any absolute Python.framework
+# load or Python-selecting LC_RPATH fails before the remaining release checks.
 python_runtime_audit=(
     python3
     "$REPO_DIR/scripts/audio_probe_release_contract.py"
@@ -432,7 +437,7 @@ for module in "${modules[@]}"; do
 done
 
 # These shipped source files are compile-only documentation consumers. Keep
-# them outside the URL package graph so the package retains exactly four
+# them outside the URL package graph so the package retains exactly five
 # binary targets, but type-check them against the candidate interfaces here.
 public_module_flags=()
 for module in "${modules[@]}"; do
@@ -504,8 +509,21 @@ grep -q '^Authority=Developer ID Application:' <<<"$signing_info" \
 grep -q 'flags=.*runtime' <<<"$signing_info" \
     || fail "worker signature does not enable hardened runtime"
 worker_archs="$(lipo -archs "$REPO_DIR/SwiftPythonWorker")"
-[ "$worker_archs" = arm64 ] \
-    || fail "shipped worker must be the documented arm64 sidecar, found $worker_archs"
+for required_arch in arm64 x86_64; do
+    case " $worker_archs " in
+        *" $required_arch "*) ;;
+        *) fail "shipped worker lacks $required_arch: $worker_archs" ;;
+    esac
+done
+[ "$(wc -w <<<"$worker_archs" | tr -d ' ')" = 2 ] \
+    || fail "shipped worker has unexpected architectures: $worker_archs"
+python_binary="$REPO_DIR/Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Python"
+require_file "$python_binary"
+python_archs="$(lipo -archs "$python_binary")"
+normalized_worker_archs="$(tr ' ' '\n' <<<"$worker_archs" | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')"
+normalized_python_archs="$(tr ' ' '\n' <<<"$python_archs" | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$normalized_worker_archs" = "$normalized_python_archs" ] \
+    || fail "worker/Python architecture mismatch: worker=$worker_archs Python=$python_archs"
 
 python3 - "$REPO_DIR" <<'PY'
 import pathlib

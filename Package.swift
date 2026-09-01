@@ -9,42 +9,49 @@ let package = Package(
     products: [
         .library(
             name: "SwiftPythonRuntime",
-            targets: ["SwiftPythonRuntime", "SwiftPythonEngine"]
+            targets: ["SwiftPythonRuntime", "SwiftPythonEngine", "Python"]
         ),
         .library(
             name: "SwiftPythonAudioInterop",
             targets: [
-                "SwiftPythonAudioInterop", "SwiftPythonRuntime", "SwiftPythonEngine"
+                "SwiftPythonAudioInterop", "SwiftPythonRuntime", "SwiftPythonEngine", "Python"
             ]
         ),
         .library(
             name: "SwiftPythonMetalInterop",
             targets: [
-                "SwiftPythonMetalInterop", "SwiftPythonRuntime", "SwiftPythonEngine"
+                "SwiftPythonMetalInterop", "SwiftPythonRuntime", "SwiftPythonEngine", "Python"
             ]
         ),
     ],
     targets: [
         .binaryTarget(
             name: "SwiftPythonRuntime",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.1/SwiftPythonRuntime.xcframework.zip",
-            checksum: "0e3604769f5357a84373e8d0bd4d8143b225424e4e98e7c694eda44d2e94d2cb"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonRuntime.xcframework.zip",
+            checksum: "fb4e303aa3fdb1b54e017110a0c92d2935f875200982e64f4788c4fdc193688f"
         ),
         // Link/embed dependency only. Deliberately absent from products.
         .binaryTarget(
             name: "SwiftPythonEngine",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.1/SwiftPythonEngine.xcframework.zip",
-            checksum: "c4a844f2e40992bd22eacbc07747907702fa9ff855edf172ca22af12695a7147"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonEngine.xcframework.zip",
+            checksum: "ec8434b5ac2a61bda3f9002a3a2db93dde591b5ea5f5fbe8a2818abae81a0e79"
+        ),
+        // Private CPython runtime. Inclusion in each product makes Xcode embed
+        // and sign it automatically; consumers install no system Python.
+        .binaryTarget(
+            name: "Python",
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/Python.xcframework.zip",
+            checksum: "0ba40798090318426ac4b5a15afe02bbdfdbe227659838c6a7d027fb85fda18d"
         ),
         .binaryTarget(
             name: "SwiftPythonAudioInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.1/SwiftPythonAudioInterop.xcframework.zip",
-            checksum: "90cf7c3a5bead9bb3cea3a62c52a3b081f9a041cd1b81e580b1cfe98dda43c0a"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonAudioInterop.xcframework.zip",
+            checksum: "07788296a4e46f43964f6ce3a981d3707627da806f086c816b5ad63937a14860"
         ),
         .binaryTarget(
             name: "SwiftPythonMetalInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.1/SwiftPythonMetalInterop.xcframework.zip",
-            checksum: "d1c8fff7b3a54193185ebfe808e09303a8f92a16c4c934dc8583b9b8b7269de9"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonMetalInterop.xcframework.zip",
+            checksum: "078072d1bc8475d7411f17dd20e54a38288885ae57e79b0d2684043b0b54c017"
         ),
     ]
 )

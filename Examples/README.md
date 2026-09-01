@@ -21,7 +21,6 @@ remote SPM dependency, set `SWIFTPYTHON_COMMERCIAL_PACKAGE_URL` and
 From the distribution root:
 
 ```bash
-swift run swiftpython-smoke
 swift run --package-path Examples/CoreRuntimeSmoke
 swift run --package-path Examples/ProcessPoolSmoke
 swift run --package-path Examples/BridgingRing
@@ -47,6 +46,6 @@ regressions that do not show up when running examples from inside the repo. In
 the final sandbox/VM release mode it also notarizes a virtualization-entitled
 app and runs the full public tenant workload through 20 positive warm restores.
 
-The example manifests auto-detect Homebrew's Apple Silicon and Intel Python
-3.13 prefixes. For custom Python layouts, set `PYTHON_HOME`, `PYTHONHOME`, or
-`SWIFTPYTHON_PYTHON_LIB_DIR`.
+The commercial package supplies and links its private Python framework. The
+example manifests require no Homebrew install, Python path, linker flag, or
+environment setup.

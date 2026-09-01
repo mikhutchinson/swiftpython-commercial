@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(dirname "$SCRIPT_DIR")"
 APP_NAME="IRIS"
 APP_DIR="$PKG_DIR/build/${APP_NAME}.app"
+APP_BINARY="$APP_DIR/Contents/MacOS/$APP_NAME"
 OPEN_APP=0
 CLEAN=0
 
@@ -26,17 +27,53 @@ done
 
 cd "$PKG_DIR"
 
+for required_tool in codesign ditto install_name_tool otool swift; do
+    command -v "$required_tool" >/dev/null || {
+        echo "Required tool not found: $required_tool" >&2
+        exit 69
+    }
+done
+
 if [ "$CLEAN" -eq 1 ]; then
     rm -rf "$APP_DIR"
 fi
 
 swift build --product IrisDemo
 BIN_DIR="$(swift build --show-bin-path)"
+STAGED_BINARY="$(mktemp "${TMPDIR:-/tmp}/swiftpython-iris-binary.XXXXXX")"
+trap 'rm -f "$STAGED_BINARY"' EXIT
+cp "$BIN_DIR/IrisDemo" "$STAGED_BINARY"
+chmod 0755 "$STAGED_BINARY"
+
+if ! otool -l "$STAGED_BINARY" \
+    | grep -Fq '@executable_path/../Frameworks'; then
+    install_name_tool \
+        -add_rpath '@executable_path/../Frameworks' \
+        "$STAGED_BINARY"
+fi
+
+# Sign the modified executable before it enters the .app. Signing it in place
+# makes codesign inspect SwiftPM's data-only resource bundle as nested code.
+codesign --force --sign - "$STAGED_BINARY"
+codesign --verify --strict "$STAGED_BINARY"
 
 rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+mkdir -p \
+    "$APP_DIR/Contents/Frameworks" \
+    "$APP_DIR/Contents/MacOS" \
+    "$APP_DIR/Contents/Resources"
 
-cp "$BIN_DIR/IrisDemo" "$APP_DIR/Contents/MacOS/$APP_NAME"
+cp "$STAGED_BINARY" "$APP_BINARY"
+
+for framework in SwiftPythonEngine.framework Python.framework; do
+    if [ ! -d "$BIN_DIR/$framework" ]; then
+        echo "SwiftPM did not stage required private framework: $BIN_DIR/$framework" >&2
+        exit 1
+    fi
+    ditto \
+        "$BIN_DIR/$framework" \
+        "$APP_DIR/Contents/Frameworks/$framework"
+done
 
 FOUND_RESOURCE_BUNDLE=0
 while IFS= read -r -d '' RESOURCE_BUNDLE; do
@@ -80,6 +117,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+# The copied release frameworks retain their existing valid signatures.
+# Distribution builds still use the inside-out release signing runbook.
+codesign --verify --deep --strict \
+    "$APP_DIR/Contents/Frameworks/SwiftPythonEngine.framework"
+codesign --verify --deep --strict \
+    "$APP_DIR/Contents/Frameworks/Python.framework"
 
 echo "Created: $APP_DIR"
 

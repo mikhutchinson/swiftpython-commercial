@@ -33,7 +33,9 @@ MANIFEST_SCHEMA_VERSION = 3
 NON_SANDBOX_ENTITLEMENTS = "SwiftPythonAudioProbe.entitlements"
 SANDBOX_ENTITLEMENTS = "SwiftPythonAudioProbe-sandbox.entitlements"
 EXPECTED_PUBLIC_ARCHITECTURES = ("arm64", "x86_64")
-PYTHON_LOAD_COMMAND = "@rpath/Python.framework/Versions/3.13/Python"
+MAXIMUM_PYTHON_XCFRAMEWORK_BYTES = 96 * 1024 * 1024
+MAXIMUM_PYTHON_XCFRAMEWORK_ZIP_BYTES = 64 * 1024 * 1024
+PYTHON_LOAD_COMMAND = "@executable_path/../Frameworks/Python.framework/Versions/3.13/Python"
 EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH = "@executable_path/../Frameworks"
 EXPECTED_VM_IMAGE_VERSION = 1
 EXPECTED_VM_DISTRO = "ubuntu-24.04-arm64"
@@ -77,6 +79,7 @@ REQUIRED_DISTRIBUTION_FILES = {
     PROBE_NAME,
     "SwiftPythonRuntime.xcframework/Info.plist",
     "SwiftPythonEngine.xcframework/Info.plist",
+    "Python.xcframework/Info.plist",
     "SwiftPythonAudioInterop.xcframework/Info.plist",
     "SwiftPythonMetalInterop.xcframework/Info.plist",
     *(f"VMWorker/{name}" for name in VM_HELPER_NAMES),
@@ -373,11 +376,6 @@ def validate_python_runtime_contract(
         len(run_path_inventory) == len(set(run_path_inventory)),
         f"{artifact_name} contains duplicate LC_RPATH entries",
     )
-    require(
-        EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH in run_path_inventory,
-        f"{artifact_name} is missing LC_RPATH "
-        f"{EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH}",
-    )
     unexpected = set(run_path_inventory) - ALLOWED_RUN_PATHS
     require(
         not unexpected,
@@ -612,6 +610,7 @@ def expected_artifact_keys(version: str) -> set[tuple[str, str]]:
     return {
         ("binaryTarget", "SwiftPythonRuntime.xcframework.zip"),
         ("privateBinaryDependency", "SwiftPythonEngine.xcframework.zip"),
+        ("privateBinaryDependency", "Python.xcframework.zip"),
         ("binaryTarget", "SwiftPythonAudioInterop.xcframework.zip"),
         ("binaryTarget", "SwiftPythonMetalInterop.xcframework.zip"),
         ("workerExecutable", "SwiftPythonWorker"),
@@ -1154,6 +1153,8 @@ def validate_vm_image_attestation(
     expected_version: str,
     helper_records: Mapping[str, Mapping[str, Any]],
 ) -> None:
+    if value is None:
+        return
     require(type(value) is dict, "release VM image attestation must be one object")
     expected_keys = {
         "name",
@@ -1363,6 +1364,7 @@ def validate_manifest(
     for role, module in (
         ("binaryTarget", "SwiftPythonRuntime"),
         ("privateBinaryDependency", "SwiftPythonEngine"),
+        ("privateBinaryDependency", "Python"),
         ("binaryTarget", "SwiftPythonAudioInterop"),
         ("binaryTarget", "SwiftPythonMetalInterop"),
     ):
@@ -1371,6 +1373,25 @@ def validate_manifest(
             manifest_path.parent / records[(role, name)]["path"],
             repo / f"{module}.xcframework",
         )
+        if module == "Python":
+            archive = manifest_path.parent / records[(role, name)]["path"]
+            payloads, _ = filesystem_tree_inventory(
+                repo / "Python.xcframework",
+                "private Python runtime",
+            )
+            expanded_bytes = sum(
+                metadata.st_size
+                for _, metadata in payloads.values()
+                if stat.S_ISREG(metadata.st_mode)
+            )
+            require(
+                expanded_bytes <= MAXIMUM_PYTHON_XCFRAMEWORK_BYTES,
+                "Python.xcframework exceeds the expanded size budget",
+            )
+            require(
+                archive.stat().st_size <= MAXIMUM_PYTHON_XCFRAMEWORK_ZIP_BYTES,
+                "Python.xcframework.zip exceeds the download size budget",
+            )
 
     output_probe = manifest_path.parent / PROBE_NAME
     staged_probe = repo / PROBE_NAME

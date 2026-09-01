@@ -83,31 +83,6 @@ if let packageURL, !packageURL.isEmpty,
     dependencyPackageName = "swiftpython-commercial"
 }
 
-private func pythonLibraryDirectory() -> String {
-    if let explicit = environment["SWIFTPYTHON_PYTHON_LIB_DIR"],
-       !explicit.isEmpty {
-        return explicit
-    }
-    let pythonHome = environment["PYTHON_HOME"] ?? environment["PYTHONHOME"]
-    if let home = pythonHome?.trimmingCharacters(in: .whitespacesAndNewlines),
-       !home.isEmpty {
-        let frameworkLib = "\(home)/Frameworks/Python.framework/Versions/3.13/lib"
-        if FileManager.default.fileExists(atPath: frameworkLib) {
-            return frameworkLib
-        }
-        return "\(home)/lib"
-    }
-    let candidates = [
-        "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib",
-        "/usr/local/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib",
-        "/opt/homebrew/opt/python@3.13/lib",
-        "/usr/local/opt/python@3.13/lib",
-    ]
-    return candidates.first {
-        FileManager.default.fileExists(atPath: $0)
-    } ?? candidates[0]
-}
-
 let package = Package(
     name: "DuplexSession",
     platforms: [.macOS(.v15)],
@@ -120,12 +95,6 @@ let package = Package(
                     name: "SwiftPythonRuntime",
                     package: dependencyPackageName
                 ),
-            ],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L\(pythonLibraryDirectory())",
-                    "-lpython3.13",
-                ]),
             ]
         ),
     ]

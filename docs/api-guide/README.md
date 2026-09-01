@@ -1,7 +1,7 @@
 # SwiftPython Public API Guide
 
 This guide documents the public binary API shipped by
-`swiftpython-commercial` `0.6.0-duplex.8.1`.
+`swiftpython-commercial` `0.6.0-duplex.8.3`.
 It is written for application authors who need to embed Python execution in a
 macOS app, worker service, or sandboxed tool without access to the private
 SwiftPython source tree.

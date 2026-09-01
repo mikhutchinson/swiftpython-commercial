@@ -13,11 +13,11 @@ From this directory:
 swift run
 ```
 
-The manifest auto-detects Homebrew's Apple Silicon and Intel Python 3.13
-prefixes. For custom Python layouts, set `PYTHON_HOME`, `PYTHONHOME`, or
-`SWIFTPYTHON_PYTHON_LIB_DIR`.
+The commercial dependency supplies and links its private Python 3.13
+framework. No host Python, package manager, linker flag, or environment setup
+is required.
 
 ## What it proves
 
-- The package links against `Python.framework` / `libpython` as documented.
+- The package links the commercial product's private `Python.framework`.
 - The embedded interpreter imports `sys` and `json` successfully from Swift.

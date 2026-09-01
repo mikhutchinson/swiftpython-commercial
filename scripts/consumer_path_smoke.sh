@@ -4,8 +4,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
 LOCAL_PACKAGE_DIR="$WORK_DIR/swiftpython-commercial-local"
-PYTHON_LIB_DIR="${SWIFTPYTHON_PYTHON_LIB_DIR:-}"
-CANONICAL_PYTHON_LOAD_COMMAND="@rpath/Python.framework/Versions/3.13/Python"
+HOST_PYTHON_LOAD_COMMAND="@rpath/Python.framework/Versions/3.13/Python"
 EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH="@executable_path/../Frameworks"
 NOTARY_PROFILE="${SWIFTPYTHON_NOTARY_PROFILE:-}"
 NOTARY_OUTPUT_DIR="${SWIFTPYTHON_NOTARY_OUTPUT_DIR:-}"
@@ -200,25 +199,17 @@ unset \
     SWIFTPYTHON_VM_CLONE_DIR \
     SWIFTPYTHON_VM_ITERATIONS
 
-if [ -z "$PYTHON_LIB_DIR" ]; then
-    for candidate in \
-        "/opt/homebrew/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib" \
-        "/usr/local/opt/python@3.13/Frameworks/Python.framework/Versions/3.13/lib" \
-        "/opt/homebrew/opt/python@3.13/lib" \
-        "/usr/local/opt/python@3.13/lib"; do
-        if [ -d "$candidate" ]; then
-            PYTHON_LIB_DIR="$candidate"
-            break
-        fi
-    done
-fi
-
-if [ -z "$PYTHON_LIB_DIR" ]; then
-    echo "Python 3.13 library directory not found; set SWIFTPYTHON_PYTHON_LIB_DIR." >&2
+PYTHON_XCFRAMEWORK="$REPO_DIR/Python.xcframework"
+if [ ! -d "$PYTHON_XCFRAMEWORK" ] || [ -L "$PYTHON_XCFRAMEWORK" ]; then
+    echo "Exact private Python.xcframework is missing from the candidate." >&2
     exit 1
 fi
-PYTHON_HOME_DIR="$(cd "$PYTHON_LIB_DIR/.." && pwd)"
-PYTHON_FRAMEWORK_DIR="$(cd "$PYTHON_HOME_DIR/../.." && pwd)"
+PYTHON_FRAMEWORK_DIR="$(find "$PYTHON_XCFRAMEWORK" -mindepth 2 -maxdepth 2 -type d -name Python.framework -print -quit)"
+if [ -z "$PYTHON_FRAMEWORK_DIR" ]; then
+    echo "Python.xcframework contains no Python.framework slice." >&2
+    exit 1
+fi
+PYTHON_HOME_DIR="$PYTHON_FRAMEWORK_DIR/Versions/3.13"
 PYTHON_FRAMEWORK_BINARY="$PYTHON_HOME_DIR/Python"
 for required_python_path in \
     "$PYTHON_FRAMEWORK_BINARY" \
@@ -307,24 +298,8 @@ PY
 
 copy_complete_python_framework() {
     local destination="$1"
-    mkdir -p "$destination"
-    # Bytecode caches are generated state, not runtime distribution inputs.
-    # Everything else, including site-packages metadata and native extensions,
-    # is copied from the same framework distribution as the libpython core.
-    # Some distributions use relative symlinks from the framework into another
-    # directory in that same installation prefix. Materialize only those links
-    # that would escape the embedded framework while preserving its internal
-    # framework symlinks. CPython's regression-test package is development
-    # material, not part of the production runtime; among other fixtures, it
-    # contains intentionally malformed/sparse archives that cannot be
-    # notarized as an issue-free application payload.
-    rsync -a \
-        --copy-unsafe-links \
-        --exclude '__pycache__/' \
-        --exclude '*.pyc' \
-        --exclude '/Versions/*/lib/python*/test/' \
-        "$PYTHON_FRAMEWORK_DIR/" \
-        "$destination/"
+    mkdir -p "$(dirname "$destination")"
+    ditto "$PYTHON_FRAMEWORK_DIR" "$destination"
     for required_relative in \
         Versions/3.13/Python \
         Versions/3.13/lib/python3.13 \
@@ -406,7 +381,7 @@ rebase_consumer_python_load_command() {
         echo "Consumer executable must contain exactly one Python load command: $executable" >&2
         exit 1
     fi
-    if [ "$python_loads" != "$CANONICAL_PYTHON_LOAD_COMMAND" ]; then
+    if [ "$python_loads" != "$HOST_PYTHON_LOAD_COMMAND" ]; then
         case "$python_loads" in
             /*) ;;
             *)
@@ -416,12 +391,12 @@ rebase_consumer_python_load_command() {
         esac
         install_name_tool -change \
             "$python_loads" \
-            "$CANONICAL_PYTHON_LOAD_COMMAND" \
+            "$HOST_PYTHON_LOAD_COMMAND" \
             "$executable"
     fi
     if ! otool -L "$executable" \
         | awk '{ print $1 }' \
-        | grep -Fx "$CANONICAL_PYTHON_LOAD_COMMAND" >/dev/null; then
+        | grep -Fx "$HOST_PYTHON_LOAD_COMMAND" >/dev/null; then
         echo "Consumer executable does not use the canonical Python load command: $executable" >&2
         exit 1
     fi
@@ -440,6 +415,7 @@ source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
 expected = {
     "SwiftPythonRuntime",
     "SwiftPythonEngine",
+    "Python",
     "SwiftPythonAudioInterop",
     "SwiftPythonMetalInterop",
 }
@@ -477,6 +453,7 @@ PY
     for module in \
         SwiftPythonRuntime \
         SwiftPythonEngine \
+        Python \
         SwiftPythonAudioInterop \
         SwiftPythonMetalInterop
     do
@@ -507,12 +484,6 @@ let package = Package(
                 .product(name: "SwiftPythonRuntime", package: "swiftpython-commercial"),
                 .product(name: "SwiftPythonAudioInterop", package: "swiftpython-commercial"),
                 .product(name: "SwiftPythonMetalInterop", package: "swiftpython-commercial"),
-            ],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L$PYTHON_LIB_DIR",
-                    "-lpython3.13",
-                ])
             ]
         ),
     ]
@@ -536,37 +507,12 @@ import SwiftPythonRuntime
 enum ConsumerSmoke {
     static func main() async {
         do {
-            try configureBundledPythonHomeIfRequested()
             try await run()
             try publishLaunchServicesReceiptIfRequested()
         } catch {
             let diagnostic = Data("ConsumerSmoke failed: \(error)\n".utf8)
             try? FileHandle.standardError.write(contentsOf: diagnostic)
             Foundation.exit(EXIT_FAILURE)
-        }
-    }
-
-    private static func configureBundledPythonHomeIfRequested() throws {
-        guard ProcessInfo.processInfo.environment[
-            "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME"
-        ] == "1" else {
-            return
-        }
-        guard let frameworks = Bundle.main.privateFrameworksURL else {
-            throw ConsumerFailure.bundledPythonHomeMissing("no private Frameworks URL")
-        }
-        let home = frameworks
-            .appendingPathComponent("Python.framework", isDirectory: true)
-            .appendingPathComponent("Versions/3.13", isDirectory: true)
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(
-            atPath: home.path,
-            isDirectory: &isDirectory
-        ), isDirectory.boolValue else {
-            throw ConsumerFailure.bundledPythonHomeMissing(home.path)
-        }
-        guard setenv("PYTHONHOME", home.path, 1) == 0 else {
-            throw ConsumerFailure.pythonHomeEnvironmentFailed(errno)
         }
     }
 
@@ -590,14 +536,10 @@ enum ConsumerSmoke {
 
     private static func run() async throws {
         try assertPrivateEngineLoadedOnce()
-        if ProcessInfo.processInfo.environment["SWIFTPYTHON_SKIP_IN_PROCESS"] != "1" {
-            let version: String = try await Python.run {
-                try String(pythonObject: Python.sys.version)
-            }
-            print("Python \(version)")
-        } else {
-            print("in-process Python skipped for sandbox worker-path proof")
+        let version: String = try await Python.run {
+            try String(pythonObject: Python.sys.version)
         }
+        print("Python \(version)")
 
         try await withProcessPool(workers: 1) { pool in
             let value: Double = try await pool.invokeResult(
@@ -1457,8 +1399,6 @@ enum ConsumerFailure: Error {
     case audioProbeNotReady(String)
     case audioProbeReadyInvariantFailed
     case audioProbeUnknownOutcome
-    case bundledPythonHomeMissing(String)
-    case pythonHomeEnvironmentFailed(Int32)
     case invalidLaunchServicesReceiptNonce(String)
 }
 EOF
@@ -1494,12 +1434,10 @@ cp "$REPO_DIR/SwiftPythonWorker" "$LOCAL_RUNTIME_DIR/MacOS/SwiftPythonWorker"
 copy_complete_python_framework \
     "$LOCAL_RUNTIME_DIR/Frameworks/Python.framework"
 export SWIFTPYTHON_WORKER_PATH="$LOCAL_RUNTIME_DIR/MacOS/SwiftPythonWorker"
-LOCAL_RUNTIME_PYTHON_HOME="$LOCAL_RUNTIME_DIR/Frameworks/Python.framework/Versions/3.13"
 
 echo "=== SwiftPM HeadersPath consumer ==="
-PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME" \
+env PYTHONHOME=/swiftpython-host-environment-must-not-win PYTHONPATH= \
     SWIFTPYTHON_AUDIO_PROBE_GATE=off \
-    SWIFTPYTHON_SKIP_IN_PROCESS=1 \
     swift run --package-path "$SPM_DIR"
 
 echo "=== xcodebuild slice-root consumer ==="
@@ -1513,10 +1451,9 @@ echo "=== xcodebuild slice-root consumer ==="
         CODE_SIGNING_ALLOWED=NO \
         build
 )
-DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK")" \
-    PYTHONHOME="$LOCAL_RUNTIME_PYTHON_HOME" \
+env PYTHONHOME=/swiftpython-host-environment-must-not-win PYTHONPATH= \
+    DYLD_FRAMEWORK_PATH="$(dirname "$ENGINE_FRAMEWORK"):$(dirname "$PYTHON_FRAMEWORK_DIR")" \
     SWIFTPYTHON_AUDIO_PROBE_GATE=off \
-    SWIFTPYTHON_SKIP_IN_PROCESS=1 \
     "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke"
 
 DEVELOPER_ID="$(
@@ -1775,10 +1712,6 @@ make_app() {
         direct_audio_probe_gate=off
     fi
     local bundle_identifier="ai.bestbyte.sp.$mode_identifier.$SMOKE_ID_SUFFIX"
-    local skip_in_process=0
-    if [ "$mode" = sandbox ]; then
-        skip_in_process=1
-    fi
     mkdir -p "$macos"
     cp "$WORK_DIR/DerivedData/Build/Products/Debug/ConsumerSmoke" \
         "$macos/ConsumerSmoke"
@@ -1865,11 +1798,10 @@ EOF
     local before_run_digest
     before_run_digest="$(bundle_content_digest "$app")"
     run_with_timeout 90 env \
+        PYTHONHOME=/swiftpython-host-environment-must-not-win PYTHONPATH= \
         SWIFTPYTHON_WORKER_PATH="$macos/SwiftPythonWorker" \
         SWIFTPYTHON_AUDIO_PROBE_GATE="$direct_audio_probe_gate" \
         SWIFTPYTHON_AUDIO_PERMISSION_POLICY="$AUDIO_PERMISSION_POLICY" \
-        SWIFTPYTHON_SKIP_IN_PROCESS="$skip_in_process" \
-        PYTHONHOME="$python_home_for_app" \
         PYTHONNOUSERSITE=1 \
         PYTHONDONTWRITEBYTECODE=1 \
         "$macos/ConsumerSmoke"
@@ -1979,7 +1911,7 @@ run_app_via_launchservices() {
     local mode="$1"
     local app="$2"
     local bundle_identifier="$3"
-    local python_layout="$4"
+    local runtime_layout="$4"
     local output_dir="$5"
     local stdout_path="$output_dir/ConsumerSmoke-$mode-launchservices.stdout"
     local stderr_path="$output_dir/ConsumerSmoke-$mode-launchservices.stderr"
@@ -1998,10 +1930,6 @@ run_app_via_launchservices() {
         /usr/bin/env
         -u SWIFTPYTHON_WORKER_PATH
         -u SWIFTPYTHON_PACKAGE_PATH
-        -u SWIFTPYTHON_SKIP_IN_PROCESS
-        -u SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME
-        -u PYTHONHOME
-        -u PYTHONPATH
         /usr/bin/open
         -W
         -n
@@ -2010,6 +1938,8 @@ run_app_via_launchservices() {
         --stdout "$stdout_path"
         --stderr "$stderr_path"
         --env "SWIFTPYTHON_AUDIO_PROBE_GATE=$AUDIO_PROBE_GATE"
+        --env "PYTHONHOME=/swiftpython-host-environment-must-not-win"
+        --env "PYTHONPATH="
         --env "SWIFTPYTHON_AUDIO_PERMISSION_POLICY=$AUDIO_PERMISSION_POLICY"
         --env "SWIFTPYTHON_LAUNCH_SERVICES_RECEIPT_NONCE=$nonce"
         --env "PYTHONNOUSERSITE=1"
@@ -2030,15 +1960,10 @@ run_app_via_launchservices() {
         exit 1
     fi
 
-    case "$python_layout" in
-        bundled)
-            open_args+=(--env "SWIFTPYTHON_USE_BUNDLED_PYTHON_HOME=1")
-            if [ "$mode" = sandbox ]; then
-                open_args+=(--env "SWIFTPYTHON_SKIP_IN_PROCESS=1")
-            fi
-            ;;
+    case "$runtime_layout" in
+        packaged) ;;
         *)
-            echo "Unknown LaunchServices Python layout: $python_layout" >&2
+            echo "Unknown LaunchServices runtime layout: $runtime_layout" >&2
             exit 64
             ;;
     esac
@@ -2158,7 +2083,7 @@ if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
         developer-id \
         "$DEVELOPER_APP" \
         "$DEVELOPER_BUNDLE_IDENTIFIER" \
-        bundled \
+        packaged \
         "$TCC_BOOTSTRAP_OUTPUT_DIR"
     assert_bundle_remained_sealed "$DEVELOPER_APP"
     assert_bundle_content_unchanged \
@@ -2170,7 +2095,7 @@ if [ "$AUDIO_TCC_BOOTSTRAP" = 1 ]; then
         sandbox \
         "$SANDBOX_APP" \
         "$SANDBOX_BUNDLE_IDENTIFIER" \
-        bundled \
+        packaged \
         "$TCC_BOOTSTRAP_OUTPUT_DIR"
     assert_bundle_remained_sealed "$SANDBOX_APP"
     assert_bundle_content_unchanged \
@@ -2188,7 +2113,7 @@ if [ -n "$NOTARY_PROFILE" ]; then
         developer-id \
         "$DEVELOPER_APP" \
         "$DEVELOPER_BUNDLE_IDENTIFIER" \
-        bundled \
+        packaged \
         "$NOTARY_OUTPUT_DIR"
     assert_bundle_remained_sealed "$DEVELOPER_APP"
     assert_bundle_content_unchanged \
@@ -2202,7 +2127,7 @@ if [ -n "$NOTARY_PROFILE" ]; then
         sandbox \
         "$SANDBOX_APP" \
         "$SANDBOX_BUNDLE_IDENTIFIER" \
-        bundled \
+        packaged \
         "$NOTARY_OUTPUT_DIR"
     assert_bundle_remained_sealed "$SANDBOX_APP"
     assert_bundle_content_unchanged \
@@ -2221,7 +2146,6 @@ if [ -n "$NOTARY_PROFILE" ]; then
             SWIFTPYTHON_VM_RESTORE_SECRET="$VM_RESTORE_SECRET" \
             SWIFTPYTHON_VM_CLONE_DIR="$VM_CLONE_DIR" \
             SWIFTPYTHON_VM_ITERATIONS="$VM_ITERATIONS" \
-            PYTHONHOME="$VM_APP/Contents/Frameworks/Python.framework/Versions/3.13" \
             PYTHONNOUSERSITE=1 \
             PYTHONDONTWRITEBYTECODE=1 \
             "$VM_APP/Contents/MacOS/ConsumerSmoke"

@@ -14,14 +14,16 @@ cd Examples/IrisDemo
 ./scripts/build_app.sh --open
 ```
 
-The script builds the Swift package, creates `build/IRIS.app`, copies the
-bundled Python resources into the app, and launches the app when `--open` is
-passed.
+The script builds the Swift package, creates `build/IRIS.app`, embeds the
+private Engine and Python frameworks plus the example's Python resources,
+applies a local development signature to the executable, and launches the app
+when `--open` is passed. It needs no Homebrew, system Python, or Python path
+configuration.
 
-This helper creates a development app-shaped bundle; it does not bundle a
-Python framework, apply distribution entitlements, sign nested code, notarize,
-or prove App Sandbox behavior. Follow the root distribution/signing guide for a
-shipping application.
+This helper creates a development app-shaped bundle. It does not apply
+distribution entitlements, use a Developer ID signature, notarize, or prove App
+Sandbox behavior. Follow the root distribution/signing guide for a shipping
+application.
 
 ## Boundary
 
