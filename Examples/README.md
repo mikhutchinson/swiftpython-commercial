@@ -4,7 +4,8 @@ Runnable samples that complement [docs/api-guide](../docs/api-guide/).
 
 | Directory | Purpose |
 |-----------|---------|
-| [IrisDemo](IrisDemo/) | Full SwiftUI macOS app: bundled Python sklearn service, Charts, JSON boundary |
+| [Studio](Studio/) | **Flagship app.** Native SwiftUI macOS app on the canonical V2 `pool.<module>` surface — races four scikit-learn models in parallel across Python workers, with live charts, worker activity, and an embedded "behind the curtain" console (+ `studio-cli`). Ships as a notarized DMG with a self-contained Python ([SHIPPING.md](Studio/SHIPPING.md)). |
+| [IrisDemo](IrisDemo/) | Minimal SwiftUI macOS app: bundled Python sklearn service via the raw runtime + JSON boundary (the simplest "hello world"; predates the `pool.<module>` surface) |
 | [CoreRuntimeSmoke](CoreRuntimeSmoke/) | Minimal CLI: `Python.run` + `sys` / `json` |
 | [ProcessPoolSmoke](ProcessPoolSmoke/) | Minimal CLI: `withProcessPool`, `invokeResult`, `math.sqrt` |
 | [BridgingRing](BridgingRing/) | Showcase: callbacks + **`WorkerCallbackContext` reentrant** Python↔Swift + **`evalEvents`** generator/progress streams over the pool IPC |
