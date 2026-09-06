@@ -120,6 +120,12 @@ let package = Package(
             resources: [
                 .process("Python")
             ]
-        )
+        ),
+        .testTarget(
+            name: "IrisDemoTests",
+            dependencies: ["IrisDemo"],
+            path: "Tests",
+            exclude: ["test_iris_kernel.py"]
+        ),
     ]
 )

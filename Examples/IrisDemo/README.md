@@ -42,9 +42,15 @@ and edited-value experiments separately.
 ## Verify
 
 ```bash
+swift test --package-path Examples/IrisDemo --disable-swift-testing --filter IrisChartTests
 Examples/IrisDemo/build/IRIS.app/Contents/MacOS/IrisDemo --smoke /tmp/iris-receipt.json
 codesign --verify --deep --strict Examples/IrisDemo/build/IRIS.app
 ```
+
+The chart tests render the SwiftUI view while selecting points, showing mistakes,
+and replacing datasets with different feature and class counts. Chart marks and
+hit testing capture the same input values, so a pending render cannot mix old
+samples with new axes or class labels.
 
 The smoke command exercises all nine dataset/classifier combinations, compares
 retained-model predictions with the original test predictions, verifies test
