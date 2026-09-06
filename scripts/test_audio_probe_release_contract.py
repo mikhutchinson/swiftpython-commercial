@@ -391,7 +391,7 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
     def test_iris_example_builder_embeds_private_runtime(self) -> None:
         repo = pathlib.Path(__file__).resolve().parent.parent
         script = (
-            repo / "Examples/IrisDemo/scripts/build_app.sh"
+            repo / "scripts/build_demo_app.sh"
         ).read_text(encoding="utf-8")
         readme = (
             repo / "Examples/IrisDemo/README.md"

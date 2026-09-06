@@ -27,31 +27,31 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "SwiftPythonRuntime",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonRuntime.xcframework.zip",
-            checksum: "fb4e303aa3fdb1b54e017110a0c92d2935f875200982e64f4788c4fdc193688f"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.4/SwiftPythonRuntime.xcframework.zip",
+            checksum: "be8970031930d6acfdf70c19dafdd7c96d1424c5ed1a32fbcbaa851227e4c34f"
         ),
         // Link/embed dependency only. Deliberately absent from products.
         .binaryTarget(
             name: "SwiftPythonEngine",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonEngine.xcframework.zip",
-            checksum: "ec8434b5ac2a61bda3f9002a3a2db93dde591b5ea5f5fbe8a2818abae81a0e79"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.4/SwiftPythonEngine.xcframework.zip",
+            checksum: "0fc5bcbf25102b261b06f3cfe6645fc883dbf1b73fb51893bc962a89317efc61"
         ),
         // Private CPython runtime. Inclusion in each product makes Xcode embed
         // and sign it automatically; consumers install no system Python.
         .binaryTarget(
             name: "Python",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/Python.xcframework.zip",
-            checksum: "0ba40798090318426ac4b5a15afe02bbdfdbe227659838c6a7d027fb85fda18d"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.4/Python.xcframework.zip",
+            checksum: "5f3811253ba81e068d0af8a57539f2bfd146d1ea9bca03f5524894e5d7ac583f"
         ),
         .binaryTarget(
             name: "SwiftPythonAudioInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonAudioInterop.xcframework.zip",
-            checksum: "07788296a4e46f43964f6ce3a981d3707627da806f086c816b5ad63937a14860"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.4/SwiftPythonAudioInterop.xcframework.zip",
+            checksum: "9b26707b627d043427b2e2155dbe8e7c61eed426e77595b154d8ddd0dbced7e1"
         ),
         .binaryTarget(
             name: "SwiftPythonMetalInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.3/SwiftPythonMetalInterop.xcframework.zip",
-            checksum: "078072d1bc8475d7411f17dd20e54a38288885ae57e79b0d2684043b0b54c017"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.6.0-duplex.8.4/SwiftPythonMetalInterop.xcframework.zip",
+            checksum: "15fbf56d06a3308185a9741bcab28b48c0aaa2f0fe595f36f9f42dfde8e78a14"
         ),
     ]
 )

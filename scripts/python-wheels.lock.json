@@ -1,0 +1,81 @@
+{
+  "python": "3.13",
+  "platform": "macOS 15+",
+  "packages": {
+    "numpy": {
+      "version": "2.4.2",
+      "wheels": {
+        "arm64": {
+          "filename": "numpy-2.4.2-cp313-cp313-macosx_14_0_arm64.whl",
+          "url": "https://files.pythonhosted.org/packages/da/b4/f805ab79293c728b9a99438775ce51885fd4f31b76178767cfc718701a39/numpy-2.4.2-cp313-cp313-macosx_14_0_arm64.whl",
+          "sha256": "8e4549f8a3c6d13d55041925e912bfd834285ef1dd64d6bc7d542583355e2e98"
+        },
+        "x86_64": {
+          "filename": "numpy-2.4.2-cp313-cp313-macosx_14_0_x86_64.whl",
+          "url": "https://files.pythonhosted.org/packages/74/09/826e4289844eccdcd64aac27d13b0fd3f32039915dd5b9ba01baae1f436c/numpy-2.4.2-cp313-cp313-macosx_14_0_x86_64.whl",
+          "sha256": "aea4f66ff44dfddf8c2cffd66ba6538c5ec67d389285292fe428cb2c738c8aef"
+        }
+      }
+    },
+    "scipy": {
+      "version": "1.16.1",
+      "wheels": {
+        "arm64": {
+          "filename": "scipy-1.16.1-cp313-cp313-macosx_14_0_arm64.whl",
+          "url": "https://files.pythonhosted.org/packages/f4/69/bd75dbfdd3cf524f4d753484d723594aed62cfaac510123e91a6686d520b/scipy-1.16.1-cp313-cp313-macosx_14_0_arm64.whl",
+          "sha256": "e756d688cb03fd07de0fffad475649b03cb89bee696c98ce508b17c11a03f95c"
+        },
+        "x86_64": {
+          "filename": "scipy-1.16.1-cp313-cp313-macosx_14_0_x86_64.whl",
+          "url": "https://files.pythonhosted.org/packages/ea/74/add181c87663f178ba7d6144b370243a87af8476664d5435e57d599e6874/scipy-1.16.1-cp313-cp313-macosx_14_0_x86_64.whl",
+          "sha256": "5aa2687b9935da3ed89c5dbed5234576589dd28d0bf7cd237501ccfbdf1ad608"
+        }
+      }
+    },
+    "scikit-learn": {
+      "version": "1.8.0",
+      "wheels": {
+        "arm64": {
+          "filename": "scikit_learn-1.8.0-cp313-cp313-macosx_12_0_arm64.whl",
+          "url": "https://files.pythonhosted.org/packages/58/37/31b83b2594105f61a381fc74ca19e8780ee923be2d496fcd8d2e1147bd99/scikit_learn-1.8.0-cp313-cp313-macosx_12_0_arm64.whl",
+          "sha256": "edec98c5e7c128328124a029bceb09eda2d526997780fef8d65e9a69eead963e"
+        },
+        "x86_64": {
+          "filename": "scikit_learn-1.8.0-cp313-cp313-macosx_10_13_x86_64.whl",
+          "url": "https://files.pythonhosted.org/packages/03/aa/e22e0768512ce9255eba34775be2e85c2048da73da1193e841707f8f039c/scikit_learn-1.8.0-cp313-cp313-macosx_10_13_x86_64.whl",
+          "sha256": "0d6ae97234d5d7079dc0040990a6f7aeb97cb7fa7e8945f1999a429b23569e0a"
+        }
+      }
+    },
+    "joblib": {
+      "version": "1.5.3",
+      "wheels": {
+        "arm64": {
+          "filename": "joblib-1.5.3-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl",
+          "sha256": "5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713"
+        },
+        "x86_64": {
+          "filename": "joblib-1.5.3-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl",
+          "sha256": "5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713"
+        }
+      }
+    },
+    "threadpoolctl": {
+      "version": "3.6.0",
+      "wheels": {
+        "arm64": {
+          "filename": "threadpoolctl-3.6.0-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/32/d5/f9a850d79b0851d1d4ef6456097579a9005b31fea68726a4ae5f2d82ddd9/threadpoolctl-3.6.0-py3-none-any.whl",
+          "sha256": "43a0b8fd5a2928500110039e43a5eed8480b918967083ea48dc3ab9f13c4a7fb"
+        },
+        "x86_64": {
+          "filename": "threadpoolctl-3.6.0-py3-none-any.whl",
+          "url": "https://files.pythonhosted.org/packages/32/d5/f9a850d79b0851d1d4ef6456097579a9005b31fea68726a4ae5f2d82ddd9/threadpoolctl-3.6.0-py3-none-any.whl",
+          "sha256": "43a0b8fd5a2928500110039e43a5eed8480b918967083ea48dc3ab9f13c4a7fb"
+        }
+      }
+    }
+  }
+}

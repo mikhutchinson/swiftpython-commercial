@@ -1,109 +1,185 @@
 import Foundation
 import SwiftUI
 
-@MainActor
-final class IrisViewModel: ObservableObject {
-    @Published var selectedKind: DatasetKind = .iris
-    @Published var featureNames: [String] = []
-    @Published var classNames: [String] = []
-    @Published var points: [DataPoint] = []
-    @Published var featureStats: [FeatureStat] = []
-    @Published var classDistribution: [ClassCount] = []
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var isTraining = false
-    @Published var selectedClassifier: ClassifierKind = .logisticRegression
-    @Published var useScaler: Bool = true
-    @Published var trainingResult: TrainingResult?
+@MainActor @Observable
+final class IrisViewModel {
+    var selectedKind: DatasetKind = .iris
+    var selectedClassifier: ClassifierKind = .logisticRegression
+    var useScaler = true
+    var dataset: IrisDatasetPayload?
+    var result: TrainingResult?
+    var isLoading = false
+    var isTraining = false
+    var error: String?
+    var workerPID: Int32?
+    var xFeature = 0
+    var yFeature = 1
+    var mistakesOnly = false
+    var selectedSampleID: Int?
+    var experimentValues: [Double] = []
+    var experiment: ExperimentPrediction?
+    var isPredicting = false
+    private var kernelTask: Task<IrisKernel, Error>?
+    private var revision = 0
+    private var stopping = false
+    private var pendingPrediction: PredictionRequest?
+    private var predictionTask: Task<Void, Never>?
+    private var latestPredictionID = UUID()
 
-    func loadDataset() async {
-        await load(kind: selectedKind)
+    private struct PredictionRequest {
+        let id: UUID
+        let modelID: String
+        let values: [Double]
     }
 
-    func load(kind: DatasetKind) async {
+    var samples: [DataPoint] { dataset?.samples ?? [] }
+    var predictionsByID: [Int: SamplePrediction] {
+        Dictionary(uniqueKeysWithValues: (result?.predictions ?? []).map { ($0.id, $0) })
+    }
+    var visibleSamples: [DataPoint] {
+        guard mistakesOnly, let result else { return samples }
+        let ids = Set(result.mistakes.map(\.id))
+        return samples.filter { ids.contains($0.id) }
+    }
+    var selectedSample: DataPoint? { samples.first { $0.id == selectedSampleID } }
+    var experimentChanged: Bool { selectedSample.map { $0.values != experimentValues } ?? false }
+    var hasModel: Bool { result != nil && !isLoading && !isTraining }
+
+    func className(_ index: Int) -> String {
+        guard let names = dataset?.classNames, names.indices.contains(index) else { return "Unknown" }
+        return names[index]
+    }
+
+    func featureRange(_ index: Int) -> ClosedRange<Double> {
+        let values = samples.map { $0.values[index] }
+        let lower = values.min() ?? 0
+        return lower...max(values.max() ?? 1, lower + 0.001)
+    }
+
+    private func kernel() async throws -> IrisKernel {
+        guard !stopping else { throw CancellationError() }
+        if kernelTask == nil { kernelTask = Task { try await IrisKernel() } }
+        let service = try await kernelTask!.value
+        workerPID = service.workerPID
+        return service
+    }
+
+    func loadDataset(_ kind: DatasetKind) async {
+        guard !stopping else { return }
+        revision += 1
+        let requestRevision = revision
+        selectedKind = kind
+        dataset = nil
+        result = nil
+        selectedSampleID = nil
+        invalidatePrediction()
+        mistakesOnly = false
         isLoading = true
+        isTraining = false
         error = nil
-        trainingResult = nil
         do {
-            let payload = try await IrisKernel.loadDataset(kind)
-            try apply(payload)
+            let service = try await kernel()
+            let data = try await service.loadDataset(kind)
+            guard revision == requestRevision, !stopping else { return }
+            dataset = data
+            xFeature = kind == .iris ? 2 : 0
+            yFeature = kind == .iris ? 3 : 1
         } catch {
+            guard revision == requestRevision, !stopping else { return }
             self.error = error.localizedDescription
         }
-        isLoading = false
+        if revision == requestRevision { isLoading = false }
     }
 
     func trainModel() async {
-        guard !points.isEmpty, !featureNames.isEmpty else { return }
+        guard dataset != nil, !isLoading, !isTraining, !stopping else { return }
         isTraining = true
-        trainingResult = nil
         error = nil
+        invalidatePrediction()
+        let requestRevision = revision
+        let kind = selectedKind
+        let classifier = selectedClassifier
+        let scale = useScaler
         do {
-            trainingResult = try await IrisKernel.train(
-                dataset: selectedKind,
-                classifier: selectedClassifier,
-                useScaler: useScaler
-            )
+            let service = try await kernel()
+            let trained = try await service.train(dataset: kind, classifier: classifier, useScaler: scale)
+            guard revision == requestRevision, !stopping else { return }
+            result = trained
+            mistakesOnly = false
+            selectedSampleID = trained.mistakes.first?.id ?? trained.predictions.first?.id
+            isTraining = false
+            resetExperiment()
         } catch {
+            guard revision == requestRevision, !stopping else { return }
             self.error = "Training failed: \(error.localizedDescription)"
+            // A failed request does not silently attribute an older model to new settings.
+            result = nil
         }
-        isTraining = false
+        if revision == requestRevision { isTraining = false }
     }
 
-    private func apply(_ payload: IrisDatasetPayload) throws {
-        guard payload.points.count == payload.targets.count else {
-            throw IrisKernelError.invalidPayload("Python returned mismatched feature and target counts")
-        }
-        featureNames = payload.featureNames
-        classNames = payload.classNames
-        points = zip(payload.points, payload.targets).map { values, classId in
-            DataPoint(values: values, classId: classId)
-        }
-        computeFeatureStats()
-        computeClassDistribution()
+    func resetExperiment() {
+        invalidatePrediction()
+        experimentValues = selectedSample?.values ?? []
+        if hasModel { queuePrediction() }
     }
 
-    private func computeFeatureStats() {
-        guard let nFeatures = points.first?.values.count, nFeatures > 0 else {
-            featureStats = []
-            return
-        }
+    func editFeature(_ index: Int, value: Double) {
+        guard experimentValues.indices.contains(index), value.isFinite else { return }
+        experimentValues[index] = value
+        queuePrediction()
+    }
 
-        featureStats = (0..<nFeatures).map { featureIndex in
-            var sum = 0.0
-            var sumSq = 0.0
-            var minVal = Double.infinity
-            var maxVal = -Double.infinity
+    private func invalidatePrediction() {
+        latestPredictionID = UUID()
+        pendingPrediction = nil
+        experiment = nil
+    }
 
-            for point in points {
-                let value = point.value(at: featureIndex)
-                sum += value
-                sumSq += value * value
-                minVal = min(minVal, value)
-                maxVal = max(maxVal, value)
+    private func queuePrediction() {
+        guard let result, hasModel, !experimentValues.isEmpty, !stopping else { return }
+        experiment = nil
+        let request = PredictionRequest(id: UUID(), modelID: result.id, values: experimentValues)
+        latestPredictionID = request.id
+        pendingPrediction = request
+        guard predictionTask == nil else { return }
+        predictionTask = Task { [weak self] in await self?.drainPredictions() }
+    }
+
+    private func drainPredictions() async {
+        isPredicting = true
+        defer { isPredicting = false; predictionTask = nil }
+        // One in-flight call plus one replaceable pending value. Slider events
+        // cannot build an IPC backlog, and stale completions cannot update the UI.
+        while let request = pendingPrediction, !stopping {
+            pendingPrediction = nil
+            do {
+                let service = try await kernel()
+                let prediction = try await service.predict(modelID: request.modelID, values: request.values)
+                if latestPredictionID == request.id, result?.id == request.modelID, !stopping {
+                    experiment = prediction
+                }
+            } catch {
+                if latestPredictionID == request.id, !stopping { self.error = error.localizedDescription }
             }
-
-            let count = Double(points.count)
-            let mean = sum / count
-            let variance = (sumSq / count) - (mean * mean)
-            let std = variance > 0 ? sqrt(variance) : 0
-            let name = featureNames.indices.contains(featureIndex) ? featureNames[featureIndex] : "F\(featureIndex + 1)"
-
-            return FeatureStat(
-                name: name,
-                mean: mean,
-                std: std,
-                min: minVal,
-                max: maxVal
-            )
         }
     }
 
-    private func computeClassDistribution() {
-        let counts = Dictionary(grouping: points, by: \.classId).mapValues(\.count)
-        classDistribution = classNames.enumerated().compactMap { index, name in
-            guard let count = counts[index] else { return nil }
-            return ClassCount(className: name, count: count)
-        }
+    func restart() async {
+        revision += 1
+        invalidatePrediction()
+        if let service = try? await kernelTask?.value { await service.shutdown() }
+        kernelTask = nil
+        workerPID = nil
+        await loadDataset(selectedKind)
+    }
+
+    func stop() async {
+        stopping = true
+        revision += 1
+        invalidatePrediction()
+        if let service = try? await kernelTask?.value { await service.shutdown() }
+        await predictionTask?.value
+        kernelTask = nil
     }
 }

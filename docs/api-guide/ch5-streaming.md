@@ -289,11 +289,6 @@ when the application needs to distinguish a producer failure.
 | Same generator in a different isolation provider | The same `startOutputStream` call; the runtime selects the route |
 | Main commands while a long-running output stream is active | Regular pool calls plus `ManagedOutputBuffer` polling |
 
-The
-[`Examples/SharedTensorPipeline`](../../Examples/SharedTensorPipeline/) demo
-exercises the full path end-to-end (shared-memory tensor + OOB telemetry +
-concurrent `evalResult` on the same worker, all measured).
-
 ## Common Pitfalls
 
 | Issue | Fix |

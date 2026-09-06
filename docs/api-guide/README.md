@@ -56,11 +56,8 @@ the five-file `VMWorker/` set, and the entitlement templates.
 | Run an interactive terminal in a tenant | `SandboxPool.execShellPTY` |
 | Require accelerated isolated startup | `SandboxConfiguration.startup` plus `tenant.startupMode` |
 | Let Python call Swift | `registerCallback`, `registerReentrantCallback`, `registerStreamingCallback` |
-| Pool callbacks / reentrant / `evalEvents` in one runnable CLI | `Examples/BridgingRing` |
-| Managed tensor + output streaming in one demo | `Examples/SharedTensorPipeline` |
-| Frame and fragmented-message duplex in one demo | `Examples/DuplexSession` |
-| Smoke-test wiring (`Python.run`, process pool CLIs) | `Examples/CoreRuntimeSmoke`, `Examples/ProcessPoolSmoke` |
-| Start from a complete macOS app | `Examples/IrisDemo` |
+| Render NumPy particles with Metal | [Particle Showcase](../../Examples/ParticleShowcase/) |
+| Train and visualize scikit-learn models | [Iris](../../Examples/IrisDemo/) |
 
 ## Public Package Boundary
 

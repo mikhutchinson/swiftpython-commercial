@@ -204,10 +204,10 @@ Managed tensors are a performance feature, not the default. Start with normal
 `PythonConvertible` arguments and handles, then move hot paths to shared memory
 after profiling.
 
-For a runnable end-to-end demo, Swift seeds an 8 MiB float64 tensor through
-`withManagedTensor`, two workers reduce halves through `bindings:`, and Swift
-reads it back through the same opaque handle. See
-[`Examples/SharedTensorPipeline`](../../Examples/SharedTensorPipeline/).
+[Particle Showcase](../../Examples/ParticleShowcase/) allocates a 16 MiB
+float32 particle tensor, lets NumPy update it through a worker binding, and
+renders its completed contents through scoped `withManagedTensor` access.
+Its verification compares full Python/Swift hashes and GPU-read samples.
 
 ## Capsules
 

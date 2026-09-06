@@ -1,6 +1,6 @@
 // swift-tools-version: 6.0
-import Foundation
 import PackageDescription
+import Foundation
 
 private func parseSemVer(_ raw: String) -> Version? {
     let buildSplit = raw.split(
@@ -103,17 +103,16 @@ private func swiftPythonConfig() -> SwiftPythonDependencyConfig {
 }
 
 let package = Package(
-    name: "CoreRuntimeSmoke",
+    name: "ParticleShowcase",
     platforms: [.macOS(.v15)],
-    dependencies: [
-        swiftPythonConfig().dependency,
-    ],
+    products: [.executable(name: "particle-showcase", targets: ["ParticleShowcase"])],
+    dependencies: [swiftPythonConfig().dependency],
     targets: [
         .executableTarget(
-            name: "CoreRuntimeSmoke",
-            dependencies: [
-                .product(name: "SwiftPythonRuntime", package: swiftPythonConfig().packageName),
-            ]
+            name: "ParticleShowcase",
+            dependencies: [.product(name: "SwiftPythonRuntime", package: swiftPythonConfig().packageName)],
+            resources: [.copy("Resources/particles.py"), .copy("Resources/particles.metal")],
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
     ]
 )

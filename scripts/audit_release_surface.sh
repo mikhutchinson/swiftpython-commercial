@@ -146,6 +146,10 @@ if '.library(name: "SwiftPythonEngine"' in package:
 if '.library(name: "Python"' in package:
     raise SystemExit("Python must not be exposed as a product")
 
+examples = {path.name for path in (root / "Examples").iterdir() if path.is_dir()}
+if examples != {"IrisDemo", "ParticleShowcase"}:
+    raise SystemExit(f"Commercial demos must be IrisDemo and ParticleShowcase: {sorted(examples)}")
+
 expected_helpers = {
     "_swiftpython_wire.py",
     "_swiftpython_duplex.py",
@@ -291,7 +295,7 @@ grep -q '^Authority=Developer ID Application:' <<<"$engine_signing_info" \
     || fail "private Engine is not Developer ID signed"
 grep -q 'flags=.*runtime' <<<"$engine_signing_info" \
     || fail "private Engine signature does not enable hardened runtime"
-for path in "$REPO_DIR"/scripts/*.sh "$REPO_DIR"/Examples/IrisDemo/scripts/*.sh; do
+for path in "$REPO_DIR"/scripts/*.sh "$REPO_DIR"/Examples/IrisDemo/scripts/*.sh "$REPO_DIR"/Examples/ParticleShowcase/*.sh; do
     bash -n "$path"
 done
 
@@ -312,13 +316,7 @@ if payload != expected:
     )
 PY
 
-for example in \
-    BridgingRing \
-    CoreRuntimeSmoke \
-    DuplexSession \
-    IrisDemo \
-    ProcessPoolSmoke \
-    SharedTensorPipeline
+for example in IrisDemo ParticleShowcase
 do
     dump="$(
         SWIFTPYTHON_COMMERCIAL_PACKAGE_URL=https://example.invalid/swiftpython-commercial.git \
@@ -342,16 +340,15 @@ if not any(item.get("exact") == [version] for item in requirements):
 PY
 done
 
-# Type-check every command-line example directly against the shipped public
-# module. Package-manifest validation alone cannot catch an example reaching a
-# package-only API. IrisDemo is built by the post-publication example gate
-# because SwiftPM must synthesize its resource-bundle accessor.
-for example in \
-    BridgingRing \
-    CoreRuntimeSmoke \
-    DuplexSession \
-    ProcessPoolSmoke \
-    SharedTensorPipeline
+# Check both apps against the shipped public module. SwiftPM supplies this
+# resource accessor in actual app builds; the audit needs only its public type.
+resource_accessor="$(mktemp "${TMPDIR:-/tmp}/swiftpython-demo-resources.XXXXXX.swift")"
+trap 'rm -f "$resource_accessor"' EXIT
+cat > "$resource_accessor" <<'SWIFT'
+import Foundation
+extension Bundle { static var module: Bundle { .main } }
+SWIFT
+for example in IrisDemo ParticleShowcase
 do
     example_sources=()
     while IFS= read -r source; do
@@ -369,7 +366,7 @@ do
         -parse-as-library \
         -target arm64-apple-macos15.0 \
         -I "$REPO_DIR/SwiftPythonRuntime.xcframework/macos-arm64_x86_64/Headers" \
-        "${example_sources[@]}"
+        "$resource_accessor" "${example_sources[@]}"
 done
 
 root_package="$(swift package --package-path "$REPO_DIR" dump-package)"

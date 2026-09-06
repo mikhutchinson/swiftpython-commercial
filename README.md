@@ -4,13 +4,27 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.8.3`
+Current release: `0.6.0-duplex.8.4`
 
-The preceding public commercial artifact is `0.6.0-duplex.8.1`. This release
-adds the self-contained Python runtime and carries the complete distribution
-contract for `DuplexAudioHardwareProbeLauncher`.
+The preceding public commercial artifact is `0.6.0-duplex.8.3`. This release
+hardens runtime ownership, conversions, callback lifetimes and worker queues,
+while preserving the public API and wire protocols. Embedded imports preserve
+signed app resources. The two examples are Particle Showcase and Iris.
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
+
+## Try the examples
+
+- [Particle Showcase](Examples/ParticleShowcase/): NumPy moves 1,048,576 particles.
+  Swift and Metal render their shared positions. Includes live controls and a
+  1080p video exporter with measured timings and buffer verification.
+- [Iris](Examples/IrisDemo/): select a sample, inspect a held-out mistake, and
+  change features to see a fitted scikit-learn model predict again. One Python
+  worker retains the datasets and model while Swift owns the interface.
+
+Both builders bundle hash-locked numerical packages alongside the matched
+runtime. The resulting development apps run offline without a host Python
+installation. See [Examples](Examples/README.md) for build instructions.
 
 ## License
 
@@ -44,7 +58,7 @@ macOS binaries with matched arm64 and x86_64 slices. Keep every binary, helper,
 image, and snapshot on one release version. Worker wire v6 is not compatible
 with the published v0.5 worker wire v5.
 
-The `SwiftPythonCommercial-0.6.0-duplex.8.3.zip` asset contains this complete
+The `SwiftPythonCommercial-0.6.0-duplex.8.4.zip` asset contains this complete
 checkout. The five XCFramework zips are individual binary-target assets. Its
 `manifest.json` is a separate asset and attests all five zips, the worker, the
 audio probe, all five VM helpers, and the complete distribution. Its `vmImage`
@@ -78,7 +92,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.8.3"
+        exact: "0.6.0-duplex.8.4"
     )
 ]
 ```
@@ -221,7 +235,7 @@ Capability requirements are rechecked atomically against the exact generation
 reserved for open.
 
 See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
-[DuplexSession example](Examples/DuplexSession/).
+[full-duplex API guide](docs/api-guide/ch10-full-duplex.md).
 
 ## VM and Sandbox
 
@@ -386,11 +400,8 @@ reuse a production application's bundle identifier.
 ```bash
 swift build
 swift test
-swift run --package-path Examples/CoreRuntimeSmoke
-swift run --package-path Examples/ProcessPoolSmoke
-swift run --package-path Examples/BridgingRing
-swift run -c release --package-path Examples/SharedTensorPipeline
-swift run --package-path Examples/DuplexSession
+Examples/ParticleShowcase/run.sh
+Examples/IrisDemo/scripts/build_app.sh --open
 SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
   scripts/audit_release_surface.sh "$CANDIDATE_VERSION"
 SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
@@ -439,7 +450,7 @@ preserved rather than collapsed to `0.6.0`.
 
 ## Release notes
 
-### 0.6.0-duplex.8.3
+### 0.6.0-duplex.8.4
 
 - Added a private, pruned `Python.xcframework` dependency to every public
   product. Applications install no Python, Homebrew, python.org package, `uv`,

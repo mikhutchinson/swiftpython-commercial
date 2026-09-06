@@ -311,5 +311,5 @@ maximum as an application guarantee. State the minimum in
 `DuplexSessionRequirements` and use
 `session.negotiatedConfiguration` as truth.
 
-The [DuplexSession example](../../Examples/DuplexSession/) executes frame
-loopback and a fragmented message above its physical-frame ceiling.
+The independent [consumer fixture](../../scripts/consumer_path_smoke.sh)
+executes frame loopback and a fragmented message above its physical-frame ceiling.
