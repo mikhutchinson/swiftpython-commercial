@@ -83,7 +83,8 @@ and improvements to callback ownership, worker shutdown and VM restore behavior.
 
 This release supplies macOS binaries for Apple Silicon and Intel. macOS 15 or
 later is required; ExtensionFoundation hosting requires macOS 26. The iOS demo
-on the website is a development preview; this download is the macOS SDK.
+on the website shows four native Python workers computing a Julia fractal in
+an iPad app.
 
 ## Choose your products
 
