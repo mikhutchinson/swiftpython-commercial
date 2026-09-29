@@ -5,8 +5,10 @@
 import CryptoKit
 import Darwin
 import Dispatch
-import Foundation
+import ExtensionFoundation
+@preconcurrency import Foundation
 import OSLog
+import Security
 import Swift
 import Synchronization
 import _Concurrency
@@ -94,6 +96,7 @@ final public class PythonObjectRef : @unchecked Swift.Sendable {
   public init(pythonObject: SwiftPythonRuntime.PyObjectRef)
   @objc deinit
   final public func withPyObject<T>(_ body: @escaping @Sendable (SwiftPythonRuntime.PyObjectRef) throws -> T) async throws -> T where T : Swift.Sendable
+  @available(*, deprecated, message: "Runs the closure outside the executor, so the PyObjectRef escapes the execution domain. Hold the PythonObjectRef across awaits and call withPyObject for each Python access.")
   final public func withPyObjectAsync<T>(_ body: @escaping @Sendable (SwiftPythonRuntime.PyObjectRef) async throws -> T) async throws -> T where T : Swift.Sendable
   final public func toPyObject() -> SwiftPythonRuntime.PyObjectRef
 }
@@ -126,6 +129,41 @@ extension SwiftPythonRuntime.PythonExecutor {
   nonisolated public static func releaseUsingGIL(_ handles: [SwiftPythonRuntime.PyHandle])
   public func release(_ handle: SwiftPythonRuntime.PyHandle) async throws
   public func release(_ handles: [SwiftPythonRuntime.PyHandle]) async throws
+}
+@available(macOS 15.0, iOS 18.0, *)
+public struct PythonWorkerContext : Swift.Sendable, Swift.Equatable {
+  public var environment: [Swift.String : Swift.String]
+  public var workingDirectory: Foundation.URL?
+  public var pythonExecutable: Foundation.URL?
+  public var requiredEnvironmentKeys: Swift.Set<Swift.String>
+  public init(environment: [Swift.String : Swift.String] = [:], workingDirectory: Foundation.URL? = nil, pythonExecutable: Foundation.URL? = nil, requiredEnvironmentKeys: Swift.Set<Swift.String> = [])
+  public static func declaringProcessEnvironment(_ processEnvironment: [Swift.String : Swift.String] = ProcessInfo.processInfo.environment, including included: Swift.Set<Swift.String> = [], excluding excluded: Swift.Set<Swift.String> = [], workingDirectory: Foundation.URL? = nil, pythonExecutable: Foundation.URL? = nil, requiredEnvironmentKeys: Swift.Set<Swift.String> = []) -> SwiftPythonRuntime.PythonWorkerContext
+  public static func == (a: SwiftPythonRuntime.PythonWorkerContext, b: SwiftPythonRuntime.PythonWorkerContext) -> Swift.Bool
+}
+@available(macOS 26.0, iOS 26.0, *)
+public enum PythonWorkerExtensions {
+  public static var contextGeneration: Swift.Int {
+    get
+  }
+  public static var undeclaredHostEnvironment: [Swift.String] {
+    get
+  }
+  public static func configure(extensionPoint: ExtensionFoundation.AppExtensionPoint) throws
+  public static func configure(extensionPoint: ExtensionFoundation.AppExtensionPoint, context: SwiftPythonRuntime.PythonWorkerContext) throws
+}
+@available(macOS 15.0, *)
+public enum PythonWorkerXPCServices {
+  public static func configure(context: SwiftPythonRuntime.PythonWorkerContext) throws
+  public static func configure(environment: [Swift.String : Swift.String] = [:], pythonExecutable: Foundation.URL? = nil) throws
+  @discardableResult
+  public static func publish(_ context: SwiftPythonRuntime.PythonWorkerContext) throws -> Swift.Int
+  public static func withContext<T>(_ context: SwiftPythonRuntime.PythonWorkerContext, _ body: () async throws -> T) async throws -> T
+  public static var contextGeneration: Swift.Int {
+    get
+  }
+  public static var undeclaredHostEnvironment: [Swift.String] {
+    get
+  }
 }
 public struct CancellableStream<Element> : _Concurrency.AsyncSequence, Swift.Sendable where Element : Swift.Sendable {
   public typealias AsyncIterator = SwiftPythonRuntime.CancellableStream<Element>.Iterator
@@ -1043,6 +1081,7 @@ public struct ProcessPoolConfiguration : Swift.Sendable, Swift.Equatable {
   public var respawnOnTimeout: Swift.Bool
   public var streamKeepaliveInterval: Foundation.TimeInterval
   public var broadcastsResourceSamples: Swift.Bool
+  public var minimumWorkerAvailableMemoryBytes: Swift.UInt64?
   public init(sendTimeout: Foundation.TimeInterval = 30, receiveTimeout: Foundation.TimeInterval = 30, healthCheckTimeout: Foundation.TimeInterval = 5, respawnOnTimeout: Swift.Bool = false, streamKeepaliveInterval: Foundation.TimeInterval = 5, broadcastsResourceSamples: Swift.Bool = false)
   public static let `default`: SwiftPythonRuntime.ProcessPoolConfiguration
   public static func == (a: SwiftPythonRuntime.ProcessPoolConfiguration, b: SwiftPythonRuntime.ProcessPoolConfiguration) -> Swift.Bool
@@ -1055,6 +1094,9 @@ public enum PythonWorkerError : Swift.Error, Swift.Sendable {
   case workerForciblyRespawned(workerID: Swift.Int)
   case workerQuarantined(workerID: Swift.Int)
   case noAvailableWorkers
+  case unsupportedTransferMechanism(operation: Swift.String, required: [Swift.String], declared: [Swift.String], admittedByDeclaration: [Swift.String])
+  case unrecognisedTransferMechanism(operation: Swift.String, tag: Swift.String)
+  case transferMechanismMismatch(handleID: Foundation.UUID, producedBy: Swift.String, selected: Swift.String)
   case addWorkersFailed(succeededWorkerIDs: [Swift.Int], failedWorkerID: Swift.Int, underlying: Swift.String)
   case poolShuttingDown
   case poolDrained
@@ -1881,15 +1923,18 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public var respawnBudget: SwiftPythonRuntime.RespawnBudget {
     get
   }
+  @objc deinit
   public convenience init(workers workerCount: Swift.Int, buffers: SwiftPythonRuntime.ManagedTensorConfiguration = .default, workerExecutablePath: Swift.String? = nil, configuration: SwiftPythonRuntime.ProcessPoolConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns) async throws
   public convenience init(workers workerCount: Swift.Int, buffers: SwiftPythonRuntime.ManagedTensorConfiguration = .default, workerExecutablePath: Swift.String? = nil, configuration: SwiftPythonRuntime.ProcessPoolConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded) async throws
   @_disfavoredOverload public convenience init(workers workerCount: Swift.Int, buffers: SwiftPythonRuntime.ManagedTensorConfiguration = .default, workerExecutablePath: Swift.String? = nil, configuration: SwiftPythonRuntime.ProcessPoolConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, blasThreads: Swift.Int? = nil, resourceLimits: SwiftPythonRuntime.WorkerResourceLimits = .default, backpressure: SwiftPythonRuntime.BackpressurePolicy = .unbounded, resourceMonitor monitorCfg: SwiftPythonRuntime.ResourceMonitorConfig = .default) async throws
   public static func recommended(for workload: SwiftPythonRuntime.WorkloadType) -> Swift.Int
-  @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
     get
   }
+}
+extension SwiftPythonRuntime.PythonProcessPool {
+  public func makeRecoverableSession(program: SwiftPythonRuntime.RecoverablePythonProgram, checkpoint: Foundation.Data, worker workerID: Swift.Int = 0, limits: SwiftPythonRuntime.RecoverableSessionLimits = .init(), timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.RecoverablePythonSession
 }
 extension SwiftPythonRuntime.PythonProcessPool {
   public func createManagedTensor(shape: [Swift.Int], dtype: SwiftPythonRuntime.BufferDType) async throws -> SwiftPythonRuntime.PyHandle
@@ -1972,6 +2017,19 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func unregisterCallback(name: Swift.String) async throws
 }
 extension SwiftPythonRuntime.PythonProcessPool {
+  public func healthCheck() async throws -> [Swift.Bool]
+  public func healthCheck(telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws -> [Swift.Bool]
+}
+extension SwiftPythonRuntime.PythonProcessPool {
+  public func shedIdleWorkers(force: Swift.Bool = false)
+  public func shedIdleWorkersAndWait(force: Swift.Bool = false) async
+}
+extension SwiftPythonRuntime.PythonProcessPool {
+  public func respawnWorker(_ workerIndex: Swift.Int, reason: SwiftPythonRuntime.PoolEvent.RespawnReason = .userInitiated, force: Swift.Bool = false) async throws
+  public func respawnWorker(_ workerIndex: Swift.Int, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
+  public func respawnWorker(_ workerIndex: Swift.Int, reason: SwiftPythonRuntime.PoolEvent.RespawnReason, force: Swift.Bool = false, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
+}
+extension SwiftPythonRuntime.PythonProcessPool {
   public var workerCount: Swift.Int {
     get
   }
@@ -1980,17 +2038,10 @@ extension SwiftPythonRuntime.PythonProcessPool {
   public func respawnCount(for workerIndex: Swift.Int) -> Swift.Int
   public func isWorkerDead(_ workerIndex: Swift.Int) -> Swift.Bool
   public func duplexSupport(for workerIndex: Swift.Int) -> SwiftPythonRuntime.DuplexSupport?
-  public func respawnWorker(_ workerIndex: Swift.Int, reason: SwiftPythonRuntime.PoolEvent.RespawnReason = .userInitiated, force: Swift.Bool = false) async throws
-  public func respawnWorker(_ workerIndex: Swift.Int, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
-  public func respawnWorker(_ workerIndex: Swift.Int, reason: SwiftPythonRuntime.PoolEvent.RespawnReason, force: Swift.Bool = false, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
-  public func healthCheck() async throws -> [Swift.Bool]
-  public func healthCheck(telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws -> [Swift.Bool]
   public func addWorkers(_ count: Swift.Int) async throws -> [Swift.Int]
   public func warmup(_ code: Swift.String) async throws
   public func warmup(_ code: Swift.String, telemetry: SwiftPythonRuntime.ProcessPoolTelemetryContext?) async throws
   public func drain(timeout: Swift.Duration? = .seconds(30)) async throws
-  public func shedIdleWorkers(force: Swift.Bool = false)
-  public func shedIdleWorkersAndWait(force: Swift.Bool = false) async
   public func resume()
   public func shutdown(timeout: Swift.Duration = .seconds(5)) async
   public func shutdown(timeout: Swift.Duration, preserveRuntimeState: Swift.Bool) async
@@ -2567,6 +2618,78 @@ extension SwiftPythonRuntime.PythonProcessPool {
     }
 }
 public func withProcessPool<T>(workers workerCount: Swift.Int, buffers: SwiftPythonRuntime.ManagedTensorConfiguration = .default, workerExecutablePath: Swift.String? = nil, configuration: SwiftPythonRuntime.ProcessPoolConfiguration = .default, maxRespawns: Swift.Int = RespawnBudget.default.maxTotalRespawns, maxIdenticalErrorRespawns: Swift.Int = RespawnBudget.default.maxIdenticalErrorRespawns, blasThreads: Swift.Int? = nil, _ body: @Sendable (SwiftPythonRuntime.PythonProcessPool) async throws -> T) async throws -> T where T : Swift.Sendable
+public struct RecoverablePythonProgram : Swift.Sendable, Swift.Equatable {
+  public let source: Swift.String
+  public init(source: Swift.String)
+  public static func == (a: SwiftPythonRuntime.RecoverablePythonProgram, b: SwiftPythonRuntime.RecoverablePythonProgram) -> Swift.Bool
+}
+public enum RecoverableReplayPolicy : Swift.String, Swift.Sendable, Swift.Codable {
+  case replayable
+  case never
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct RecoverableSessionLimits : Swift.Sendable, Swift.Equatable {
+  public var maximumCheckpointBytes: Swift.Int
+  public var maximumInputBytes: Swift.Int
+  public var maximumResultBytes: Swift.Int
+  public var maximumProgramBytes: Swift.Int
+  public var maximumRetainedOperations: Swift.Int
+  public var maximumRetainedResultBytes: Swift.Int
+  public var maximumRecoveryAttempts: Swift.Int
+  public init(maximumCheckpointBytes: Swift.Int = 1_048_576, maximumInputBytes: Swift.Int = 1_048_576, maximumResultBytes: Swift.Int = 1_048_576, maximumProgramBytes: Swift.Int = 65_536, maximumRetainedOperations: Swift.Int = 1024, maximumRetainedResultBytes: Swift.Int = 16_777_216, maximumRecoveryAttempts: Swift.Int = 3)
+  public static func == (a: SwiftPythonRuntime.RecoverableSessionLimits, b: SwiftPythonRuntime.RecoverableSessionLimits) -> Swift.Bool
+}
+public struct RecoverableSessionCheckpoint : Swift.Sendable, Swift.Equatable {
+  public let sessionID: Foundation.UUID
+  public let version: Swift.UInt64
+  public let data: Foundation.Data
+  public static func == (a: SwiftPythonRuntime.RecoverableSessionCheckpoint, b: SwiftPythonRuntime.RecoverableSessionCheckpoint) -> Swift.Bool
+}
+public struct RecoverableOperationResult : Swift.Sendable, Swift.Equatable {
+  public let operationID: Foundation.UUID
+  public let checkpointVersion: Swift.UInt64
+  public let data: Foundation.Data
+  public let workerLifetime: SwiftPythonRuntime.WorkerLifetimeToken
+  public let recoveryAttempts: Swift.Int
+  public static func == (a: SwiftPythonRuntime.RecoverableOperationResult, b: SwiftPythonRuntime.RecoverableOperationResult) -> Swift.Bool
+}
+public enum RecoverableSessionStatus : Swift.Sendable, Swift.Equatable {
+  case ready(workerLifetime: SwiftPythonRuntime.WorkerLifetimeToken)
+  case requiresRestoration
+  case executing(operationID: Foundation.UUID)
+  case outcomeUnknown(operationID: Foundation.UUID)
+  public static func == (a: SwiftPythonRuntime.RecoverableSessionStatus, b: SwiftPythonRuntime.RecoverableSessionStatus) -> Swift.Bool
+}
+public enum RecoverableSessionError : Swift.Error, Swift.Sendable, Swift.Equatable {
+  case closed
+  case busy(operationID: Foundation.UUID)
+  case conflictingOperationID(Foundation.UUID)
+  case invalidConfiguration(Swift.String)
+  case limitExceeded(Swift.String)
+  case restorationFailed(Swift.String)
+  case operationFailed(operationID: Foundation.UUID, message: Swift.String)
+  case recoveryFailed(operationID: Foundation.UUID, message: Swift.String)
+  case outcomeUnknown(operationID: Foundation.UUID, message: Swift.String)
+  case reconciliationRequired(operationID: Foundation.UUID)
+  case invalidReceipt(Swift.String)
+  public static func == (a: SwiftPythonRuntime.RecoverableSessionError, b: SwiftPythonRuntime.RecoverableSessionError) -> Swift.Bool
+}
+public enum RecoverableOperationResolution : Swift.Sendable {
+  case notCommitted
+  case committed(checkpoint: Foundation.Data, result: Foundation.Data)
+}
+public struct RecoverablePythonSession : Swift.Sendable {
+  public let id: Foundation.UUID
+  public func execute(operationID: Foundation.UUID, input: Foundation.Data, replay: SwiftPythonRuntime.RecoverableReplayPolicy, timeout: Foundation.TimeInterval? = nil) async throws -> SwiftPythonRuntime.RecoverableOperationResult
+  public func checkpoint() async throws -> SwiftPythonRuntime.RecoverableSessionCheckpoint
+  public func status() async throws -> SwiftPythonRuntime.RecoverableSessionStatus
+  public func resolve(operationID: Foundation.UUID, as resolution: SwiftPythonRuntime.RecoverableOperationResolution, timeout: Foundation.TimeInterval? = nil) async throws
+  public func close() async
+}
 @frozen public enum RemotePythonValue : Swift.Sendable {
   case python(any SwiftPythonRuntime.PythonConvertible)
   case handle(SwiftPythonRuntime.PyHandle)
@@ -2990,7 +3113,9 @@ public struct StreamOptions : Swift.Sendable {
     set
   }
   public var channelCapacity: Swift.Int?
+  public var maximumBufferedBytes: Swift.Int
   public init(timeout: Foundation.TimeInterval? = nil, workerAffinity: Swift.Int? = nil, surfaceProgressEvents: Swift.Bool = true, channelCapacity: Swift.Int? = nil)
+  public init(timeout: Foundation.TimeInterval? = nil, workerAffinity: Swift.Int? = nil, surfaceProgressEvents: Swift.Bool = true, channelCapacity: Swift.Int? = nil, maximumBufferedBytes: Swift.Int)
   public static let `default`: SwiftPythonRuntime.StreamOptions
   public static func longRunning(timeout: Foundation.TimeInterval = 600.0) -> SwiftPythonRuntime.StreamOptions
   public static func pinned(worker workerIndex: Swift.Int) -> SwiftPythonRuntime.StreamOptions
@@ -3432,6 +3557,7 @@ public func PyCapsule_SetContext(_ capsule: SwiftPythonRuntime.PyObjectPointer?,
 }
 @_hasMissingDesignatedInitializers final public class PythonRuntime : @unchecked Swift.Sendable {
   public static let shared: SwiftPythonRuntime.PythonRuntime
+  final public func configureFileBackedObjectArenas(directory: Foundation.URL, maximumBytes: Swift.Int) throws
   final public var builtins: SwiftPythonRuntime.PyObjectRef {
     get
   }
@@ -3687,6 +3813,16 @@ extension Swift.Optional : SwiftPythonRuntime.PythonConvertible where Wrapped : 
   public func toPythonObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
 public func pyArg(_ value: any SwiftPythonRuntime.PythonConvertible) throws -> SwiftPythonRuntime.PyObjectRef
+extension SwiftPythonRuntime.PyObjectRef {
+  convenience public init(_ value: any SwiftPythonRuntime.PythonConvertible) throws
+  final public func swiftValue<T>(as type: T.Type = T.self) async throws -> T where T : SwiftPythonRuntime.PythonConvertible
+  final public var doubleValue: Swift.Double {
+    get throws
+  }
+  final public var intValue: Swift.Int {
+    get throws
+  }
+}
 public func pyArgOptionalExistential(_ value: (any SwiftPythonRuntime.PythonConvertible)?) throws -> SwiftPythonRuntime.PyObjectRef
 public func pyArgs(_ args: [any SwiftPythonRuntime.PythonConvertible]) throws -> [SwiftPythonRuntime.PyObjectRef]
 public func pyKwargs(_ kwargs: [Swift.String : any SwiftPythonRuntime.PythonConvertible]) throws -> [Swift.String : SwiftPythonRuntime.PyObjectRef]
@@ -3787,6 +3923,9 @@ extension SwiftPythonRuntime.ProcessPoolCallbackState : Swift.Hashable {}
 extension SwiftPythonRuntime.ProcessPoolCallbackState : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Equatable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Hashable {}
+extension SwiftPythonRuntime.RecoverableReplayPolicy : Swift.Equatable {}
+extension SwiftPythonRuntime.RecoverableReplayPolicy : Swift.Hashable {}
+extension SwiftPythonRuntime.RecoverableReplayPolicy : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SandboxExecStream : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.PosixSignal : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SandboxStopReason : Swift.Hashable {}

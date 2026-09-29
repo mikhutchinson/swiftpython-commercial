@@ -1,0 +1,128 @@
+import AppKit
+import Darwin
+import SwiftPythonRuntime
+__HOST_IMPORTS__
+
+__EXTENSION_POINT__
+
+/// Minimal public integration smoke. This is not the full release corpus.
+@main enum ConsumerApp {
+    static var outputDirectory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(Bundle.main.bundleIdentifier!, isDirectory: true)
+    }
+
+    @MainActor static func main() {
+        let inheritedEvidence = CommandLine.arguments.contains("--stdout-evidence")
+        if !inheritedEvidence {
+            do { try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true) }
+            catch { fatalError("Cannot create consumer output: \(error)") }
+            let descriptor = open(outputDirectory.appendingPathComponent("console.log").path,
+                                  O_CREAT | O_TRUNC | O_WRONLY, 0o600)
+            guard descriptor >= 0 else { fatalError("Cannot open consumer log") }
+            dup2(descriptor, STDOUT_FILENO)
+            dup2(descriptor, STDERR_FILENO)
+            close(descriptor)
+        }
+        setenv("SWIFTPYTHON_AUTOBUILD_WORKER", "0", 1)
+        setenv("SWIFTPYTHON_WORKER_PATH", "/nonexistent/SwiftPythonWorker", 1)
+        setenv("SWIFTPYTHON_PACKAGE_PATH", "/nonexistent/SwiftPythonSource", 1)
+        setenv("PYTHONDONTWRITEBYTECODE", "1", 1)
+        let app = NSApplication.shared
+        app.setActivationPolicy(.prohibited)
+        Task { @MainActor in
+            var receipt: [String: Any] = ["schemaVersion": 1, "passed": false,
+                "bundleIdentifier": Bundle.main.bundleIdentifier!, "appPath": Bundle.main.bundlePath,
+                "host": "__HOST_KIND__", "completedShutdown": false, "hostPID": getpid()]
+            if let index = CommandLine.arguments.firstIndex(of: "--run-id"),
+               CommandLine.arguments.indices.contains(index + 1) {
+                receipt["runID"] = CommandLine.arguments[index + 1]
+            }
+            do {
+                __CONFIGURE_HOST__
+                let pool = try await PythonProcessPool(workers: 1, blasThreads: 1)
+                do {
+                    let initialPID: Int = try await pool.evalResult("__import__('os').getpid()")
+                    let value: Int = try await pool.evalResult("sum(range(100))")
+                    let prefix: String = try await pool.evalResult("__import__('sys').prefix")
+                    receipt["initialPID"] = initialPID
+                    receipt["value"] = value
+                    receipt["pythonPrefix"] = prefix
+                    receipt["runtimePaths"] = try await pool.evalResult(
+                        "__import__('json').dumps({'prefix': __import__('sys').prefix, 'realPrefix': __import__('os').path.realpath(__import__('sys').prefix), 'basePrefix': __import__('sys').base_prefix, 'executable': __import__('sys').executable, 'stdlib': __import__('os').__file__})"
+                    ) as String
+                    let canonicalPrefix = URL(fileURLWithPath: prefix).resolvingSymlinksInPath().path
+                    let canonicalApp = Bundle.main.bundleURL.resolvingSymlinksInPath().path
+                    receipt["canonicalPythonPrefix"] = canonicalPrefix
+                    guard value == 4950, canonicalPrefix.hasPrefix(canonicalApp + "/") else {
+                        throw NSError(domain: "SwiftPython.Consumer", code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "Incorrect result or external Python runtime"])
+                    }
+                    let sourceProbes = CommandLine.arguments.indices.compactMap { index -> String? in
+                        guard CommandLine.arguments[index] == "--deny-source",
+                              CommandLine.arguments.indices.contains(index + 1) else { return nil }
+                        return CommandLine.arguments[index + 1]
+                    }
+                    if !sourceProbes.isEmpty {
+                        var hostDenials: [[String: Any]] = []
+                        for path in sourceProbes {
+                            errno = 0
+                            let descriptor = Darwin.open(path, O_RDONLY)
+                            let failure = errno
+                            if descriptor >= 0 { close(descriptor) }
+                            guard descriptor < 0, failure == EACCES || failure == EPERM else {
+                                throw NSError(domain: "SwiftPython.Consumer", code: 3,
+                                    userInfo: [NSLocalizedDescriptionKey: "Host source read was not denied: \(path), errno=\(failure)"])
+                            }
+                            hostDenials.append(["path": path, "denied": true, "errno": Int(failure)])
+                        }
+                        let data = try JSONSerialization.data(withJSONObject: sourceProbes)
+                        receipt["sourceReadDenial"] = ["host": hostDenials, "worker": []]
+                        let paths = data.base64EncodedString()
+                        let workerDenials: String = try await pool.evalResult("""
+                        import errno, json
+                        _source_denials = []
+                        for _source_path in json.loads(__import__('base64').b64decode('\(paths)')):
+                            try:
+                                with open(_source_path, 'rb') as _source_file:
+                                    _source_file.read(1)
+                            except PermissionError as _source_error:
+                                if _source_error.errno not in (errno.EACCES, errno.EPERM):
+                                    raise
+                                _source_denials.append({'path': _source_path, 'denied': True, 'errno': _source_error.errno})
+                            else:
+                                raise RuntimeError('Worker source read was not denied: ' + _source_path)
+                        json.dumps(_source_denials)
+                        """)
+                        receipt["sourceReadDenial"] = ["host": hostDenials,
+                            "worker": try JSONSerialization.jsonObject(with: Data(workerDenials.utf8))]
+                    }
+                    try await pool.respawnWorker(0, reason: .userInitiated, force: true)
+                    let replacementPID: Int = try await pool.evalResult("__import__('os').getpid()")
+                    guard replacementPID != initialPID else {
+                        throw NSError(domain: "SwiftPython.Consumer", code: 2,
+                            userInfo: [NSLocalizedDescriptionKey: "Worker did not replace its process"])
+                    }
+                    receipt["replacementPID"] = replacementPID
+                    await pool.shutdown()
+                    receipt["completedShutdown"] = true
+                    receipt["passed"] = true
+                } catch {
+                    await pool.shutdown()
+                    throw error
+                }
+            } catch { receipt["error"] = String(describing: error) }
+            do {
+                let data = try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
+                if inheritedEvidence {
+                    print("SWIFTPYTHON_CONSUMER_RECEIPT " + data.base64EncodedString())
+                } else {
+                    try data.write(to: outputDirectory.appendingPathComponent("receipt.json"), options: .atomic)
+                }
+            } catch { print("CONSUMER_RECEIPT_FAILED", error) }
+            fflush(nil)
+            app.terminate(nil)
+        }
+        app.run()
+    }
+}

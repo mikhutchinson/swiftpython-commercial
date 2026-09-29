@@ -1,0 +1,12 @@
+import ExtensionFoundation
+import SwiftPythonWorkerService
+
+@main struct WorkerExtension: AppExtension {
+    @AppExtensionPoint.Bind var point: AppExtensionPoint {
+        AppExtensionPoint.Identifier(host: "__CONSUMER_BUNDLE_ID__", name: "Worker")
+    }
+
+    var configuration: some AppExtensionConfiguration {
+        ConnectionHandler(onConnection: { PythonWorkerExtensionService.acceptConnection($0) })
+    }
+}

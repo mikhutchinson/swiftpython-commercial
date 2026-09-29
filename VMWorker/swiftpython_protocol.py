@@ -406,6 +406,9 @@ IDLE_STATUS = frame(
 SNAPSHOT_READY = frame(
     FrameSpec("snapshot_ready", Routing.CONTROL, fields=("workers", "execs"))
 )
+ENTROPY_RESEEDED = frame(
+    FrameSpec("entropy_reseeded", Routing.CONTROL, fields=("bytes",))
+)
 
 # --- authentication --------------------------------------------------------
 

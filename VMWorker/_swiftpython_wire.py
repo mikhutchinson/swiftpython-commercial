@@ -54,6 +54,7 @@ COMMAND_CASES = frozenset({
     "shutdown",
     "store",
     "streamCancel",
+    "streamCredit",
     "unregisterCallback",
 })
 
@@ -110,10 +111,15 @@ SESSION_ROUTED_RESPONSES = frozenset({
 
 # Capability names known to this host source.
 WORKER_CAPABILITY_NAMES = frozenset({
+    "callback.owned-reentry.v1",
     "duplex.accelerator.backend.v1",
     "duplex.arena-ingress.v1",
     "duplex.messages.v1",
     "duplex.sessions.v1",
+    "duplex.transferred-arena.v1",
+    "duplex.transferred-socket.v1",
+    "stream.credit.v1",
+    "worker.memory-admission.v1",
 })
 
 # Duplex media transport names known to this host source.

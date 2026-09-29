@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "$#" -gt 1 ]; then
+    echo "usage: $0 [distribution-directory]" >&2
+    exit 64
+fi
+REPO_DIR="$(cd "${1:-$SCRIPT_DIR/..}" && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
 LOCAL_PACKAGE_DIR="$WORK_DIR/swiftpython-commercial-local"
 HOST_PYTHON_LOAD_COMMAND="@rpath/Python.framework/Versions/3.13/Python"
@@ -419,6 +424,8 @@ expected = {
     "SwiftPythonAudioInterop",
     "SwiftPythonMetalInterop",
 }
+if (pathlib.Path(sys.argv[1]).parent / "payload.json").is_file():
+    expected.add("SwiftPythonWorkerService")
 pattern = re.compile(
     r'\.binaryTarget\(\s*'
     r'name: "([^"]+)",\s*'
@@ -461,6 +468,10 @@ PY
             "$REPO_DIR/$module.xcframework" \
             "$LOCAL_PACKAGE_DIR/$module.xcframework"
     done
+    if [ -f "$REPO_DIR/payload.json" ]; then
+        ditto "$REPO_DIR/SwiftPythonWorkerService.xcframework" \
+            "$LOCAL_PACKAGE_DIR/SwiftPythonWorkerService.xcframework"
+    fi
     swift package --package-path "$LOCAL_PACKAGE_DIR" dump-package >/dev/null
 }
 
@@ -1425,6 +1436,9 @@ XCODE_DIR="$WORK_DIR/xcode"
 write_local_binary_package
 write_consumer_package "$SPM_DIR"
 write_consumer_package "$XCODE_DIR"
+# A native macOS target owns one link entry per binary. A generated package
+# scheme repeats overlapping product closures and advertises unrelated platforms.
+python3 "$SCRIPT_DIR/consumer_xcode_project.py" "$REPO_DIR" "$XCODE_DIR"
 
 assert_python_loader_contract "$REPO_DIR/SwiftPythonWorker" SwiftPythonWorker
 assert_python_loader_contract "$AUDIO_PROBE" SwiftPythonAudioProbe
@@ -1445,9 +1459,11 @@ echo "=== xcodebuild slice-root consumer ==="
     cd "$XCODE_DIR"
     xcodebuild \
         -quiet \
+        -project ConsumerSmoke.xcodeproj \
         -scheme ConsumerSmoke \
-        -destination "platform=macOS,arch=arm64" \
+        -destination "generic/platform=macOS" \
         -derivedDataPath "$WORK_DIR/DerivedData" \
+        "ARCHS=$(uname -m)" \
         CODE_SIGNING_ALLOWED=NO \
         build
 )
@@ -1504,11 +1520,13 @@ EOF
 
 assert_bundle_remained_sealed() {
     local app="$1"
-    if find "$app" -type d -name __pycache__ -print -quit | grep -q .; then
+    if [ -f "$REPO_DIR/payload.json" ]; then
+        PYTHONDONTWRITEBYTECODE=1 python3 "$REPO_DIR/Consumer/sealed_stdlib.py" \
+            --distribution "$REPO_DIR" --app "$app"
+    elif find "$app" -type d -name __pycache__ -print -quit | grep -q .; then
         echo "Python __pycache__ appeared in sealed app: $app" >&2
         exit 1
-    fi
-    if find "$app" -type f -name '*.pyc' -print -quit | grep -q .; then
+    elif find "$app" -type f -name '*.pyc' -print -quit | grep -q .; then
         echo "Python bytecode appeared in sealed app: $app" >&2
         exit 1
     fi

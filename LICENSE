@@ -1,85 +1,248 @@
-SwiftPython Runtime Binary Distribution License
+Commercial SDK License
+Version 1.0 — September 23, 2026
 
 Copyright (c) 2026 Dr. Mikholae Hutchinson. All rights reserved.
 
-This repository is a public distribution point for SwiftPython Runtime binary
-artifacts, documentation, and integration templates. The
-SwiftPython source code, build system, generator pipeline, private tests, and
-implementation internals are not licensed by this repository.
+1. Scope
 
-SwiftPython is available under these licensing paths. You may use SwiftPython
-under any one valid path:
+This agreement is between Dr. Mikholae Hutchinson (Licensor) and the individual
+or legal entity exercising the permissions below (Licensee). By exercising
+those permissions, Licensee accepts this agreement on its own behalf or with
+authority to bind the entity it represents.
 
-1. the GNU Affero General Public License v3.0 (AGPL-3.0), for applications and
-   services that comply with the AGPL; or
-2. the Small Organization Commercial Grant below, for proprietary or
-   closed-source applications and services built by qualifying small
-   organizations; or
-3. a written SwiftPython Commercial license, for proprietary or closed-source
-   applications that do not use the AGPL path.
+SDK means the Licensor-owned software, interfaces, examples, templates and
+documentation supplied with this agreement as part of SwiftPython or
+SiriusMarkdown. A copy supplied with one SDK grants rights to that SDK only;
+it does not grant access to the other SDK or to private applications.
 
-The AGPL-3.0 text is available from the Free Software Foundation at
-https://www.gnu.org/licenses/agpl-3.0.html.
+SwiftPython's distribution includes SwiftPythonRuntime.xcframework,
+SwiftPythonEngine.xcframework, Python.xcframework, SwiftPythonWorker,
+SwiftPythonAudioInterop.xcframework, SwiftPythonMetalInterop.xcframework and
+the accompanying integration material, where supplied. SiriusMarkdown's
+distribution includes its supplied Swift package products and integration
+material. Third-party components are governed by section 9.
 
-Small Organization Commercial Grant:
+Application means Licensee's own end-user application, internal tool or
+service that incorporates the SDK to provide functionality to its users.
+It excludes the SDK/OEM distribution described in section 7.
 
-If you are an individual or an organization with fewer than 10 total employees
-and contractors, counted across your company, parent companies, subsidiaries,
-and other controlled affiliates, you may use the materials in this repository
-in proprietary or closed-source applications and services without a separate
-written commercial license, subject to the restrictions below.
+Order means a written commercial agreement or order accepted by both parties
+that identifies the licensed SDK, Licensee, tier, covered product family,
+term, fixed fee and currency. A product family may include the same product
+on macOS, iOS, iPadOS and other supported platforms. No separate platform fee
+applies under this agreement.
 
-This grant ends when you no longer qualify as a small organization. You may
-continue using and distributing existing SwiftPython-based applications for up
-to 90 days after crossing the threshold solely to transition to a written
-commercial license or another valid licensing path.
+2. Revenue and eligibility
 
-This grant does not permit selling, sublicensing, hosting, or redistributing
-SwiftPython itself as a standalone runtime, SDK, developer tool, hosted bridge,
-or substantially similar competing product.
+Annual Revenue is the gross revenue recognized by Licensee and its Group
+during the preceding twelve months, before operating expenses, salaries,
+commissions, marketplace fees and other costs. Exclude sales or similar taxes
+collected for a taxing authority, customer refunds and intercompany amounts
+already counted in consolidated revenue. Revenue from all business activities
+counts, not only revenue attributed to the SDK or a particular Application.
 
-Permission is granted to users operating under any valid licensing path to
-use the materials in this repository, including:
+Group includes entities that control Licensee, are controlled by Licensee or
+are under common control with Licensee. Control means ownership of more than
+50 percent of the voting interests or the power to direct management. Count
+consolidated third-party revenue once; dividing a business among affiliates
+does not create separate eligibility.
 
-1. downloading and pinning this package with Swift Package Manager;
-2. linking applications against SwiftPythonRuntime.xcframework, its private
-   SwiftPythonEngine.xcframework dependency, and the
-   optional SwiftPythonAudioInterop.xcframework and
-   SwiftPythonMetalInterop.xcframework adapters;
-3. bundling SwiftPythonWorker with covered applications;
-4. deploying the VMWorker scripts with covered applications or tenant images;
-5. copying and adapting the entitlement templates for covered applications;
-6. using the public documentation as integration guidance.
+For an individual, count revenue from the individual's business activities
+and controlled businesses. Exclude wages from unrelated employment and
+personal investment income unrelated to those businesses. Investment capital
+and loan proceeds are not revenue. For a business operating less than twelve
+months, use its actual revenue since formation; do not annualize it.
 
-Restrictions:
+For work on a client-owned Application, determine eligibility using the higher
+of the service provider's Annual Revenue and that client's Group Annual
+Revenue. The client must hold the applicable license before receiving or
+distributing the Application. Its contractors may work under that license
+solely on its behalf. Ordinary sales of Licensee's own Application to end
+users do not make those end users clients for this rule.
 
-1. You may not sell, sublicense, or redistribute the binary artifacts except as
-   embedded in an AGPL-compliant application, embedded in an application covered
-   by the Small Organization Commercial Grant, embedded in a commercially
-   licensed application, or as otherwise allowed by a written commercial
-   agreement with Dr. Mikholae Hutchinson.
-2. You may not reverse engineer, decompile, disassemble, or otherwise attempt to
-   derive source code, private protocols, build scripts, generator logic, or
-   implementation internals from the binary artifacts, except to the extent such
-   restriction is prohibited by applicable law.
-3. You may not remove copyright, license, or attribution notices.
-4. You may not publish extracted private implementation details or use this
-   repository to reconstruct the private SwiftPython source tree.
-5. You may not use the SwiftPython name, trademarks, or branding to imply
-   endorsement of an unrelated product without written permission.
+All thresholds are in United States dollars. Convert other currencies using
+a consistently applied published exchange rate used in ordinary business
+records. Licensee must assess eligibility when use begins, at renewal, and
+when it becomes aware of a threshold crossing. On a reasonable written
+request, Licensee must provide confirmation of its eligibility. This does not
+authorize access to Licensee's systems, credentials or customer data.
 
-Public viewing of this repository and its documentation is permitted. Production
-use of the binary artifacts requires either compliance with SwiftPython's
-AGPL-3.0 license terms, qualification under the Small Organization Commercial
-Grant, or a valid SwiftPython Commercial license.
+3. License tiers
 
-Third-party software, Python packages, and Apple platform components remain
-subject to their own licenses.
+Community: Annual Revenue below USD 100,000. No license fee or separate Order
+is required while Licensee qualifies. Commercial and closed-source
+Applications are permitted.
 
-THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM USE OF
-THE MATERIALS, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE.
+Indie: Annual Revenue of at least USD 100,000 and below USD 1,000,000.
+A paid Indie Order is required, subject to the transition in section 6.
 
-For licensing inquiries: licensing@swiftpython.dev
+Business: Annual Revenue of USD 1,000,000 or more. A paid Business Order is
+required, subject to the transition in section 6.
+
+Indie and Business fees are fixed in the Order. They are not royalties or
+percentages of revenue and do not vary with employee count, render count,
+document count, installations or end-user count. The default paid term is
+twelve months unless the Order specifies another term. An Order may cover
+one SDK or an expressly identified bundle; purchase of one is not purchase
+of every Licensor product.
+
+4. Integration and application distribution
+
+Subject to the applicable tier and this agreement, Licensor grants Licensee
+a nonexclusive, worldwide license to:
+
+a. install, copy and use the supplied SDK for developing, testing, maintaining
+   and operating Applications;
+b. compile and modify source deliberately included in the SDK distribution
+   for integration into those Applications;
+c. copy and adapt supplied examples, templates and public interfaces for that
+   integration; and
+d. distribute the SDK in object-code form as an incorporated component of
+   Applications, including through app stores, direct downloads and enterprise
+   deployment, and use it in Licensee's own hosted end-user services.
+
+Licensee may allow employees, contractors, build services and distributors to
+exercise these rights only on its behalf and for its covered Applications.
+They receive no independent SDK license. Licensee is responsible for their
+compliance and must preserve required notices and third-party terms.
+
+End users may run and make ordinary installation and backup copies of the
+incorporated SDK as part of lawfully distributed Applications. They receive
+no right under this agreement to extract or redistribute it as a separate SDK.
+Licensee may sell Applications that compete with Licensor's end-user products.
+No publication of Licensee's own application source is required by this grant.
+
+5. Paid-version continuity
+
+After payment of the agreed fee, Licensee may retain, use, modify for permitted
+integration, and distribute SDK versions acquired within the paid term for
+the covered product family indefinitely, subject to this agreement. This
+includes later maintenance releases of that Application built with those SDK
+versions. Nonrenewal or later revenue growth does not cancel these rights.
+
+New SDK versions released after the paid term, additional product families,
+and support beyond the term require the applicable new or renewed Order.
+Support commitments exist only if stated in an Order. There is no automatic
+renewal unless the Order expressly provides for it.
+
+Lawfully distributed Applications may continue running after a license term
+ends or eligibility changes. Neither continued operation nor retained-version
+rights require an online activation service or periodic license check.
+
+6. Growth and transition
+
+When a Community Licensee first reaches USD 100,000 in Annual Revenue, it has
+90 days from that crossing to obtain the applicable paid Order for ongoing SDK
+development, operation and new distribution. During those 90 days it may
+continue its existing permitted use. If it does not obtain an Order, it must
+stop those activities under the Community grant at the end of the period.
+Previously distributed end-user copies may continue to run.
+
+When an Indie Licensee reaches USD 1,000,000, it has 90 days to obtain a Business
+Order for rights beyond the versions and product family already secured under
+section 5. It may continue acquiring versions covered by its existing Order
+during the shorter of that transition or the Order's remaining term. Section 5
+continues to protect already acquired versions. A higher tier does not impose
+retroactive fees for use that was permitted when it occurred.
+
+7. Evaluation and SDK/OEM redistribution
+
+Any Licensee may evaluate the SDK without charge in local development and
+nonproduction test environments. Evaluation does not permit production
+deployment, distribution to end users, or use as an SDK service for others.
+Community Licensees have the production rights in section 4 while eligible.
+
+A separate written OEM agreement is required to sell, sublicense, redistribute
+or expose the SDK itself as a standalone library, runtime, development toolkit,
+white-label SDK or service whose principal offering supplies SDK functionality
+to unrelated developers for incorporation into their own products. This rule
+applies at every revenue level. Ordinary end-user Applications and services
+that incorporate the SDK are covered by section 4 and are not OEM distribution.
+
+8. Source access and restrictions
+
+No right to receive unpublished implementation source, private build tools,
+private tests or other private repositories is granted. Source access beyond
+material deliberately supplied in the SDK requires a separate written
+agreement specifying the material, permitted use and any confidentiality terms.
+Source already supplied as part of an SDK may be compiled as section 4 permits;
+its presence does not make it open source or authorize standalone redistribution.
+
+Except where an independent earlier grant, third-party license or applicable
+law permits otherwise, Licensee must not:
+
+a. redistribute SDK source or SDK binaries independently of permitted
+   Applications, or grant others broader SDK rights than it holds;
+b. reverse engineer, decompile or disassemble supplied proprietary binaries
+   to derive undisclosed implementation source;
+c. remove copyright, license or attribution notices;
+d. use Licensor's names, trademarks or branding to imply endorsement; or
+e. transfer its license to an unrelated entity without written consent.
+
+Nothing here prohibits independent development without use of protected SDK
+material, limits rights required by law, or makes previously public information
+confidential. The copyright holders retain their rights in their own work.
+
+9. Third-party components
+
+Third-party code, fonts and platform components retain their own licenses.
+Those licenses control their components if they conflict with this agreement.
+Preserve their notices, license texts, source availability and other required
+conditions. This agreement does not relicense third-party code, limit rights
+in its source, or grant rights Licensor does not hold.
+
+For EPL-2.0 components, distributors must provide the required source notice
+and access, preserve the EPL terms and disclaimers, and require subsequent
+distribution to satisfy EPL section 3. Warranties or support promised for an
+Application are Licensee's responsibility and are not made on behalf of
+third-party contributors. Other third-party obligations remain applicable.
+
+10. Earlier grants and changes
+
+This agreement governs newly offered rights in copies supplied with it. It
+does not revoke, narrow or replace earlier MIT, AGPL or commercial grants,
+change an executed agreement, or impose new conditions on independently held
+rights. Material available under an earlier grant remains usable under that
+grant to the extent it covers the material. Earlier AGPL rights cannot be
+conditioned on a new purchase or nondisclosure agreement. Any applicable
+historical obligations remain separate.
+
+A later website update or license revision does not retroactively change the
+terms for copies licensed under this version. A separately accepted Order
+controls only the SDK and rights it identifies. No new MIT or AGPL grant is
+made by this agreement.
+
+11. Termination
+
+Licensor may terminate rights under this agreement for a material breach that
+Licensee fails to cure within 30 days after written notice. On termination,
+Licensee must stop the uses no longer authorized and delete SDK copies it has
+no independent right to retain. End-user rights in Applications lawfully
+distributed before termination survive. Earlier and third-party grants are
+not terminated by this agreement. Sections concerning ownership, restrictions,
+third-party rights, earlier grants, disclaimers and liability survive as needed.
+
+12. Warranty and liability
+
+EXCEPT AS AN EXECUTED ORDER OR APPLICABLE LAW REQUIRES OTHERWISE, THE SDK IS
+PROVIDED AS IS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING TITLE, MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+AND NONINFRINGEMENT.
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, LICENSOR AND THIRD-PARTY CONTRIBUTORS
+DISCLAIM ALL LIABILITY FOR DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY
+AND CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, DATA OR BUSINESS, ARISING
+FROM THE SDK OR ITS USE, WHETHER IN CONTRACT, TORT OR OTHERWISE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. NO APPLICATION WARRANTY OR SUPPORT
+PROMISE MAY BE MADE ON BEHALF OF A THIRD-PARTY CONTRIBUTOR.
+
+13. General
+
+This agreement and an applicable Order state the terms of the grant. An Order
+may vary these terms only expressly and only for the parties, SDK and rights
+it identifies; it cannot remove independently held third-party or earlier
+open-source rights. If a provision is unenforceable, the remaining provisions
+continue to apply to the extent permitted by law. No rights are granted by
+implication beyond those stated here.
+
+Licensing, Orders and source-access inquiries: licensing@swiftpython.dev

@@ -4,12 +4,19 @@ Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.8.4`
+Current release: `0.7.0-preview.1`
 
-The preceding public commercial artifact is `0.6.0-duplex.8.3`. This release
-hardens runtime ownership, conversions, callback lifetimes and worker queues,
-while preserving the public API and wire protocols. Embedded imports preserve
-signed app resources. The two examples are Particle Showcase and Iris.
+Unshipped hosting candidate: the staged package adds
+`SwiftPythonWorkerService.xcframework` and the [Consumer assembly kit](Consumer/README.md).
+`payload.json` inventories its complete binary/recipe inputs. These local
+candidate files are not part of the published 8.4 release. Compilation,
+preflight, execution qualification and notarization remain separate gates.
+
+The preceding public commercial artifact is `0.6.0-duplex.8.4`. This preview
+adds app-owned XPC and extension worker hosting, declared worker context and
+recoverable logical sessions. It also hardens callback ownership, worker
+lifecycle and VM restore behavior. Embedded imports preserve signed app
+resources. The two examples are Particle Showcase and Iris.
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 
@@ -28,13 +35,19 @@ installation. See [Examples](Examples/README.md) for build instructions.
 
 ## License
 
-Use this package under one of:
+This checkout uses Commercial SDK License 1.0, shared with SiriusMarkdown.
+Community use is free below USD 100,000 in trailing-twelve-month business
+revenue. Indie covers USD 100,000 to below USD 1 million; Business covers
+USD 1 million and above. Paid fees are fixed by order, with no royalties or
+per-seat charges. SDK/OEM redistribution requires a separate agreement.
 
-- AGPL-3.0;
-- the free Small Organization Commercial Grant in [LICENSE](LICENSE); or
-- a written commercial license.
+Integrate through the XCFrameworks, API documentation and Swift interfaces.
+Implementation source access requires a separate agreement. Earlier grants
+remain intact. The licensing revision is local and unpublished; existing
+releases retain the license supplied with them.
 
-Read [LICENSE](LICENSE) before distributing an application.
+Read [LICENSE](LICENSE) and [eligibility and examples](LICENSING.md).
+Orders and source-access inquiries: licensing@swiftpython.dev.
 
 ## Release contents
 
@@ -45,31 +58,35 @@ Read [LICENSE](LICENSE) before distributing an application.
 | `Python.xcframework` | Private self-contained CPython runtime linked by every public product |
 | `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
 | `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
+| `SwiftPythonWorkerService.xcframework` | Entry point for app-owned XPC and extension workers |
+| `Consumer/` | Versioned worker-host assembly, signing and validation recipes |
+| `payload.json` | Exact binary and consumer-recipe inventory |
 | `SwiftPythonWorker` | Matched universal local ProcessPool sidecar |
 | `SwiftPythonAudioProbe` | Fixed-path, kill/reap-bounded macOS hardware-readiness helper |
-| `VMWorker/` | Matched five-file generated protocol/helper/supervisor/worker set |
+| `VMWorker/` | Matched seven-file protocol, framing, duplex, supervisor and worker set |
 | `Entitlements/` | Parent, worker, audio-probe, inherited-sandbox, and virtualization templates |
 | `Examples/` | Standalone packages compiled against this public distribution |
 | `docs/api-guide/` | Public API and deployment guide |
 | `manifest.json` release asset | Version, source revision, protocols, byte sizes, SHA-256 records, and an explicit VM-image attestation or `null` |
 
-The five XCFrameworks and prebuilt `SwiftPythonWorker` sidecar are universal
+The six XCFrameworks and prebuilt `SwiftPythonWorker` sidecar are universal
 macOS binaries with matched arm64 and x86_64 slices. Keep every binary, helper,
 image, and snapshot on one release version. Worker wire v6 is not compatible
 with the published v0.5 worker wire v5.
 
-The `SwiftPythonCommercial-0.6.0-duplex.8.4.zip` asset contains this complete
-checkout. The five XCFramework zips are individual binary-target assets. Its
-`manifest.json` is a separate asset and attests all five zips, the worker, the
-audio probe, all five VM helpers, and the complete distribution. Its `vmImage`
+The `SwiftPythonCommercial-0.7.0-preview.1.zip` asset contains this complete
+checkout. The six XCFramework zips are individual binary-target assets. Its
+`manifest.json` is a separate asset and attests all six zips, the payload inventory,
+worker, audio probe, all seven VM helpers, and the complete distribution. Its `vmImage`
 field contains the same-version VM-image attestation when that gate runs, or
 explicit `null` for a scoped non-VM release.
 
-A launcher-bearing release uses manifest schema 3 and adds exactly one
+This hosting preview uses manifest schema 4, records host build targets and
+execution qualification separately, and includes exactly one
 `audioHardwareProbeExecutable` record for `SwiftPythonAudioProbe`, plus
 `protocols.audioHardwareProbe: 1`. Its complete distribution must contain the
 same helper bytes and both probe entitlement templates. The raw helper is not a
-SwiftPM binary target; `Python` is the fifth target and remains private.
+SwiftPM binary target; `Python` remains a private dependency.
 
 ## Requirements
 
@@ -92,7 +109,7 @@ Pin the prerelease exactly:
 dependencies: [
     .package(
         url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.6.0-duplex.8.4"
+        exact: "0.7.0-preview.1"
     )
 ]
 ```
@@ -239,13 +256,13 @@ See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
 
 ## VM and Sandbox
 
-`0.6.0-duplex.5` includes the isolated Sandbox surface. Its certified gate uses
-the same source revision for:
+The `0.7.0-preview.1` candidate includes the isolated Sandbox surface. Its
+qualification requires the same source revision for:
 
-- all five XCFrameworks and the local sidecar;
+- all six XCFrameworks and the local sidecar;
 - `_swiftpython_wire.py`, `_swiftpython_duplex.py`,
-  `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and
-  `swiftpython_worker.py`;
+  `swiftpython_frames.py`, `swiftpython_guest_duplex.py`,
+  `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and `swiftpython_worker.py`;
 - the attested Ubuntu base image and warm snapshot;
 - cold and warm vsock duplex/message workloads.
 
@@ -254,7 +271,7 @@ helper hashes. Image/snapshot verification must reject a hash, version,
 protocol, supervisor, configuration, or restore-secret mismatch; a warm gate
 must not silently fall back to cold boot.
 
-Deploy the five-file `VMWorker/` directory together and point custom layouts
+Deploy the complete seven-file `VMWorker/` directory together and point custom layouts
 at it with:
 
 ```bash
@@ -338,6 +355,15 @@ Before publication, `scripts/consumer_path_smoke.sh` derives a temporary
 path-based binary manifest from this checkout. That keeps every local and
 notarized fixture on the candidate XCFramework bytes instead of resolving the
 preceding hosted tag or requiring the new asset URLs to exist early.
+
+**Unshipped validation tooling:** the script also accepts an explicit
+distribution directory as its sole argument. Its companion
+`scripts/consumer_xcode_project.py` constructs a native macOS target for the
+slice-root check, with one link entry per binary and an explicit destination.
+The separate SwiftPM check still imports all three public products through
+`HeadersPath`. Keep the script and companion together when running a newer
+validation-tool revision against an older frozen distribution; this does not
+change the distribution's bytes or claim those tools shipped with it.
 
 `SWIFTPYTHON_AUDIO_PROBE_GATE` controls only the device-dependent launcher
 portion of that fixture:
@@ -445,7 +471,7 @@ preserved rather than collapsed to `0.6.0`.
 | `Bad CPU type` for the worker | Verify the worker and private Python framework came from the same tag; both shipped slices are arm64 and x86_64 |
 | duplex `featureUnavailable` | Inspect live capabilities and put requirements on the open |
 | arena requirement rejected in VM | Expected: shared arena ingress is local UDS only |
-| VM image/snapshot rejected | Rebuild all five helpers, image, and snapshot from this release |
+| VM image/snapshot rejected | Rebuild the complete seven-file helper set, image, and snapshot from this release |
 | SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
 
 ## Release notes

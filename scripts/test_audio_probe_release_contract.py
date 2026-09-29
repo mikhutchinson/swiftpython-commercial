@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import pathlib
+import shutil
 import stat
 import subprocess
 import sys
@@ -814,6 +815,117 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
     def test_exact_schema_three_candidate_passes(self) -> None:
         self.validate()
 
+    def schema_four_candidate(self):
+        kit = pathlib.Path(__file__).resolve().parents[1] / "Consumer"
+        if not kit.is_dir():
+            self.skipTest("Historical schema-3 checkout has no consumer kit")
+        sys.path.insert(0, str(kit))
+        self.addCleanup(lambda: sys.path.remove(str(kit)))
+        import release_manifest
+        from contract import tree_inventory
+        shutil.copytree(kit, self.repo / "Consumer")
+        service = self.repo / "SwiftPythonWorkerService.xcframework"
+        service.mkdir()
+        (service / "Info.plist").write_bytes(b"synthetic service archive fixture")
+        archive = self.write_xcframework_archive("SwiftPythonWorkerService")
+        candidate = copy.deepcopy(self.manifest)
+        candidate["manifestSchemaVersion"] = 4
+        # Schema 3 remains the historical five-helper contract. Hosting
+        # candidates add the frame and guest-duplex helpers and attest them
+        # in the VM image as well as the distribution inventory.
+        for helper in contract.HOSTING_VM_HELPER_NAMES:
+            if helper in contract.VM_HELPER_NAMES:
+                continue
+            data = helper.encode()
+            (self.repo / "VMWorker" / helper).write_bytes(data)
+            record = self.write_record("vmGuestHelper", helper, f"VMWorker/{helper}", data)
+            candidate["artifacts"].append(record)
+            candidate["vmImage"]["guestArtifactSHA256"][helper] = record["sha256"]
+        candidate["artifacts"].append(self.write_record("binaryTarget", archive.name, archive.name,
+                                                       archive.read_bytes(), swiftpm=True))
+        payload = {"schemaVersion": 1, "sourceRevision": candidate["sourceRevision"], "sourceTreeState": "clean",
+                   "buildTargets": {name: [{"platform": "macos", "architecture": arch,
+                       "minimumOS": "15.0", "sdks": ["26.5"]} for arch in ("arm64", "x86_64")]
+                       for name in (*release_manifest.BINARY_MODULES, "SwiftPythonWorker", "SwiftPythonAudioProbe")},
+                   "inventory": {"roots": release_manifest.PAYLOAD_ROOTS,
+                                 "entries": tree_inventory(self.repo, release_manifest.PAYLOAD_ROOTS)}}
+        data = json.dumps(payload).encode()
+        (self.repo / "payload.json").write_bytes(data)
+        candidate["artifacts"].append(self.write_record("payloadInventory", "payload.json", "payload.json", data))
+        candidate["hosts"] = release_manifest.host_records(payload)
+        distribution = self.write_distribution()
+        self.update_artifact_digest(self.distribution_record(candidate), distribution)
+        return candidate
+
+    def test_exact_schema_four_candidate_preserves_legacy_gates(self):
+        candidate = self.schema_four_candidate()
+        self.validate(candidate)
+        candidate["vmImage"]["swiftpythonVersion"] = "0.0.0-wrong-candidate"
+        with self.assertRaises(contract.ContractError):
+            self.validate(candidate)
+
+    def test_schema_four_rejects_claimed_qualification_and_recipe_mutation(self):
+        candidate = self.schema_four_candidate()
+        changed = copy.deepcopy(candidate)
+        changed["hosts"][1]["qualification"] = {"status": "passed", "evidence": []}
+        with self.assertRaisesRegex(contract.ContractError, "host/payload contract"):
+            self.validate(changed)
+        (self.repo / "Consumer/XPC/Worker.swift").write_text("altered recipe")
+        with self.assertRaisesRegex(contract.ContractError, "host/payload contract"):
+            self.validate(candidate)
+
+    def test_schema_three_rejects_apple_host_declarations(self):
+        candidate = copy.deepcopy(self.manifest)
+        candidate["hosts"] = []
+        with self.assertRaisesRegex(contract.ContractError, "root has missing or extra"):
+            self.validate(candidate)
+
+    def add_sealed_stdlib_fixture(self):
+        import py_compile
+        if sys.version_info[:2] != (3, 13):
+            self.skipTest("Sealed-bytecode audit requires the CPython 3.13 build interpreter")
+        source = self.repo / "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/example.py"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("def value():\n    return 42\n")
+        py_compile.compile(str(source), dfile="/__swiftpython__/python3.13/example.py", doraise=True,
+                           optimize=0, invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+        return source
+
+    def refresh_fixture_bytecode_artifacts(self, candidate):
+        from contract import tree_inventory
+        payload_path = self.repo / "payload.json"
+        payload = json.loads(payload_path.read_text())
+        payload["inventory"]["entries"] = tree_inventory(self.repo, payload["inventory"]["roots"])
+        payload_path.write_text(json.dumps(payload))
+        self.update_artifact_digest(self.artifact_record(candidate, "payloadInventory", "payload.json"), payload_path)
+        self.update_artifact_digest(self.artifact_record(candidate, "privateBinaryDependency", "Python.xcframework.zip"),
+                                    self.write_xcframework_archive("Python"))
+        self.update_artifact_digest(self.distribution_record(candidate), self.write_distribution())
+
+    def test_schema_four_accepts_exact_source_derived_sealed_bytecode(self):
+        self.add_sealed_stdlib_fixture()
+        candidate = self.schema_four_candidate()
+        self.refresh_fixture_bytecode_artifacts(candidate)
+        self.validate(candidate)
+
+    def test_rehashing_payload_cannot_bless_private_path_or_changed_bytecode(self):
+        import py_compile
+        source = self.add_sealed_stdlib_fixture()
+        candidate = self.schema_four_candidate()
+        py_compile.compile(str(source), dfile=str(source), doraise=True, optimize=0,
+                           invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+        with self.assertRaisesRegex(contract.ContractError, "sealed-bytecode contract"):
+            self.refresh_fixture_bytecode_artifacts(candidate)
+            self.validate(candidate)
+
+    def test_schema_three_still_rejects_all_bytecode(self):
+        self.add_sealed_stdlib_fixture()
+        self.update_artifact_digest(self.artifact_record(self.manifest, "privateBinaryDependency", "Python.xcframework.zip"),
+                                    self.write_xcframework_archive("Python"))
+        with self.assertRaisesRegex(contract.ContractError, "forbidden generated"):
+            self.update_artifact_digest(self.distribution_record(self.manifest), self.write_distribution())
+            self.validate()
+
     def test_schema_two_is_rejected(self) -> None:
         candidate = copy.deepcopy(self.manifest)
         candidate["manifestSchemaVersion"] = 2
@@ -855,6 +967,27 @@ class AudioProbeReleaseContractTests(unittest.TestCase):
         del candidate["distributionZip"]
         with self.assertRaisesRegex(contract.ContractError, "root has missing"):
             self.validate(candidate)
+
+    def test_hosting_vm_image_requires_every_split_helper_digest(self) -> None:
+        image = copy.deepcopy(self.manifest["vmImage"])
+        records = {item["name"]: item for item in self.manifest["artifacts"]
+                   if item["role"] == "vmGuestHelper"}
+        for helper in ("swiftpython_frames.py", "swiftpython_guest_duplex.py"):
+            records[helper] = {"sha256": "b" * 64}
+            image["guestArtifactSHA256"][helper] = "b" * 64
+        contract.validate_vm_image_attestation(
+            image, expected_version=self.version, helper_records=records)
+        for helper in ("swiftpython_frames.py", "swiftpython_guest_duplex.py"):
+            missing = copy.deepcopy(image)
+            del missing["guestArtifactSHA256"][helper]
+            with self.assertRaises(contract.ContractError):
+                contract.validate_vm_image_attestation(
+                    missing, expected_version=self.version, helper_records=records)
+            changed = copy.deepcopy(image)
+            changed["guestArtifactSHA256"][helper] = "c" * 64
+            with self.assertRaises(contract.ContractError):
+                contract.validate_vm_image_attestation(
+                    changed, expected_version=self.version, helper_records=records)
 
     def test_vm_image_attestation_can_explicitly_be_null(self) -> None:
         candidate = copy.deepcopy(self.manifest)

@@ -5,12 +5,12 @@ exposing the provider's boot mechanism, transport, kernel assets, or storage
 layout. Use a sandbox for tenant-specific dependencies, shell tools, untrusted
 jobs, per-tenant secrets, or Linux-only packages.
 
-The `0.6.0-duplex.3` commercial release keeps these matched assets together:
+The `0.7.0-preview.1` candidate keeps these matched assets together:
 
 - `SwiftPythonRuntime.xcframework` and its private
-  `SwiftPythonEngine.xcframework` dependency;
+  `SwiftPythonEngine.xcframework` and `Python.xcframework` dependencies;
 - the local `SwiftPythonWorker` sidecar;
-- the complete five-file `VMWorker/` helper set;
+- the complete seven-file `VMWorker/` helper set listed in the release manifest;
 - the attested runtime asset and optional accelerated-start checkpoint.
 
 Treat the release as one unit. Do not mix frameworks, workers, helpers,
@@ -37,7 +37,7 @@ let configuration = SandboxConfiguration(
     startup: .standard,
     network: .denied,
     workersPerSandbox: 1,
-    minimumRuntimeVersion: "0.6.0-duplex.3",
+    minimumRuntimeVersion: "0.7.0-preview.1",
     integrity: .strict
 )
 
@@ -67,7 +67,7 @@ let configuration = SandboxConfiguration(
     ),
     network: .denied,
     workersPerSandbox: 1,
-    minimumRuntimeVersion: "0.6.0-duplex.3",
+    minimumRuntimeVersion: "0.7.0-preview.1",
     integrity: .strict
 )
 ```

@@ -99,7 +99,7 @@ with (Path(app) / 'Contents/Info.plist').open('wb') as stream:
         'CFBundleDisplayName': name,
         'CFBundlePackageType': 'APPL',
         'CFBundleShortVersionString': version.split('-')[0],
-        'CFBundleVersion': version.split('-duplex.')[-1],
+        'CFBundleVersion': version.split('-')[0].split('+')[0],
         'SwiftPythonRuntimeVersion': version,
         'LSApplicationCategoryType': 'public.app-category.developer-tools',
         'LSMinimumSystemVersion': '15.0',

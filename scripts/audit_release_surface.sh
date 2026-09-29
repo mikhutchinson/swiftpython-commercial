@@ -4,6 +4,10 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXPECTED_VERSION="${1:-$(tr -d '[:space:]' < "$REPO_DIR/VERSION")}"
 MANIFEST_PATH="${SWIFTPYTHON_RELEASE_MANIFEST:-}"
+HOST_CONTRACT=0
+if [ -e "$REPO_DIR/payload.json" ] || [ -d "$REPO_DIR/Consumer" ] || [ -d "$REPO_DIR/SwiftPythonWorkerService.xcframework" ]; then
+    HOST_CONTRACT=1
+fi
 
 fail() {
     echo "release-surface audit failed: $*" >&2
@@ -23,13 +27,37 @@ actual_version="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 [ "$actual_version" = "$EXPECTED_VERSION" ] \
     || fail "VERSION is $actual_version, expected $EXPECTED_VERSION"
 
-python3 - "$REPO_DIR" "$EXPECTED_VERSION" <<'PY'
+PYTHONDONTWRITEBYTECODE=1 python3 - "$REPO_DIR" "$EXPECTED_VERSION" "$HOST_CONTRACT" <<'PY'
 import pathlib
+import plistlib
 import re
+import subprocess
 import sys
+import tempfile
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]) / "scripts"))
+from audio_probe_release_contract import validated_sealed_bytecode
 
 root = pathlib.Path(sys.argv[1])
 version = sys.argv[2]
+host_contract = sys.argv[3] == "1"
+# Exercise the same metadata writer as the distributed app builder. A valid
+# SDK prerelease identifier is not necessarily a valid Apple bundle version.
+builder = (root / "scripts/build_demo_app.sh").read_text()
+metadata_writers = re.findall(r"<<'PY'\n(.*?)\nPY\n", builder, re.DOTALL)
+if len(metadata_writers) != 1:
+    raise SystemExit("Expected exactly one demo app metadata writer")
+with tempfile.TemporaryDirectory(prefix="swiftpython-demo-metadata-audit-") as temporary:
+    app = pathlib.Path(temporary) / "Example.app"
+    (app / "Contents").mkdir(parents=True)
+    subprocess.run([sys.executable, "-", str(app), "Example", "Example",
+                    "dev.swiftpython.metadata-audit", version],
+                   input=metadata_writers[0], text=True, check=True)
+    info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", info.get("CFBundleVersion", "")):
+        raise SystemExit("Demo CFBundleVersion must be a numeric Apple build string")
+    if info.get("SwiftPythonRuntimeVersion") != version:
+        raise SystemExit("Demo metadata lost the complete SDK version")
+sealed = validated_sealed_bytecode(root) if host_contract else set()
 readme = (root / "README.md").read_text()
 license_text = (root / "LICENSE").read_text()
 required = [
@@ -55,6 +83,10 @@ required = [
     'SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>"',
 ]
 missing = [item for item in required if item not in readme]
+if host_contract:
+    for item in ("SwiftPythonWorkerService", "Consumer", "payload.json"):
+        if item not in readme:
+            missing.append(item)
 if missing:
     raise SystemExit(f"README missing release facts: {missing}")
 for item in (
@@ -134,7 +166,7 @@ for product in (
     "SwiftPythonRuntime",
     "SwiftPythonAudioInterop",
     "SwiftPythonMetalInterop",
-):
+) + (("SwiftPythonWorkerService",) if host_contract else ()):
     if package.count(f'name: "{product}"') < 2:
         raise SystemExit(f"Package.swift does not expose binary product {product}")
 if package.count('.binaryTarget(\n            name: "SwiftPythonEngine"') != 1:
@@ -157,6 +189,8 @@ expected_helpers = {
     "swiftpython_supervisor.py",
     "swiftpython_worker.py",
 }
+if host_contract:
+    expected_helpers.update({"swiftpython_frames.py", "swiftpython_guest_duplex.py"})
 actual_helpers = {
     path.name
     for path in (root / "VMWorker").glob("*.py")
@@ -170,11 +204,13 @@ if actual_helpers != expected_helpers:
 
 release_placeholder_prefixes = tuple(
     "__" + product + "_XCFRAMEWORK_"
-    for product in ("RUNTIME", "ENGINE", "PYTHON", "AUDIO", "METAL")
+    for product in ("RUNTIME", "ENGINE", "PYTHON", "AUDIO", "METAL", "WORKER_SERVICE")
 )
 
 for path in root.rglob("*"):
     relative = path.relative_to(root)
+    if relative.as_posix() in sealed:
+        continue  # Only individually source-validated, payload-attested entries.
     if path.is_dir() and path.name in {
         ".build",
         ".swiftpm",
@@ -221,6 +257,22 @@ for path in sorted(root.rglob("*.md")):
         if relative_target and not (path.parent / relative_target).resolve().exists():
             raise SystemExit(f"broken relative Markdown link {target!r} in {path}")
 PY
+
+if [ "$HOST_CONTRACT" = 1 ]; then
+    require_file "$REPO_DIR/payload.json"
+    require_file "$REPO_DIR/Consumer/release_manifest.py"
+    require_dir "$REPO_DIR/SwiftPythonWorkerService.xcframework"
+    PYTHONDONTWRITEBYTECODE=1 python3 - "$REPO_DIR" <<'PY'
+import pathlib
+import sys
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root / "Consumer"))
+from release_manifest import verified_payload
+# This pre-manifest lane is deliberately development evidence only. The
+# manifest-backed audit below requires clean publisher provenance separately.
+verified_payload(root, allow_development=True)
+PY
+fi
 
 python3 - "$REPO_DIR" <<'PY'
 import pathlib
@@ -370,7 +422,7 @@ do
 done
 
 root_package="$(swift package --package-path "$REPO_DIR" dump-package)"
-python3 - "$root_package" <<'PY'
+python3 - "$root_package" "$HOST_CONTRACT" <<'PY'
 import json
 import sys
 
@@ -381,6 +433,8 @@ public_products = {
     "SwiftPythonAudioInterop",
     "SwiftPythonMetalInterop",
 }
+if sys.argv[2] == "1":
+    public_products.add("SwiftPythonWorkerService")
 allowed = (public_products, public_products | {"swiftpython-smoke"})
 if products not in allowed:
     raise SystemExit(
@@ -396,6 +450,9 @@ modules=(
     SwiftPythonAudioInterop
     SwiftPythonMetalInterop
 )
+if [ "$HOST_CONTRACT" = 1 ]; then
+    modules+=(SwiftPythonWorkerService)
+fi
 for module in "${modules[@]}"; do
     framework="$REPO_DIR/$module.xcframework"
     require_dir "$framework"
@@ -434,8 +491,7 @@ for module in "${modules[@]}"; do
 done
 
 # These shipped source files are compile-only documentation consumers. Keep
-# them outside the URL package graph so the package retains exactly five
-# binary targets, but type-check them against the candidate interfaces here.
+# them outside the URL package graph; type-check against candidate interfaces.
 public_module_flags=()
 for module in "${modules[@]}"; do
     public_module_flags+=(
@@ -550,6 +606,8 @@ required = {
         "DuplexMetalRegionPool",
     ],
 }
+if (root / "payload.json").is_file():
+    required["SwiftPythonWorkerService"] = ["PythonWorkerXPCService", "PythonWorkerExtensionService", "acceptConnection", "run() throws"]
 for module, names in required.items():
     interface = (
         root
@@ -592,6 +650,17 @@ for layout in ("SwiftPythonRuntime.swiftmodule", "Headers/SwiftPythonRuntime.swi
             leaked = [token for token in denied if token in text]
             if leaked:
                 raise SystemExit(f"Runtime interface leaks {leaked} in {path}")
+
+service_root = root / "SwiftPythonWorkerService.xcframework" / "macos-arm64_x86_64"
+if (root / "payload.json").is_file():
+    for layout in ("SwiftPythonWorkerService.swiftmodule", "Headers/SwiftPythonWorkerService.swiftmodule"):
+        for arch in ("arm64", "x86_64"):
+            for suffix in ("swiftinterface", "private.swiftinterface"):
+                path = service_root / layout / f"{arch}-apple-macos.{suffix}"
+                text = path.read_text()
+                leaked = [token for token in denied + ("ExtensionWorkerProtocol", "WorkerServiceContext", "PoolWire") if token in text]
+                if leaked:
+                    raise SystemExit(f"WorkerService interface leaks {leaked} in {path}")
 PY
 
 if [ -n "$MANIFEST_PATH" ]; then

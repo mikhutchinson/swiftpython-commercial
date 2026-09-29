@@ -122,6 +122,15 @@ public struct DuplexMetalPoolSnapshot : Swift.Sendable, Swift.Equatable {
   public let reuseCount: Swift.UInt64
   public static func == (a: SwiftPythonMetalInterop.DuplexMetalPoolSnapshot, b: SwiftPythonMetalInterop.DuplexMetalPoolSnapshot) -> Swift.Bool
 }
+public struct DuplexMappedMetalBuffer : @unchecked Swift.Sendable {
+  public let buffer: any Metal.MTLBuffer
+  public let route: SwiftPythonMetalInterop.DuplexMetalRoute
+  public let byteCount: Swift.Int
+  public let copiedBytes: Swift.Int
+}
+@available(macOS 15, iOS 18, tvOS 18, *)
+@available(watchOS, unavailable)
+public func makeMetalBufferMapping(pages: Swift.UnsafeMutableRawBufferPointer, device: any Metal.MTLDevice, ledger: SwiftPythonMetalInterop.DuplexCopyLedger = DuplexCopyLedger()) throws -> SwiftPythonMetalInterop.DuplexMappedMetalBuffer
 public struct DuplexMetalBufferLease : @unchecked Swift.Sendable {
   public var buffer: any Metal.MTLBuffer {
     get

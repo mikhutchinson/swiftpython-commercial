@@ -1,7 +1,7 @@
 # SwiftPython Public API Guide
 
-This guide documents the public binary API shipped by
-`swiftpython-commercial` `0.6.0-duplex.8.3`.
+This guide documents the public binary API in the staged, unshipped
+`swiftpython-commercial` `0.7.0-preview.1` candidate.
 It is written for application authors who need to embed Python execution in a
 macOS app, worker service, or sandboxed tool without access to the private
 SwiftPython source tree.
@@ -12,7 +12,10 @@ from the public package artifacts: `SwiftPythonRuntime.xcframework`, its
 code-only private dependency `SwiftPythonEngine.xcframework`, optional
 `SwiftPythonAudioInterop.xcframework` and
 `SwiftPythonMetalInterop.xcframework`, the matched `SwiftPythonWorker`,
-the five-file `VMWorker/` set, and the entitlement templates.
+the seven-file `VMWorker/` set, and the entitlement templates. The optional
+`SwiftPythonWorkerService` product and [consumer kit](../../Consumer/README.md)
+provide app-owned worker hosting; use the kit's declared host and context
+contracts when integrating those workers.
 
 ## Chapters
 
@@ -61,9 +64,11 @@ the five-file `VMWorker/` set, and the entitlement templates.
 
 ## Public Package Boundary
 
-This public repository is the binary distribution for SwiftPython users on the
-AGPL-3.0 path, the free Small Organization Commercial Grant, or a written
-commercial-license path. Use the documented runtime APIs to build your app-level
+This checkout uses Commercial SDK License 1.0, shared with SiriusMarkdown:
+Community below USD 100,000 annual business revenue, paid Indie below USD
+1 million, and Business from USD 1 million. The revision is unpublished;
+previously published versions retain their original grants. See the root
+LICENSE and LICENSING.md. Use the documented runtime APIs to build your app-level
 integration. Do not depend on private source paths, private generated bindings,
 internal test fixtures, or implementation details from a SwiftPython source
 checkout.

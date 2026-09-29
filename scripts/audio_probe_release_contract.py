@@ -57,6 +57,7 @@ VM_HELPER_NAMES = (
     "swiftpython_supervisor.py",
     "swiftpython_worker.py",
 )
+HOSTING_VM_HELPER_NAMES = (*VM_HELPER_NAMES, "swiftpython_frames.py", "swiftpython_guest_duplex.py")
 REQUIRED_MANIFEST_KEYS = {
     "manifestSchemaVersion",
     "version",
@@ -606,8 +607,9 @@ def sha256(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def expected_artifact_keys(version: str) -> set[tuple[str, str]]:
-    return {
+def expected_artifact_keys(version: str, schema: int = MANIFEST_SCHEMA_VERSION) -> set[tuple[str, str]]:
+    require(type(schema) is int and schema in (3, 4), "unsupported manifest schema")
+    artifacts = {
         ("binaryTarget", "SwiftPythonRuntime.xcframework.zip"),
         ("privateBinaryDependency", "SwiftPythonEngine.xcframework.zip"),
         ("privateBinaryDependency", "Python.xcframework.zip"),
@@ -616,8 +618,13 @@ def expected_artifact_keys(version: str) -> set[tuple[str, str]]:
         ("workerExecutable", "SwiftPythonWorker"),
         (PROBE_ROLE, PROBE_NAME),
         ("completeDistribution", f"SwiftPythonCommercial-{version}.zip"),
-        *(("vmGuestHelper", name) for name in VM_HELPER_NAMES),
+        *(("vmGuestHelper", name) for name in
+          (HOSTING_VM_HELPER_NAMES if schema == 4 else VM_HELPER_NAMES)),
     }
+    if schema == 4:
+        artifacts.update({("binaryTarget", "SwiftPythonWorkerService.xcframework.zip"),
+                          ("payloadInventory", "payload.json")})
+    return artifacts
 
 
 def expected_artifact_path(key: tuple[str, str]) -> str:
@@ -712,7 +719,23 @@ def require_exact_probe_record(
         )
 
 
-def is_forbidden_distribution_relative(relative: pathlib.PurePosixPath) -> bool:
+def validated_sealed_bytecode(repo: pathlib.Path) -> set[str]:
+    if not (repo / "payload.json").exists():
+        return set()
+    validator = repo / "Consumer/sealed_stdlib.py"
+    require(validator.is_file(), "Schema-4 payload lacks its sealed-bytecode validator")
+    result = subprocess.run([sys.executable, str(validator), "--distribution", str(repo)],
+                            capture_output=True, text=True, check=False,
+                            env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+    require(result.returncode == 0, "Invalid sealed-bytecode contract: " + result.stderr[-4000:])
+    paths = json.loads(result.stdout)
+    require(type(paths) is list and all(type(path) is str for path in paths), "Invalid sealed-bytecode inventory")
+    return set(paths)
+
+
+def is_forbidden_distribution_relative(relative: pathlib.PurePosixPath, sealed: set[str] | None = None) -> bool:
+    if sealed and relative.as_posix() in sealed:
+        return False  # Exact source-derived entries, never a directory-wide exemption.
     if any(component in FORBIDDEN_DISTRIBUTION_COMPONENTS for component in relative.parts):
         return True
     if any(component.endswith(".dSYM") for component in relative.parts):
@@ -749,12 +772,15 @@ def contained_symlink_target(
 
 def distribution_repo_payloads(
     repo: pathlib.Path,
+    sealed: set[str] | None = None,
 ) -> tuple[
     dict[str, tuple[pathlib.Path, os.stat_result]],
     dict[str, tuple[pathlib.Path, os.stat_result]],
 ]:
     payloads: dict[str, tuple[pathlib.Path, os.stat_result]] = {}
     directory_payloads: dict[str, tuple[pathlib.Path, os.stat_result]] = {}
+    if sealed is None:
+        sealed = validated_sealed_bytecode(repo)
     for directory, directories, files in os.walk(repo, followlinks=False):
         directory_path = pathlib.Path(directory)
         kept_directories: list[str] = []
@@ -764,7 +790,7 @@ def distribution_repo_payloads(
             if relative.parts[0] == ".git":
                 continue
             require(
-                not is_forbidden_distribution_relative(relative),
+                not is_forbidden_distribution_relative(relative, sealed),
                 f"forbidden generated directory in commercial checkout: {relative}",
             )
             metadata = candidate.lstat()
@@ -789,7 +815,7 @@ def distribution_repo_payloads(
             if relative.parts[0] == ".git":
                 continue
             require(
-                not is_forbidden_distribution_relative(relative),
+                not is_forbidden_distribution_relative(relative, sealed),
                 f"forbidden generated file in commercial checkout: {relative}",
             )
             metadata = candidate.lstat()
@@ -1005,8 +1031,10 @@ def validate_distribution_zip(
     *,
     repo: pathlib.Path,
     expected_probe_sha256: str,
+    allow_sealed_bytecode: bool = False,
 ) -> None:
-    expected_payloads, expected_directories = distribution_repo_payloads(repo)
+    sealed = validated_sealed_bytecode(repo) if allow_sealed_bytecode else set()
+    expected_payloads, expected_directories = distribution_repo_payloads(repo, sealed)
     root = f"swiftpython-commercial-{version}"
     observed_payloads: dict[str, zipfile.ZipInfo] = {}
     observed_directories: dict[str, zipfile.ZipInfo] = {}
@@ -1061,7 +1089,7 @@ def validate_distribution_zip(
                     continue
                 relative = pathlib.PurePosixPath(*entry.parts[1:])
                 require(
-                    not is_forbidden_distribution_relative(relative),
+                    not is_forbidden_distribution_relative(relative, sealed),
                     f"complete distribution contains forbidden payload: {relative}",
                 )
                 mode = info.external_attr >> 16
@@ -1216,10 +1244,10 @@ def validate_vm_image_attestation(
     require_iso8601(value.get("builtAt"), "release VM image build date")
     hashes = value.get("guestArtifactSHA256")
     require(
-        type(hashes) is dict and set(hashes) == set(VM_HELPER_NAMES),
-        "release VM image helper digest inventory is not the exact five-file set",
+        type(hashes) is dict and set(hashes) == set(helper_records),
+        "release VM image helper digest inventory does not match the exact release helper set",
     )
-    for helper in VM_HELPER_NAMES:
+    for helper in helper_records:
         expected = helper_records[helper].get("sha256")
         require(
             hashes.get(helper) == expected,
@@ -1239,17 +1267,15 @@ def validate_manifest(
         inventory.architectures == EXPECTED_PUBLIC_ARCHITECTURES,
         "public release manifest cannot attest a non-universal audio probe",
     )
+    schema = manifest.get("manifestSchemaVersion")
     require(
-        set(manifest) == REQUIRED_MANIFEST_KEYS,
-        "release manifest schema-3 root has missing or extra fields: "
-        f"missing={sorted(REQUIRED_MANIFEST_KEYS - set(manifest))} "
-        f"extra={sorted(set(manifest) - REQUIRED_MANIFEST_KEYS)}",
+        type(schema) is int and schema in (3, 4),
+        "release manifest schema must be exactly 3 or 4",
     )
-    require(
-        type(manifest.get("manifestSchemaVersion")) is int
-        and manifest.get("manifestSchemaVersion") == MANIFEST_SCHEMA_VERSION,
-        f"release manifest schema must be exactly {MANIFEST_SCHEMA_VERSION}",
-    )
+    required_keys = REQUIRED_MANIFEST_KEYS | ({"hosts"} if schema == 4 else set())
+    require(set(manifest) == required_keys,
+            f"release manifest schema-{schema} root has missing or extra fields: "
+            f"missing={sorted(required_keys - set(manifest))} extra={sorted(set(manifest) - required_keys)}")
     require(
         manifest.get("version") == expected_version, "release manifest version mismatch"
     )
@@ -1301,7 +1327,7 @@ def validate_manifest(
         )
         require(key not in records, f"duplicate release artifact record: {key}")
         records[key] = candidate
-    expected = expected_artifact_keys(expected_version)
+    expected = expected_artifact_keys(expected_version, schema)
     require(
         set(records) == expected,
         "manifest artifact inventory mismatch: "
@@ -1361,13 +1387,27 @@ def validate_manifest(
                 f"manifest executable artifact lacks execute permission: {key}",
             )
 
-    for role, module in (
+    binary_modules = [
         ("binaryTarget", "SwiftPythonRuntime"),
         ("privateBinaryDependency", "SwiftPythonEngine"),
         ("privateBinaryDependency", "Python"),
         ("binaryTarget", "SwiftPythonAudioInterop"),
         ("binaryTarget", "SwiftPythonMetalInterop"),
-    ):
+    ]
+    if schema == 4:
+        binary_modules.append(("binaryTarget", "SwiftPythonWorkerService"))
+        require(sha256(repo / "payload.json") == records[("payloadInventory", "payload.json")]["sha256"],
+                "commercial payload inventory differs from manifest artifact bytes")
+        # The same public contract used by the builder and consumer verifies
+        # the complete recipe/binary inventory and host metadata. It cannot
+        # replace any of the legacy archive, VM, audio or signature gates.
+        result = subprocess.run(
+            [sys.executable, str(repo / "Consumer/release_manifest.py"), "validate-release",
+             "--root", str(repo), "--manifest", str(manifest_path)],
+            env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), capture_output=True, text=True, check=False,
+        )
+        require(result.returncode == 0, "schema-4 host/payload contract failed: " + result.stderr)
+    for role, module in binary_modules:
         name = f"{module}.xcframework.zip"
         validate_xcframework_zip(
             manifest_path.parent / records[(role, name)]["path"],
@@ -1407,7 +1447,7 @@ def validate_manifest(
     )
 
     helper_records: dict[str, Mapping[str, Any]] = {}
-    for helper in VM_HELPER_NAMES:
+    for helper in (HOSTING_VM_HELPER_NAMES if schema == 4 else VM_HELPER_NAMES):
         record = records[("vmGuestHelper", helper)]
         helper_records[helper] = record
         require(
@@ -1429,6 +1469,7 @@ def validate_manifest(
         expected_version,
         repo=repo,
         expected_probe_sha256=probe_record["sha256"],
+        allow_sealed_bytecode=schema == 4,
     )
 
 

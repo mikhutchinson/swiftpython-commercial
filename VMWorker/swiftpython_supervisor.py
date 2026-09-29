@@ -49,6 +49,7 @@ from swiftpython_protocol import (  # noqa: E402
     AUTH_ROTATED,
     CONFIGURED,
     DESCRIBED,
+    ENTROPY_RESEEDED,
     ERROR,
     EXEC_ERROR,
     EXEC_RESULT,
@@ -74,17 +75,24 @@ from swiftpython_protocol import (  # noqa: E402
     observed_undeclared_keys,
     registered_commands,
 )
-from _swiftpython_duplex import capability_declaration as duplex_capability_declaration  # noqa: E402
+from swiftpython_frames import worker_capability_declaration  # noqa: E402
 from _swiftpython_wire import CURRENT_PROTOCOL_VERSION  # noqa: E402
+
+# <linux/random.h>: _IOW('R', 0x03, int[2]) and _IO('R', 0x07).
+RNDADDENTROPY = 0x40085203
+RNDRESEEDCRNG = 0x5207
+MINIMUM_RESEED_BYTES = 32
 
 
 def _guest_artifact_sha256() -> dict[str, str]:
-    """Hash the exact five guest files beside this running supervisor."""
+    """Hash the exact seven guest files beside this running supervisor."""
     directory = os.path.dirname(os.path.abspath(__file__))
     candidates = {
         "swiftpython_protocol.py": ("swiftpython_protocol.py",),
         "_swiftpython_wire.py": ("_swiftpython_wire.py",),
         "_swiftpython_duplex.py": ("_swiftpython_duplex.py",),
+        "swiftpython_frames.py": ("swiftpython_frames.py",),
+        "swiftpython_guest_duplex.py": ("swiftpython_guest_duplex.py",),
         "swiftpython_supervisor.py": (
             os.path.basename(os.path.abspath(__file__)),
             "swiftpython_supervisor.py",
@@ -296,7 +304,7 @@ class Supervisor:
         self._report_host_emit_skew(emits or [])
         return DESCRIBED(
             **declaration(
-                worker_capabilities=duplex_capability_declaration(
+                worker_capabilities=worker_capability_declaration(
                     CURRENT_PROTOCOL_VERSION,
                     "duplex.vsock.v1",
                 ),
@@ -477,6 +485,31 @@ class Supervisor:
         self.auth_nonce = os.urandom(32).hex()
         self.authenticated = False
         return AUTH_ROTATED()
+
+    @command("reseed_entropy")
+    def _reseed_entropy(self, data: dict) -> dict:
+        """Mix host entropy into the kernel pool and force a CRNG reseed.
+
+        Every guest restored from one snapshot resumes with the same kernel RNG
+        state, so until a reseed their `/dev/urandom` output is identical.
+        """
+        try:
+            seed = base64.b64decode(data.get("bytesBase64", ""), validate=True)
+        except Exception:
+            return ERROR(message="reseed_entropy requires valid base64 bytes")
+        if len(seed) < MINIMUM_RESEED_BYTES:
+            return ERROR(message=f"reseed_entropy requires at least {MINIMUM_RESEED_BYTES} bytes")
+        try:
+            fd = os.open("/dev/random", os.O_WRONLY)
+            try:
+                fcntl.ioctl(fd, RNDADDENTROPY, struct.pack("ii", len(seed) * 8, len(seed)) + seed)
+                fcntl.ioctl(fd, RNDRESEEDCRNG)
+            finally:
+                os.close(fd)
+        except OSError as exc:
+            return ERROR(message=f"reseed_entropy failed: {exc}")
+        self.auth_nonce = os.urandom(32).hex()
+        return ENTROPY_RESEEDED(bytes=len(seed))
 
     @command("spawn", open_fields=("ipcConfig",))
     def _spawn_worker(self, data: dict) -> dict:
