@@ -33,16 +33,15 @@ try await withProcessPool(workers: 4) { pool in
 ## Configuration
 
 ```swift
-let ipc = IPCConfiguration(
+let configuration = ProcessPoolConfiguration(
     receiveTimeout: 60,
-    streamKeepaliveInterval: 5,
-    maxPayloadBytes: 32 * 1024 * 1024
+    streamKeepaliveInterval: 5
 )
 
 let pool = try await PythonProcessPool(
     workers: PythonProcessPool.recommended(for: .cpuBound),
     workerExecutablePath: "/path/to/SwiftPythonWorker",
-    ipc: ipc,
+    configuration: configuration,
     maxRespawns: 3,
     resourceLimits: WorkerResourceLimits(maxMemoryBytes: 4 * 1024 * 1024 * 1024),
     backpressure: .suspend(maxInFlight: 32)
@@ -55,7 +54,7 @@ The common knobs are:
 |--------|-----|
 | `workers` | Number of worker processes |
 | `workerExecutablePath` | Explicit sidecar path when auto-discovery is not enough |
-| `ipc` | Timeouts, payload caps, protocol version, keepalive |
+| `configuration` | Timeouts, timeout recovery, keepalive and resource-sample events |
 | `maxRespawns` | Crash recovery budget per worker |
 | `resourceLimits` | Per-worker memory guardrails |
 | `backpressure` | What to do when too many commands are in flight |
@@ -383,7 +382,7 @@ if let snapshot = await pool.resourceSnapshot() {
 ```
 
 Resource samples can also be broadcast through `pool.events()` by setting
-`IPCConfiguration.broadcastResourceSamples`.
+`ProcessPoolConfiguration.broadcastsResourceSamples`.
 
 ## Worker Discovery and Packaging
 
@@ -402,11 +401,11 @@ let pool = try await PythonProcessPool(
 
 For `.app` bundles, copy `SwiftPythonWorker` into
 `YourApp.app/Contents/MacOS/` and re-sign it with the provided entitlement
-template. The root README has the app bundle and signing commands.
+template. The [packaging guide](https://swiftpython.dev/docs/packaging/) explains
+the app bundle and signing requirements.
 
-The current public sidecar is built for Apple Silicon. If you need Intel Mac
-worker execution, build and ship a matching `SwiftPythonWorker` for that
-architecture with the same runtime release.
+The supplied sidecar is universal, with Apple Silicon and Intel slices. Use the
+worker and bundled Python runtime from the same release.
 
 Do not mix worker binaries from older tags with a newer XCFramework. Protocol
 mismatches fail fast as `PythonWorkerError.protocolError`.
@@ -435,9 +434,9 @@ teardown.
 | Issue | Fix |
 |-------|-----|
 | Worker cannot start in packaged app | Copy and re-sign `SwiftPythonWorker` inside `Contents/MacOS` |
-| `Bad CPU type in executable` launching the worker | Use Apple Silicon for the shipped sidecar, or ship a matching Intel worker |
+| `Bad CPU type in executable` launching the worker | Use the matched universal worker and Python framework from this release |
 | Calls fail after worker respawn | Recreate worker-owned objects; old handles are stale |
 | Large results hit payload limits | Return a handle or use shared memory instead of pickling the full object |
-| Oversized command looks like protocol corruption | The current release routes channel-0 decode failures to the sole waiter as the typed payload error; verify that runtime and worker are from one tag |
+| Oversized command fails | Use smaller arguments or managed tensors, and verify that runtime and worker are from one release |
 | UI blocks waiting for a pool call | Keep pool use behind an actor/task and update UI from the main actor |
 | Multiple tenants need isolation | Use `SandboxPool` instead of a shared process pool |

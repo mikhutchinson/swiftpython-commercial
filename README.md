@@ -1,595 +1,139 @@
-# SwiftPython Commercial Distribution
+# SwiftPython
 
-Binary distribution of SwiftPython for macOS applications that need in-process
-Python, isolated worker processes, long-lived full-duplex sessions, or
-Virtualization.framework-backed Linux tenants.
+**Python libraries, native Swift apps.**
 
-Current release: `0.7.0-preview.1`
+Call Python from Swift, keep models loaded in worker processes, stream results,
+and connect numerical workloads to native audio and Metal.
+SwiftPython includes Python 3.13, so your users do not need to install Python.
 
-Unshipped hosting candidate: the staged package adds
-`SwiftPythonWorkerService.xcframework` and the [Consumer assembly kit](Consumer/README.md).
-`payload.json` inventories its complete binary/recipe inputs. These local
-candidate files are not part of the published 8.4 release. Compilation,
-preflight, execution qualification and notarization remain separate gates.
+[Get started](docs/api-guide/) · [Examples](Examples/) ·
+[Website](https://swiftpython.dev) ·
+[Download 0.7.0-preview.1](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1)
 
-The preceding public commercial artifact is `0.6.0-duplex.8.4`. This preview
-adds app-owned XPC and extension worker hosting, declared worker context and
-recoverable logical sessions. It also hardens callback ownership, worker
-lifecycle and VM restore behavior. Embedded imports preserve signed app
-resources. The two examples are Particle Showcase and Iris.
+## Make your first call
 
-Product page: [Best Byte AI](https://bestbyteai.com/)
-
-## Try the examples
-
-- [Particle Showcase](Examples/ParticleShowcase/): NumPy moves 1,048,576 particles.
-  Swift and Metal render their shared positions. Includes live controls and a
-  1080p video exporter with measured timings and buffer verification.
-- [Iris](Examples/IrisDemo/): select a sample, inspect a held-out mistake, and
-  change features to see a fitted scikit-learn model predict again. One Python
-  worker retains the datasets and model while Swift owns the interface.
-
-Both builders bundle hash-locked numerical packages alongside the matched
-runtime. The resulting development apps run offline without a host Python
-installation. See [Examples](Examples/README.md) for build instructions.
-
-## License
-
-This checkout uses Commercial SDK License 1.0, shared with SiriusMarkdown.
-Community use is free below USD 100,000 in trailing-twelve-month business
-revenue. Indie covers USD 100,000 to below USD 1 million; Business covers
-USD 1 million and above. Paid fees are fixed by order, with no royalties or
-per-seat charges. SDK/OEM redistribution requires a separate agreement.
-
-Integrate through the XCFrameworks, API documentation and Swift interfaces.
-Implementation source access requires a separate agreement. Earlier grants
-remain intact. The licensing revision is local and unpublished; existing
-releases retain the license supplied with them.
-
-Read [LICENSE](LICENSE) and [eligibility and examples](LICENSING.md).
-Orders and source-access inquiries: licensing@swiftpython.dev.
-
-## Release contents
-
-| Path or release asset | Purpose |
-|---|---|
-| `SwiftPythonRuntime.xcframework` | Library-evolved consumer API surface |
-| `SwiftPythonEngine.xcframework` | Private code-only dependency; no product or textual Swift module |
-| `Python.xcframework` | Private self-contained CPython runtime linked by every public product |
-| `SwiftPythonAudioInterop.xcframework` | Optional AVAudio capture/playback adapter |
-| `SwiftPythonMetalInterop.xcframework` | Optional Metal leases, shared-arena mapping, and copy ledger |
-| `SwiftPythonWorkerService.xcframework` | Entry point for app-owned XPC and extension workers |
-| `Consumer/` | Versioned worker-host assembly, signing and validation recipes |
-| `payload.json` | Exact binary and consumer-recipe inventory |
-| `SwiftPythonWorker` | Matched universal local ProcessPool sidecar |
-| `SwiftPythonAudioProbe` | Fixed-path, kill/reap-bounded macOS hardware-readiness helper |
-| `VMWorker/` | Matched seven-file protocol, framing, duplex, supervisor and worker set |
-| `Entitlements/` | Parent, worker, audio-probe, inherited-sandbox, and virtualization templates |
-| `Examples/` | Standalone packages compiled against this public distribution |
-| `docs/api-guide/` | Public API and deployment guide |
-| `manifest.json` release asset | Version, source revision, protocols, byte sizes, SHA-256 records, and an explicit VM-image attestation or `null` |
-
-The six XCFrameworks and prebuilt `SwiftPythonWorker` sidecar are universal
-macOS binaries with matched arm64 and x86_64 slices. Keep every binary, helper,
-image, and snapshot on one release version. Worker wire v6 is not compatible
-with the published v0.5 worker wire v5.
-
-The `SwiftPythonCommercial-0.7.0-preview.1.zip` asset contains this complete
-checkout. The six XCFramework zips are individual binary-target assets. Its
-`manifest.json` is a separate asset and attests all six zips, the payload inventory,
-worker, audio probe, all seven VM helpers, and the complete distribution. Its `vmImage`
-field contains the same-version VM-image attestation when that gate runs, or
-explicit `null` for a scoped non-VM release.
-
-This hosting preview uses manifest schema 4, records host build targets and
-execution qualification separately, and includes exactly one
-`audioHardwareProbeExecutable` record for `SwiftPythonAudioProbe`, plus
-`protocols.audioHardwareProbe: 1`. Its complete distribution must contain the
-same helper bytes and both probe entitlement templates. The raw helper is not a
-SwiftPM binary target; `Python` remains a private dependency.
-
-## Requirements
-
-- macOS 15 or newer
-- Swift 6 / Xcode command-line tools
-- Apple Silicon or Intel for the matched universal ProcessPool sidecar
-- Virtualization.framework entitlement and Apple Silicon for VM/Sandbox use
-
-The package carries its own Python 3.13 runtime. Consumers do not install
-Python, Homebrew, python.org packages, `uv`, or custom linker paths, and do not
-set `PYTHON_HOME`/`PYTHONHOME`. App launch performs no runtime download or
-extraction.
-
-## Swift Package Manager
-
-Pin the prerelease exactly:
+Add the package in Xcode with **Exact Version** `0.7.0-preview.1`, or use SwiftPM:
 
 ```swift
-// Package.swift
-dependencies: [
-    .package(
-        url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-        exact: "0.7.0-preview.1"
-    )
-]
-```
-
-Choose only the products the application uses:
-
-```swift
-.product(
-    name: "SwiftPythonRuntime",
-    package: "swiftpython-commercial"
-)
-.product(
-    name: "SwiftPythonAudioInterop",
-    package: "swiftpython-commercial"
-)
-.product(
-    name: "SwiftPythonMetalInterop",
-    package: "swiftpython-commercial"
+.package(
+    url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
+    exact: "0.7.0-preview.1"
 )
 ```
 
-`SwiftPythonAudioInterop` and `SwiftPythonMetalInterop` are independent
-optional products. A core-only consumer does not link AVFAudio or Metal through
-those adapters. `SwiftPythonEngine` is intentionally not a product and must not
-be imported. SwiftPM links it and the private `Python` binary target as
-dependencies of each public product.
+Add `SwiftPythonRuntime` to your app target:
 
-## In-process and ProcessPool smoke
+```swift
+.product(name: "SwiftPythonRuntime", package: "swiftpython-commercial")
+```
+
+Then call Python from an asynchronous function or task:
 
 ```swift
 import SwiftPythonRuntime
 
-let version: String = try await Python.run {
-    try String(pythonObject: Python.sys.version)
+let result: Double = try await Python.run {
+    let math = try Python.import("math")
+    return try Double(pythonObject: try math.sqrt(144.0))
 }
+print(result) // 12.0
+```
 
+Use `Python.run` for short calls in your app process. For heavier work, a
+`PythonProcessPool` runs independent Python interpreters in worker processes:
+
+```swift
 try await withProcessPool(workers: 2) { pool in
-    let value: Double = try await pool.invokeResult(
+    let result: Double = try await pool.invokeResult(
         module: "math",
         function: "sqrt",
         args: [.python(144.0)]
     )
-    print(version, value)
+    print(result)
 }
 ```
 
-For an app bundle, copy `SwiftPythonWorker` into
-`Contents/MacOS/SwiftPythonWorker`, then sign nested code before the outer
-app. Worker discovery also accepts `SWIFTPYTHON_WORKER_PATH` or the explicit
-`workerExecutablePath:` initializer argument.
+The scoped helper waits for worker shutdown when the work finishes or throws.
+For this sidecar example, embed the matching `SwiftPythonWorker` from the complete
+distribution in your app's `Contents/MacOS` directory.
 
-`Python.xcframework` is already a private dependency of every public product.
-Xcode links and embeds `Python.framework` through the normal package graph; do
-not add Python linker flags or select a host interpreter.
+## Build something
 
-## App Bundle Layout
+- **[Particle Showcase](Examples/ParticleShowcase/):** NumPy moves 1,048,576
+  particles while Swift and Metal render their shared positions. Try the live
+  controls or export a video.
+- **[Iris](Examples/IrisDemo/):** explore datasets, train scikit-learn classifiers,
+  inspect held-out mistakes, and change measurements to get new predictions.
+
+```sh
+git clone https://github.com/mikhutchinson/swiftpython-commercial.git
+cd swiftpython-commercial
+Examples/IrisDemo/scripts/build_app.sh --open
+```
+
+The example builders download their dependencies and create development apps
+that run offline. [See both examples and their prerequisites.](Examples/)
+
+## What's new in Preview 1
+
+Preview 1 adds app-owned XPC and ExtensionFoundation workers through
+`SwiftPythonWorkerService` and the [consumer assembly kit](Consumer/).
+It includes explicit worker context configuration, recoverable logical sessions,
+and improvements to callback ownership, worker shutdown and VM restore behavior.
+
+This release supplies macOS binaries for Apple Silicon and Intel. macOS 15 or
+later is required; ExtensionFoundation hosting requires macOS 26. The iOS demo
+on the website is a development preview; this download is the macOS SDK.
+
+## Choose your products
+
+| Product | Use it for |
+|---|---|
+| `SwiftPythonRuntime` | Python calls, process pools, retained objects, callbacks, streaming, task graphs and duplex sessions |
+| `SwiftPythonWorkerService` | Workers hosted in your app's XPC services or extensions |
+| `SwiftPythonAudioInterop` | Native audio capture and playback with duplex sessions |
+| `SwiftPythonMetalInterop` | Metal buffer integration and GPU ownership |
+
+The package includes the Python runtime and Engine dependencies automatically.
+Import the public products your app uses. Bundle additional Python packages,
+such as NumPy, for the supplied Python 3.13 runtime and your target architecture.
+
+## Package your app
+
+Download the **complete distribution** for the matched worker, audio probe,
+consumer kit, VM helpers, examples and entitlement templates. SwiftPM downloads
+the six XCFramework assets used by the four products.
+
+For a sidecar app, the basic layout is:
 
 ```text
 YourApp.app/
   Contents/
     Frameworks/
-      SwiftPythonEngine.framework/ # required private runtime code, embed once
-      Python.framework/        # embedded from the private package target
+      SwiftPythonEngine.framework/
+      Python.framework/
     MacOS/
       YourApp
-      SwiftPythonAudioProbe
       SwiftPythonWorker
-    Info.plist
 ```
 
-Embed the supplied signed `SwiftPythonEngine.framework` exactly once. The
-application executable must resolve its `@rpath` install name through
-`@executable_path/../Frameworks`; do not copy Engine into multiple nested
-locations. The worker, Engine, and host load the same package-owned Python.
-Copying a sidecar is not a signing or notarization step; use the
-distribution-specific rules below.
+Embed Engine once and sign nested code before signing the outer app. Xcode links
+and embeds Python through the package dependency; no host interpreter,
+`PYTHONHOME` or custom Python linker paths are needed.
 
-The public audio launcher resolves only
-`Bundle.main.bundleURL/Contents/MacOS/SwiftPythonAudioProbe`. A URL-based
-SwiftPM dependency does not auto-embed that raw executable. Copy the helper
-from the exact matching complete distribution or commercial checkout, keep its
-direct app-relative Python load command unchanged, re-sign it as nested code,
-and then sign the containing app. Do not add a PATH, build-directory, worker,
-caller-supplied-path, XPC, autobuild, or in-process fallback.
+For XPC services or extensions, follow the [consumer kit](Consumer/README.md).
+For audio readiness checks, embed the matching `SwiftPythonAudioProbe` at
+`Contents/MacOS/SwiftPythonAudioProbe`, configure microphone permission on the
+parent app, and follow [the audio guide](docs/api-guide/ch11-apple-interop.md).
 
-## Full-duplex sessions
+Keep binaries and helpers on the same release. Use the supplied
+[entitlement templates](Entitlements/) for your app's sandbox policy, then sign
+and notarize your finished application for distribution.
 
-`PythonDuplexSession` pins one worker ID and generation while input, output,
-semantic control, and interruption progress independently. It never migrates or
-replays after worker replacement.
+[Packaging guide](https://swiftpython.dev/docs/packaging/) ·
+[API guide](docs/api-guide/) ·
+[All releases](https://github.com/mikhutchinson/swiftpython-commercial/releases)
 
-```swift
-let session = try await pool.openDuplexSession(
-    handler: .eval(
-        code: """
-        from swift_duplex import InputFrame
-        def run(session):
-            session.ready()
-            for event in session.iter_input():
-                if isinstance(event, InputFrame):
-                    session.output.send(
-                        bytes(event.buffer),
-                        processed_input_through=event.sequence,
-                    )
-            session.output.finish()
-        """,
-        entrypoint: "run"
-    )
-)
+## License
 
-do {
-    try await session.input.send(
-        DuplexInputFrame(payload: Data("hello".utf8))
-    )
-    try await session.input.finish()
-    for try await frame in session.output {
-        consume(frame.buffer)
-        try await session.acknowledgeOutput(
-            consumedThrough: DuplexPosition(
-                sequence: frame.position.sequence,
-                byteOffset: frame.buffer.count
-            )
-        )
-    }
-    _ = try await session.result()
-    await session.close()
-} catch {
-    await session.cancel(reason: .user)
-    await session.close()
-    throw error
-}
-```
-
-Frame-only sessions require `.frames`. Bounded logical-message fragmentation
-requires `.messages`. The local fixed-pool shared-ingress route requires
-`.managedBuffers` and a `ManagedBufferConfiguration`; isolated providers may use
-inline logical-message chunks instead. Backing paths, offsets, slot topology,
-generational counters, and quarantine state are private.
-Capability requirements are rechecked atomically against the exact generation
-reserved for open.
-
-See [Chapter 10](docs/api-guide/ch10-full-duplex.md) and the runnable
-[full-duplex API guide](docs/api-guide/ch10-full-duplex.md).
-
-## VM and Sandbox
-
-The `0.7.0-preview.1` candidate includes the isolated Sandbox surface. Its
-qualification requires the same source revision for:
-
-- all six XCFrameworks and the local sidecar;
-- `_swiftpython_wire.py`, `_swiftpython_duplex.py`,
-  `swiftpython_frames.py`, `swiftpython_guest_duplex.py`,
-  `swiftpython_protocol.py`, `swiftpython_supervisor.py`, and `swiftpython_worker.py`;
-- the attested Ubuntu base image and warm snapshot;
-- cold and warm vsock duplex/message workloads.
-
-The release manifest identifies the verified image and records the exact guest
-helper hashes. Image/snapshot verification must reject a hash, version,
-protocol, supervisor, configuration, or restore-secret mismatch; a warm gate
-must not silently fall back to cold boot.
-
-Deploy the complete seven-file `VMWorker/` directory together and point custom layouts
-at it with:
-
-```bash
-SWIFTPYTHON_VM_WORKER_DIR=/absolute/path/to/VMWorker
-```
-
-See [Chapter 9](docs/api-guide/ch9-sandbox-vm.md) for image, snapshot, tenant,
-shell/PTY, and VM ProcessPool usage.
-
-## Audio and Metal
-
-```swift
-import SwiftPythonAudioInterop
-import SwiftPythonMetalInterop
-```
-
-`DuplexAudioFormat` validates PCM shape before capture/playback.
-`DuplexAudioCapture` and `DuplexAudioPlayback` keep AVAudio callbacks
-realtime-only; async pumps own session interaction.
-
-On macOS, `DuplexAudioHardwareProbeLauncher` provides a bounded point-in-time
-hardware readiness receipt using the fixed nested helper. The parent app owns a
-nonempty `NSMicrophoneUsageDescription`, the first microphone prompt, and
-`com.apple.security.device.audio-input` (required by App Sandbox and by
-hardened-runtime prompting). The helper requires already
-granted permission and never prompts. A `ready` receipt proves only one fresh,
-muted, helper-owned shared engine at that instant; it does not certify the
-caller's engine or a future route. See Chapter 11 for the public call shape and
-the zero-required capture clock-health counters.
-
-`ManagedBuffer.makeMetalBufferLease` maps a page-aligned managed buffer to an
-`MTLBuffer` without copying those pages. Registered command buffers and access
-completion hold the opaque allocation until safe reuse.
-`DuplexCopyLedger` records actual zero-copy, bounded CPU-copy, or kernel-copy
-routes. It does not turn capture-source, IOSurface, socket, or VM routes into a
-blanket zero-copy claim.
-
-See [Chapter 11](docs/api-guide/ch11-apple-interop.md).
-
-## App Sandbox and signing
-
-Select nested-code entitlements from the parent app's sandbox state, not from
-the certificate class:
-
-| Parent | Worker template | Audio-probe template |
-|---|---|---|
-| Non-sandbox, any signing identity | `SwiftPythonWorker.entitlements` | `SwiftPythonAudioProbe.entitlements` |
-| Sandboxed, Apple Development or Developer ID | `SwiftPythonWorker-sandbox.entitlements` | `SwiftPythonAudioProbe-sandbox.entitlements` |
-
-Each inherited nested-code template contains exactly
-`com.apple.security.app-sandbox` and `com.apple.security.inherit`.
-Capabilities belong on the parent. For a sandboxed distribution, bundle
-Python at `Contents/Frameworks/Python.framework`, verify the worker and probe
-retain the published app-relative load contract, and same-team-sign all native
-code. Sign the probe with the exact
-identifier `<parent signing identifier>.SwiftPythonAudioProbe` at the fixed
-path before signing the outer app.
-
-```bash
-codesign --force --sign "$SIGN_ID" --options runtime \
-  --entitlements Entitlements/SwiftPythonWorker.entitlements \
-  YourApp.app/Contents/MacOS/SwiftPythonWorker
-
-codesign --force --sign "$SIGN_ID" --options runtime \
-  --identifier "${PARENT_SIGNING_IDENTIFIER}.SwiftPythonAudioProbe" \
-  --entitlements Entitlements/SwiftPythonAudioProbe.entitlements \
-  YourApp.app/Contents/MacOS/SwiftPythonAudioProbe
-
-codesign --force --sign "$SIGN_ID" --options runtime \
-  --entitlements Entitlements/ConsumerApp.entitlements \
-  YourApp.app
-```
-
-The release gate notarizes the exact complete distribution and three app-shaped
-consumer fixtures (non-sandbox, inherited sandbox, and virtualization), staples
-them, applies quarantine provenance, requires
-`source=Notarized Developer ID`, reruns duplex, and rechecks each signed bundle
-for mutation. The virtualization fixture must complete 20 consecutive positive warm restores
-and the full public VM tenant workload without accepting a cold fallback.
-Before publication, `scripts/consumer_path_smoke.sh` derives a temporary
-path-based binary manifest from this checkout. That keeps every local and
-notarized fixture on the candidate XCFramework bytes instead of resolving the
-preceding hosted tag or requiring the new asset URLs to exist early.
-
-**Unshipped validation tooling:** the script also accepts an explicit
-distribution directory as its sole argument. Its companion
-`scripts/consumer_xcode_project.py` constructs a native macOS target for the
-slice-root check, with one link entry per binary and an explicit destination.
-The separate SwiftPM check still imports all three public products through
-`HeadersPath`. Keep the script and companion together when running a newer
-validation-tool revision against an older frozen distribution; this does not
-change the distribution's bytes or claim those tools shipped with it.
-
-`SWIFTPYTHON_AUDIO_PROBE_GATE` controls only the device-dependent launcher
-portion of that fixture:
-
-- `off` verifies embedding/signing structure but makes no launcher claim;
-- `containment` runs the public launcher and accepts a strict receipt or only a
-  valid typed device/helper-timeout result after confirmed containment; either
-  result is explicitly not release-gate evidence; and
-- `ready` requires a strict `.ready` receipt, including zero capture host-time
-  fallbacks and device/host clock resets. The separately reported
-  `playbackInvalidSampleTimeCount` is diagnostic, not a zero-required gate.
-
-Notary mode refuses `off` and `containment`. It requires
-`SWIFTPYTHON_AUDIO_PROBE_GATE=ready`, runs the Developer ID non-sandbox and
-sandbox launcher fixtures before notarization, then reruns both exact stapled,
-quarantined candidates through LaunchServices (`open`), without a worker-path
-override. Each final run must expose a live exact bundle identifier and emit
-one fresh nonce-bound success receipt before exit; retained stdout, stderr, and
-receipt files are part of the gate evidence. All three app-shaped fixtures
-embed and re-sign the helper; the virtualization fixture does not make a
-redundant device claim.
-
-Notary `ready` mode requires an explicit stable 4-32 character lowercase
-alphanumeric `SWIFTPYTHON_SMOKE_ID_SUFFIX`; release automation uses
-`releasegate`. That produces distinct, version-independent Developer ID,
-sandbox, and virtualization test identities. The Developer ID and sandbox apps
-each need one initial microphone grant for the release-machine user. Later
-notary runs use a require-granted policy and never open a TCC prompt: missing,
-denied, or reset permission fails the gate before notarization. The VM fixture
-does not access the microphone.
-
-Bootstrap the two grants once, interactively, without a notary profile. The
-explicit bootstrap mode runs its preliminary direct smoke with the audio gate
-off, then launches the stable Developer ID and sandbox apps through
-LaunchServices with `request-if-needed`. Its receipts live under the disposable
-smoke work directory and are not release evidence. Use the exact stable suffix
-that later release runs use:
-
-```bash
-env -u SWIFTPYTHON_NOTARY_PROFILE \
-  SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
-  SWIFTPYTHON_AUDIO_PROBE_GATE=ready \
-  SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP=1 \
-  SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate \
-  SWIFTPYTHON_VM_RELEASE_GATE=0 \
-  scripts/consumer_path_smoke.sh
-```
-
-Executing `Contents/MacOS/ConsumerSmoke` directly does not provision the app's
-LaunchServices/TCC identity and is not a substitute for this bootstrap. The
-bootstrap reuses macOS's normal signed-app update identity; it does not bypass
-TCC or make the retained permission release evidence. Every candidate still
-needs its own fresh helper receipt, notarization, staple, quarantine,
-Gatekeeper, LaunchServices, and sealed-bundle checks. Do not derive the suffix
-from a release version, path, machine, timestamp, or artifact hash, and do not
-reuse a production application's bundle identifier.
-
-## Build and run public evidence
-
-```bash
-swift build
-swift test
-Examples/ParticleShowcase/run.sh
-Examples/IrisDemo/scripts/build_app.sh --open
-SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
-  scripts/audit_release_surface.sh "$CANDIDATE_VERSION"
-SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
-SWIFTPYTHON_AUDIO_PROBE_GATE=containment \
-  scripts/consumer_path_smoke.sh
-```
-
-For the final notarized VM release gate, supply the same-commit image and
-snapshot explicitly:
-
-```bash
-SWIFTPYTHON_NOTARY_PROFILE="<notarytool-keychain-profile>" \
-SWIFTPYTHON_NOTARY_OUTPUT_DIR="$PWD/notarization" \
-SWIFTPYTHON_RELEASE_MANIFEST=/absolute/path/to/manifest.json \
-SWIFTPYTHON_AUDIO_PROBE_GATE=ready \
-SWIFTPYTHON_AUDIO_TCC_BOOTSTRAP=0 \
-SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate \
-SWIFTPYTHON_VM_RELEASE_GATE=1 \
-SWIFTPYTHON_VM_BASE_IMAGE=/absolute/path/to/base-ubuntu.img \
-SWIFTPYTHON_VM_SNAPSHOT=/absolute/path/to/snapshot \
-SWIFTPYTHON_VM_RESTORE_SECRET=/absolute/path/to/snapshot.restore-secret \
-SWIFTPYTHON_VM_CLONE_DIR=/absolute/path/to/consumer-clones \
-SWIFTPYTHON_VM_ITERATIONS=20 \
-  scripts/consumer_path_smoke.sh
-```
-
-Every standalone example defaults to this checkout. For a published-tag proof,
-set `SWIFTPYTHON_COMMERCIAL_PACKAGE_URL` and
-`SWIFTPYTHON_COMMERCIAL_PACKAGE_VERSION`; prerelease identifiers are
-preserved rather than collapsed to `0.6.0`.
-
-## Troubleshooting
-
-| Symptom | Check |
-|---|---|
-| `Library not loaded: Python.framework` | Verify the exact commercial package is pinned and Xcode embedded its private `Python.framework`; do not install or discover a host Python |
-| `workerNotFound` | Copy the matched sidecar or set its explicit path |
-| `helperNotFound` or helper identity failure | Embed the exact `SwiftPythonAudioProbe` at the fixed app path and re-sign it with the parent team and derived identifier |
-| microphone preflight failure | Put the purpose string and `com.apple.security.device.audio-input` on the parent, obtain permission there, then launch |
-| protocol/helper/media skew | Compare the release tag and `manifest.json`; never mix helpers |
-| `Bad CPU type` for the worker | Verify the worker and private Python framework came from the same tag; both shipped slices are arm64 and x86_64 |
-| duplex `featureUnavailable` | Inspect live capabilities and put requirements on the open |
-| arena requirement rejected in VM | Expected: shared arena ingress is local UDS only |
-| VM image/snapshot rejected | Rebuild the complete seven-file helper set, image, and snapshot from this release |
-| SPM fingerprint mismatch | Do not reuse tags; clear stale local resolution state and resolve the new version |
-
-## Release notes
-
-### 0.6.0-duplex.8.4
-
-- Added a private, pruned `Python.xcframework` dependency to every public
-  product. Applications install no Python, Homebrew, python.org package, `uv`,
-  linker path, `PYTHONHOME`, download, or extraction step.
-- Bound the host, worker, and audio probe to the embedded framework and
-  initialized CPython through explicit `PyConfig` state without trusting or
-  mutating process `PYTHONHOME`.
-- Shipped a universal worker with exact worker/Python architecture parity and
-  added zero-configuration hostile-environment, native-stdlib, asyncio timeout,
-  callback, relocation, and cold-start release gates.
-- Included the 8.2 asyncio import-order repair so `current_task()`,
-  `asyncio.timeout`, and `asyncio.wait_for` use one coherent native registry in
-  packaged workers. Public Swift APIs, worker wire v6, and duplex media v1 are
-  unchanged.
-
-### 0.6.0-duplex.8.1
-
-- Rebased `SwiftPythonWorker` and `SwiftPythonAudioProbe` onto the standard
-  `@rpath/Python.framework/Versions/3.13/Python` contract. Packaged helpers no
-  longer encode a machine-wide Python installation path.
-- Added fail-fast worker startup validation for the loaded CPython core,
-  framework metadata, standard library, and native standard-library extension
-  origins. A mixed runtime is rejected before user Python executes.
-- Added release gates that reject absolute Python framework dependencies and a
-  neutral two-root async-callback relocation stress. Public Swift APIs, worker
-  wire v6, and duplex media v1 are unchanged.
-- Consumers must embed one coherent Python framework at
-  `Contents/Frameworks/Python.framework` and re-sign the final nested code.
-  Fresh artifacts require no downstream rewrite and consumers must not rely on
-  one; a defensive audit/repair may remain as defense in depth if it rejects
-  leftovers. A conflicting process `PYTHONHOME` cannot redirect the packaged
-  runtime; SwiftPython supplies its embedded root directly through `PyConfig`.
-
-### 0.6.0-duplex.8
-
-- Added the raw `SwiftPythonAudioProbe` distribution contract, schema-3
-  manifest audit, entitlement templates, and signed app-shaped containment/
-  readiness fixtures. Published `0.6.0-duplex.7` remains unchanged.
-- Added `PythonProcessPool.shedIdleWorkersAndWait(force:)`, typed
-  `PythonWorkerError.drainTimedOut(inFlight:seconds:)`, and explicit callback,
-  worker-lifecycle, and transport-cleanup uncertainty events. These are
-  source-additive and do not change worker wire v6.
-- Made `DuplexFailure`, `DuplexFailureCode`, and `DuplexFailureOrigin`
-  `Hashable` for structured failure grouping without parsing descriptions.
-
-### 0.6.0-duplex.7
-
-- Added a backend-neutral accelerator contract with opaque backend IDs and
-  shared lane, warm-up, residency, admission, pressure, and resource-evidence
-  policies. Backend packages can now build on the public Runtime interface
-  without adding a branded llama.cpp policy to SwiftPython.
-- Added negotiated `duplex.accelerator.backend.v1` admission for native workers
-  while preserving the existing MLX source contract and worker-wire-v6 JSON
-  shape. VM guests remain explicit about the capabilities they actually carry.
-- Fixed a terminal/acknowledgement race so a direction-end published after a
-  successful output acknowledgement cannot lose the acknowledged cursor.
-
-### 0.6.0-duplex.6
-
-- Fixed the duplex control reader so an empty 60-second receive interval is a
-  liveness poll rather than a terminal `runtimeUnavailable` failure. Healthy
-  workers may now remain silent while a model or accelerator is busy; actual
-  worker death, channel closure, protocol failure, and explicit deadlines stay
-  terminal.
-- Fixed the external `DuplexSession` example so it no longer reaches the
-  Runtime package's internal negotiated-configuration state, and extended the
-  release-surface audit to type-check command-line examples against the shipped
-  public module.
-
-### 0.6.0-duplex.5
-
-- Added opaque, generation-bound application-control receipts with repeatable
-  owned, rejected, pending, and delivery-uncertain resolution. A timeout or
-  cancellation no longer destroys ownership knowledge or permits replay.
-- Preserved late control acknowledgement across terminal cleanup and replaced
-  a worker after uncertain partial control-frame transport failure.
-- Aligned native duplex Python timeout and argument exception types with the VM
-  worker, while preserving arbitrary accelerator callable failures.
-- Hardened complete-distribution manifest ordering, candidate-binary consumer
-  gates, and interactive QEMU image construction.
-
-### 0.6.0-duplex.4
-
-- Added equality-only worker lifetime tokens for generation-safe consumer state
-  without exposing generation counters.
-- Added provider-neutral exact sandbox policy, sanitized lifecycle and failure
-  diagnostics, explicit activity-stream loss, and confirmed termination.
-- Preserved the code-only private Engine boundary introduced in `.3`.
-
-### 0.6.0-duplex.3
-
-- Split proprietary transport, managed-memory, sandbox, and tuning code into
-  the private code-only `SwiftPythonEngine` framework.
-- Removed Engine Swift module metadata and textual interfaces from the
-  distribution; the public Runtime interface contains only consumer APIs.
-- Replaced low-level arenas, leases, ring buffers, VM builders/configuration,
-  and policy thresholds with managed handles, presets, and `SandboxProvider`.
-- Added private-Engine signing, embedding, one-copy load, interface-denylist,
-  and consumer behavior gates.
-
-### 0.6.0-duplex.2
-
-- Worker wire v6 and first-class `PythonDuplexSession` with bounded credit,
-  half-close, control, interruption, terminal watermarks, and no replay.
-- Feature-negotiated logical messages with bounded fragmentation and
-  reassembly, plus local owned fixed-pool shared-arena ingress.
-- Separate optional Audio and Metal XCFramework products with realtime adapter
-  contracts, lease-safe GPU completion, poison/quarantine semantics, and a
-  route-specific copy ledger.
-- Same-version five-helper VM image/snapshot line with authenticated vsock
-  duplex and cold/warm restore gates.
-- Dual SwiftPM/xcodebuild module layouts, strengthened external consumer,
-  sandbox inheritance, notarization, Gatekeeper, and hosted-byte verification.
-
-Prior release history is recorded in the source repository changelog and older
-commercial tags.
+See [LICENSE](LICENSE) for the terms and [LICENSING.md](LICENSING.md) for common questions.

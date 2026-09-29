@@ -9,7 +9,7 @@ Use duplex when a Python handler must receive new input while it is still
 producing output. Keep `evalStream`, `invokeStream`, and `methodStream`
 for finite output-only iterators.
 
-## Capability truth
+## Capability requirements
 
 Duplex requires worker wire v6 plus live feature, transport, authentication,
 helper-schema, payload-route, and limit declarations. Lowering the ordinary
@@ -208,7 +208,7 @@ ended. `session.managedBufferStatus` exposes only coarse capacity, bytes in use,
 and availability. A caller-controlled path or naked public memory region is
 never duplex send authority.
 
-## Control, interruption, and terminal truth
+## Control, interruption, and completion
 
 For explicit ownership handling, submit an application control and retain its
 opaque, generation-bound receipt until it resolves:
@@ -248,7 +248,7 @@ generation stopped without state truncation, already finished, or unsupported;
 it is not a promise that arbitrary Python or GPU work is preemptible between
 safe points.
 
-`result()` waits for terminal truth and throws a typed `DuplexFailure` for a
+`result()` waits for completion and throws a typed `DuplexFailure` for a
 failed terminal. Sessions remain pinned, never migrate or replay, and resolve
 once with final accepted, processed, produced, and acknowledged watermarks.
 
@@ -309,7 +309,8 @@ advertise a larger physical-frame ceiling than VM/vsock; logical-message limits
 are negotiated separately and may exceed both. Do not hard-code the source
 maximum as an application guarantee. State the minimum in
 `DuplexSessionRequirements` and use
-`session.negotiatedConfiguration` as truth.
+`session.profile` to inspect the public session configuration, including
+`maximumMessageBytes` and `supportsManagedBuffers`.
 
 The independent [consumer fixture](../../scripts/consumer_path_smoke.sh)
 executes frame loopback and a fragmented message above its physical-frame ceiling.

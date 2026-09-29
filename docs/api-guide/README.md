@@ -1,14 +1,11 @@
 # SwiftPython Public API Guide
 
-This guide documents the public binary API in the staged, unshipped
-`swiftpython-commercial` `0.7.0-preview.1` candidate.
+This guide documents the published `swiftpython-commercial` `0.7.0-preview.1` API.
 It is written for application authors who need to embed Python execution in a
 macOS app, worker service, or sandboxed tool without access to the private
 SwiftPython source tree.
 
-The private SwiftPython implementation, generator pipeline, and internal test
-layout are intentionally not documented here. Everything below is supported
-from the public package artifacts: `SwiftPythonRuntime.xcframework`, its
+The package includes `SwiftPythonRuntime.xcframework`, its
 code-only private dependency `SwiftPythonEngine.xcframework`, optional
 `SwiftPythonAudioInterop.xcframework` and
 `SwiftPythonMetalInterop.xcframework`, the matched `SwiftPythonWorker`,
@@ -64,14 +61,11 @@ contracts when integrating those workers.
 
 ## Public Package Boundary
 
-This checkout uses Commercial SDK License 1.0, shared with SiriusMarkdown:
-Community below USD 100,000 annual business revenue, paid Indie below USD
-1 million, and Business from USD 1 million. The revision is unpublished;
-previously published versions retain their original grants. See the root
-LICENSE and LICENSING.md. Use the documented runtime APIs to build your app-level
-integration. Do not depend on private source paths, private generated bindings,
-internal test fixtures, or implementation details from a SwiftPython source
-checkout.
+Use the documented runtime APIs to build your app-level integration. The four
+public products are Runtime, WorkerService, AudioInterop and MetalInterop;
+generated Python-package bindings are not included.
+
+See [LICENSE](../../LICENSE) and [licensing questions](../../LICENSING.md).
 
 When in doubt, treat the public Swift interface inside the XCFramework as the
 contract and keep your app code behind your own small facade.

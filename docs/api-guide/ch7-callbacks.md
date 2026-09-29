@@ -68,12 +68,10 @@ let registration = try await pool.registerReentrantCallback(name: "objective") {
 Reentrant callbacks avoid deadlocks by routing nested work through the worker's
 callback-safe path.
 
-Do not call `WorkerProcess.sendCommand()` directly from a callback handler for
-the same worker. That callback-stack reentry is rejected immediately as
-`PythonWorkerError.reentrantCallback`; use `WorkerCallbackContext` for nested
-same-worker work. The guard is scoped to callback-stack reentry, so unrelated
-top-level commands to the same worker may still proceed while a callback is
-active.
+Use `WorkerCallbackContext` for nested same-worker work. Ordinary command
+reentry from the same callback stack is rejected as
+`PythonWorkerError.reentrantCallback`; unrelated top-level commands may still
+proceed while a callback is active.
 
 ## Raw Callbacks
 
@@ -241,8 +239,9 @@ Task {
 }
 ```
 
-Use this to annotate logs, cancel dependent UI work, or explain why a callback
-never returned.
+Use this to annotate logs or reconcile dependent UI work. An orphan notice means
+the worker did not acknowledge the callback result; the Swift handler may already
+have completed. Inspect effects before retrying work.
 
 ## Common Pitfalls
 

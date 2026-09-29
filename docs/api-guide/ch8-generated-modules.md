@@ -1,9 +1,7 @@
 # Chapter 8 - Python Packages and App Facades
 
-The public commercial package exposes the SwiftPython runtime, worker, VM
-scripts, and integration templates. It does not require a SwiftPython source
-checkout, and this public guide does not document the private generator or
-private generated module sources.
+The commercial package includes the runtime, worker and integration templates.
+Use Python packages through its Swift API without building SwiftPython from source.
 
 Build application features by importing Python packages dynamically, calling
 module functions through `PythonProcessPool`, and wrapping those calls in your
@@ -107,8 +105,8 @@ small glue and `invoke` for stable app logic.
 
 ## Packaging Python Dependencies
 
-SwiftPython uses the Python runtime your app launches with. The commercial
-XCFramework is built for Python 3.13 on macOS.
+SwiftPython includes Python 3.13 for macOS. Bundle additional packages for that
+runtime and the architectures your app supports.
 
 Common deployment patterns:
 
@@ -118,11 +116,8 @@ Common deployment patterns:
 | Additional bundled site packages | Third-party Python dependencies not present in the sealed standard library |
 | VM tenant image | Isolated Linux tools, untrusted jobs, or per-tenant dependencies |
 
-Make sure the same environment is visible to:
-
-- your main app process for `Python.run`,
-- `SwiftPythonWorker` for process pools,
-- VM images if you use `SandboxPool`.
+Bundle dependencies where the workload runs: in the app's Python environment
+for local calls and workers, or in the Linux image for sandbox workloads.
 
 Finder/Dock launches use the same private framework as Terminal launches. Do
 not add `PYTHONHOME`, `PATH`, Homebrew discovery, or linker setup to the app;
@@ -182,17 +177,10 @@ local Python environment, put it in a SandboxPool image and call it through
 
 See [Chapter 9](ch9-sandbox-vm.md).
 
-## Boundary Guidance
+## Package your app
 
-Use the public runtime API as the contract. Do not couple your app to:
+Keep package imports and conversion code in your Swift wrapper. Bundle the
+Python dependencies and matched worker with your application.
 
-- private SwiftPython source paths,
-- private generator commands,
-- private test fixtures,
-- package-internal Python shims,
-- a local checkout layout.
-
-If your commercial agreement includes additional typed wrappers or generated
-surfaces, document them in your application repository as app-specific facades.
-This public guide stays focused on the binary runtime anyone can consume from
-this package.
+[Packaging guide](https://swiftpython.dev/docs/packaging/) ·
+[Worker pools](ch4-process-pool.md)

@@ -176,10 +176,10 @@ float(x.sum())
 scoped direct access, use `withManagedTensor`:
 
 ```swift
-try await pool.withManagedTensor(shared, as: Double.self) { buf in
+try await pool.withManagedTensor(shared, as: Float.self) { buf in
     // Scoped mutable access; do not retain the pointer after this closure.
     for i in 0..<buf.count {
-        buf[i] = Double(i)
+        buf[i] = Float(i)
     }
 }
 ```

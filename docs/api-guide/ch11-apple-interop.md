@@ -13,10 +13,8 @@ AVFAudio or Metal linkage.
 
 ## Platform and release scope
 
-The executed commercial gate is macOS 15 on Apple Silicon. Source availability
-also permits the adapters on supported iOS 18 and tvOS 18 builds, with watchOS
-unavailable. That annotation is not a claim that the ProcessPool sidecar or
-every adapter path is distributed and executed on every Apple platform.
+Preview 1 distributes these adapters for macOS 15 or later, with Apple Silicon
+and Intel slices. This package does not include iOS, tvOS or watchOS binaries.
 
 ## PCM format
 
@@ -175,16 +173,6 @@ resets, and capture host-clock resets. Keep
 `playbackInvalidSampleTimeCount` as a separate diagnostic: downstream
 sample-rate conversion can legitimately invalidate HAL callback sample time,
 so that counter alone is not loss and is not a zero-required gate.
-
-The commercial fixture exposes `SWIFTPYTHON_AUDIO_PROBE_GATE=off`,
-`containment`, and `ready`. `containment` may observe a strict receipt or
-establish bounded launch/cleanup around a typed device failure, but the fixture
-never promotes that mode to release-gate evidence. Only `ready` satisfies the
-notarized release device gate. The final non-sandbox and inherited-sandbox
-fixtures are launched as quarantined stapled `.app` bundles through
-LaunchServices, not by directly executing `Contents/MacOS`. The gate observes
-the exact transient bundle identifier, relies on bundle worker discovery, and
-requires one fresh nonce-bound success receipt before the app exits.
 
 ## Route-specific Metal evidence
 

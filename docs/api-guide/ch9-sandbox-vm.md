@@ -5,7 +5,7 @@ exposing the provider's boot mechanism, transport, kernel assets, or storage
 layout. Use a sandbox for tenant-specific dependencies, shell tools, untrusted
 jobs, per-tenant secrets, or Linux-only packages.
 
-The `0.7.0-preview.1` candidate keeps these matched assets together:
+Use the `0.7.0-preview.1` runtime with matching deployment assets:
 
 - `SwiftPythonRuntime.xcframework` and its private
   `SwiftPythonEngine.xcframework` and `Python.xcframework` dependencies;
@@ -73,8 +73,8 @@ let configuration = SandboxConfiguration(
 ```
 
 Keep the credential outside the checkpoint and restrict it to the application.
-For a release gate, require `tenant.startupMode == .accelerated`; do not accept
-standard startup as evidence that an accelerated checkpoint restored.
+Check `tenant.startupMode == .accelerated` when your application requires
+checkpoint restoration.
 
 ## Acquire and Release a Tenant
 

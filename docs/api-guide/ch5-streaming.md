@@ -57,17 +57,20 @@ struct Token: Sendable, Decodable {
     let logprob: Double
 }
 
-let stream = try await pool.invokeStream(
+let stream: CancellableStream<String> = try await pool.invokeStream(
     module: "my_inference",
     function: "json_token_stream",
     args: [.python(prompt)]
-) { data in
-    try JSONDecoder().decode(Token.self, from: data)
+)
+for try await json in stream {
+    let token = try JSONDecoder().decode(Token.self, from: Data(json.utf8))
+    print(token.text)
 }
 ```
 
-If your Python code naturally returns JSON, msgpack, protobuf, or another
-format, decode it in the closure and keep your Swift app strongly typed.
+Here Python yields JSON strings. The typed stream converts each Python string
+before JSON decoding. A custom `decode:` closure receives raw pickled data;
+do not pass that payload directly to `JSONDecoder`.
 
 ## `StreamOptions`
 
@@ -139,10 +142,10 @@ long-running Python iterators with checkpoints when you need graceful cancel.
 ## Timeouts and Keepalive
 
 ```swift
-let ipc = IPCConfiguration(
+let configuration = ProcessPoolConfiguration(
     receiveTimeout: 30,
-    streamKeepaliveInterval: 5,
-    respawnOnTimeout: true
+    respawnOnTimeout: true,
+    streamKeepaliveInterval: 5
 )
 ```
 
