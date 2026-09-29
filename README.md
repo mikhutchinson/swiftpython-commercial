@@ -1,10 +1,16 @@
 # SwiftPython Commercial Distribution
 
+> **Historical release branch — 0.6.0-duplex.8.** This branch preserves the
+> documentation and package for that version. For the current SDK, start with
+> [the developer guide on main](https://github.com/mikhutchinson/swiftpython-commercial#readme)
+> or [Preview 1](https://swiftpython.dev/releases/). Requirements and license
+> terms below apply to this older version.
+
 Binary distribution of SwiftPython for macOS applications that need in-process
 Python, isolated worker processes, long-lived full-duplex sessions, or
 Virtualization.framework-backed Linux tenants.
 
-Current release: `0.6.0-duplex.8`
+Version documented here: `0.6.0-duplex.8`
 
 The preceding `0.6.0-duplex.7` tag predates the raw audio-readiness helper and
 does not contain it. This candidate carries the complete distribution contract
