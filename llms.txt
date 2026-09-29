@@ -1,0 +1,43 @@
+# SwiftPython
+
+> SwiftPython embeds Python in native Swift apps. It provides in-process calls, worker pools, process isolation, retained Python objects, streaming, Python-to-Swift callbacks and Metal data sharing.
+
+Current commercial release: 0.7.0-preview.1. The package includes Python 3.13 and requires macOS 15 or newer and Swift 6. ExtensionFoundation worker hosting requires macOS 26. The iOS recording on the website is a development preview; the current commercial package supplies macOS binaries.
+
+## Install
+
+Add https://github.com/mikhutchinson/swiftpython-commercial.git through Swift Package Manager with exact version 0.7.0-preview.1. Add the SwiftPythonRuntime product to your app target. For a sidecar worker, embed SwiftPythonWorker from the matching complete distribution. Follow the getting-started and packaging guides below.
+
+## Website
+
+- [Home](https://swiftpython.dev/): Product overview and recorded demos.
+- [Runtime](https://swiftpython.dev/runtime/): Execution models, worker ownership, shared data, callbacks and app distribution.
+- [Examples](https://swiftpython.dev/examples/): iOS simulator development preview and recorded macOS Metal and callback checks.
+- [Showcase](https://swiftpython.dev/showcase/): Sirius and SiriusMsg application workflows.
+- [Compare](https://swiftpython.dev/compare/): SwiftPython, PythonKit, multiprocessing, Ray and Dask.
+- [Documentation](https://swiftpython.dev/docs/): Installation, packaging and API chapter index.
+- [Getting started](https://swiftpython.dev/docs/getting-started/): Exact package pin, first Python call and worker example.
+- [Packaging](https://swiftpython.dev/docs/packaging/): Runtime embedding, Python dependencies, worker hosting and signing.
+- [Licensing](https://swiftpython.dev/licensing/): Commercial SDK License 1.0 and links to the full terms.
+- [Releases](https://swiftpython.dev/releases/): Current version, package products and matched downloads.
+
+## API guides
+
+- [Core runtime](https://swiftpython.dev/docs/core-runtime/): In-process Python calls, imports, objects and errors.
+- [Data and shared memory](https://swiftpython.dev/docs/data-interop/): Value conversion, buffers and managed tensors.
+- [Concurrency and handles](https://swiftpython.dev/docs/concurrency-handles/): Python execution, object ownership and release.
+- [Worker pools](https://swiftpython.dev/docs/process-pool/): Process pools, worker affinity, lifecycle and telemetry.
+- [Streaming](https://swiftpython.dev/docs/streaming/): Generators, progress events and cancellation.
+- [Task graphs](https://swiftpython.dev/docs/dag/): Dependencies, worker affinity and failure policies.
+- [Callbacks](https://swiftpython.dev/docs/callbacks/): Synchronous, asynchronous, reentrant and streaming Python-to-Swift calls.
+- [Python packages](https://swiftpython.dev/docs/python-packages/): App-owned Swift facades and bundled Python dependencies.
+- [Linux sandboxes](https://swiftpython.dev/docs/sandboxes/): Isolated tenants, shell execution and Python workloads.
+- [Duplex sessions](https://swiftpython.dev/docs/duplex/): Concurrent input, output, controls and completion.
+- [Audio and Metal](https://swiftpython.dev/docs/apple-interop/): Native media adapters, buffer ownership and GPU completion.
+
+## Distribution
+
+- [Commercial repository](https://github.com/mikhutchinson/swiftpython-commercial): Package manifest, public guides and examples.
+- [Preview 1 release](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1): XCFrameworks and the complete distribution.
+- [Consumer kit](https://github.com/mikhutchinson/swiftpython-commercial/blob/main/Consumer/README.md): App-owned XPC services and extension worker hosts.
+- [License](https://github.com/mikhutchinson/swiftpython-commercial/blob/v0.7.0-preview.1/LICENSE): Terms for Preview 1.
