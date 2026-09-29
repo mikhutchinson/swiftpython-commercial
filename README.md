@@ -1,5 +1,10 @@
 # SwiftPython Runtime Binary Distribution
 
+> **Historical Studio development branch.** This branch uses the older 0.5.14
+> runtime. Its APIs, setup and licensing text describe that version. New apps
+> should start with [the current developer guide](https://github.com/mikhutchinson/swiftpython-commercial#readme)
+> and [Preview 1](https://swiftpython.dev/releases/).
+
 Public binary distribution for the SwiftPython runtime on macOS.
 
 This repository is intentionally public so SwiftPython users can depend on it
@@ -11,7 +16,7 @@ proprietary/closed-source use. The SwiftPython source code, generator pipeline,
 and implementation internals remain private. You do not need the private
 repository to build an app against this package.
 
-Current release: `0.5.14`
+Version used by this branch: `0.5.14`
 
 Product page: [Best Byte AI](https://bestbyteai.com/)
 

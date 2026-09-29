@@ -1,11 +1,14 @@
 # SwiftPython Studio
 
-The flagship demo for the SwiftPython runtime: **Swift driving scikit-learn across
+This historical example uses SwiftPython 0.5.14. For the current SDK and examples,
+start at [swiftpython.dev](https://swiftpython.dev/).
+
+**Swift driving scikit-learn across
 real Python worker processes, live, in a native macOS app.**
 
 Studio races four classifiers (Random Forest, Gradient Boosting, Logistic
 Regression, K-Neighbors) in parallel — each pinned to its own Python worker —
-through the canonical V2 `pool.<module>` surface, and shows the accuracy bars,
+through Studio's app-owned `pool.<module>` wrappers, and shows the accuracy bars,
 confusion matrix, worker activity, and the raw pool calls streaming in an embedded
 "behind the curtain" console.
 
