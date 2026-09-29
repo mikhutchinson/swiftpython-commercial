@@ -2,7 +2,7 @@
 
 > SwiftPython embeds Python in native Swift apps. It provides in-process calls, worker pools, process isolation, retained Python objects, streaming, Python-to-Swift callbacks and Metal data sharing.
 
-Current commercial release: 0.7.0-preview.1. The package includes Python 3.13 and requires macOS 15 or newer and Swift 6. ExtensionFoundation worker hosting requires macOS 26. The iOS recording on the website is a development preview; the current commercial package supplies macOS binaries.
+Current commercial release: 0.7.0-preview.1. The package includes Python 3.13 and requires macOS 15 or newer and Swift 6. ExtensionFoundation worker hosting requires macOS 26. The iOS demo shows four native Python worker processes computing a Julia fractal in an iPad app. The recording uses the iPadOS simulator. The current commercial download supplies macOS binaries.
 
 ## Install
 
@@ -12,7 +12,7 @@ Add https://github.com/mikhutchinson/swiftpython-commercial.git through Swift Pa
 
 - [Home](https://swiftpython.dev/): Product overview and recorded demos.
 - [Runtime](https://swiftpython.dev/runtime/): Execution models, worker ownership, shared data, callbacks and app distribution.
-- [Examples](https://swiftpython.dev/examples/): iOS simulator development preview and recorded macOS Metal and callback checks.
+- [Examples](https://swiftpython.dev/examples/): Native Python on iOS, recorded in the iPadOS simulator, plus macOS Metal and callback checks.
 - [Showcase](https://swiftpython.dev/showcase/): Sirius and SiriusMsg application workflows.
 - [Compare](https://swiftpython.dev/compare/): SwiftPython, PythonKit, multiprocessing, Ray and Dask.
 - [Documentation](https://swiftpython.dev/docs/): Installation, packaging and API chapter index.
