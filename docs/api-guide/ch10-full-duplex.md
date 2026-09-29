@@ -311,6 +311,3 @@ maximum as an application guarantee. State the minimum in
 `DuplexSessionRequirements` and use
 `session.profile` to inspect the public session configuration, including
 `maximumMessageBytes` and `supportsManagedBuffers`.
-
-The independent [consumer fixture](../../scripts/consumer_path_smoke.sh)
-executes frame loopback and a fragmented message above its physical-frame ceiling.
