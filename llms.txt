@@ -21,6 +21,12 @@ Add https://github.com/mikhutchinson/swiftpython-commercial.git through Swift Pa
 - [Licensing](https://swiftpython.dev/licensing/): Commercial SDK License 1.0 and links to the full terms.
 - [Releases](https://swiftpython.dev/releases/): Current version, package products and matched downloads.
 
+## Measurements
+
+- [Mac and iPad duplex measurements](https://swiftpython.dev/benchmarks/duplex/): 85 trials per device on a MacBook Pro M4 Pro and a physical iPad mini A17 Pro, collected 29–30 September 2026 UTC. Receipt latency, verified transfer throughput, concurrent sessions, idle resources and measurement method.
+- [Measurement report (PDF)](https://swiftpython.dev/media/duplex/swiftpython-duplex-mac-ipad.pdf): Five-page report with charts and tables.
+- [Per-trial data (JSON)](https://swiftpython.dev/media/duplex/data.json): Trial parameters and statistics for both devices. Throughput counts bytes per direction and includes output verification and acknowledgement.
+
 ## API guides
 
 - [Core runtime](https://swiftpython.dev/docs/core-runtime/): In-process Python calls, imports, objects and errors.
