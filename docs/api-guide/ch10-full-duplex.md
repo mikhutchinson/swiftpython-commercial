@@ -1,5 +1,7 @@
 # Chapter 10 - Full-Duplex Sessions
 
+[Full-duplex sessions](https://swiftpython.dev/docs/duplex/)
+
 `PythonDuplexSession` is the long-lived ProcessPool primitive for input,
 output, application control, and interruption that must progress independently
 on one pinned worker generation. Core duplex carries bounded opaque bytes. It is

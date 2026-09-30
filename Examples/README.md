@@ -1,5 +1,7 @@
 # Examples
 
+[SwiftPython examples](https://swiftpython.dev/examples/)
+
 Two native Mac apps built against the public SwiftPython runtime:
 
 | Demo | What it does | Run |

@@ -1,5 +1,7 @@
 # Chapter 5 - Streaming
 
+[Streaming](https://swiftpython.dev/docs/streaming/)
+
 Use streaming when Python produces values over time: token generation, progress
 updates, sensor data, long transforms, search results, or incremental parsing.
 

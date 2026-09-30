@@ -1,5 +1,7 @@
 # Chapter 2 - Data Interop
 
+[Data & shared memory](https://swiftpython.dev/docs/data-interop/)
+
 SwiftPython gives you three levels of data exchange:
 
 1. Convert normal Swift values with `PythonConvertible`.

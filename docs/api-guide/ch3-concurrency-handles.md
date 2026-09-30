@@ -1,5 +1,7 @@
 # Chapter 3 - Concurrency & Handles
 
+[Concurrency & handles](https://swiftpython.dev/docs/concurrency-handles/)
+
 Swift concurrency and CPython have different ownership rules. The safe pattern
 is simple:
 

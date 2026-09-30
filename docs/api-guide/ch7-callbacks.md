@@ -1,5 +1,7 @@
 # Chapter 7 - Callbacks
 
+[Python → Swift callbacks](https://swiftpython.dev/docs/callbacks/)
+
 Callbacks let Python code running in a worker call Swift. Use them for host
 services, progress decisions, scoring functions, cancellation policy, streaming
 data sources, or any operation that must stay in Swift while Python controls the

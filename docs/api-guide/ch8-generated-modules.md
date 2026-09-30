@@ -1,5 +1,7 @@
 # Chapter 8 - Python Packages and App Facades
 
+[Python packages](https://swiftpython.dev/docs/python-packages/)
+
 The commercial package includes the runtime, worker and integration templates.
 Use Python packages through its Swift API without building SwiftPython from source.
 

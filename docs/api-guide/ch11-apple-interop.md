@@ -1,5 +1,7 @@
 # Chapter 11 - Audio and Metal Interop
 
+[Audio & Metal](https://swiftpython.dev/docs/apple-interop/)
+
 The generic duplex API lives in `SwiftPythonRuntime`. Apple-native integration
 is opt-in:
 

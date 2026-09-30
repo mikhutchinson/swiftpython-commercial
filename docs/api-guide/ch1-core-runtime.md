@@ -1,5 +1,7 @@
 # Chapter 1 - Core Runtime
 
+[Core runtime](https://swiftpython.dev/docs/core-runtime/)
+
 Use the core runtime when you want Python in the current process: lightweight
 scripts, direct access to Python packages, custom conversion, or setup work that
 does not need a separate worker process.

@@ -1,5 +1,7 @@
 # Chapter 4 - ProcessPool
 
+[Worker pools](https://swiftpython.dev/docs/process-pool/)
+
 `PythonProcessPool` runs Python work in separate worker processes. Each worker
 has its own interpreter and GIL, so CPU-bound Python can run in parallel and
 native extension crashes do not take down your app process.

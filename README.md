@@ -7,7 +7,7 @@ and connect numerical workloads to native audio and Metal.
 SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
-[Website](https://swiftpython.dev) ·
+Product page: [SwiftPython](https://swiftpython.dev/) ·
 [Download 0.7.0-preview.1.1](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.1)
 
 ## Make your first call
@@ -77,7 +77,7 @@ that run offline. [See both examples and their prerequisites.](Examples/)
 ## What's new in Preview 1.1
 
 Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
-and stale responses after worker replacement. Public APIs are unchanged.
+and stale responses after worker replacement. Public APIs are unchanged. [Mac and iPad duplex benchmarks](https://swiftpython.dev/benchmarks/duplex/).
 
 Current release: `0.7.0-preview.1.1`. [Distribution verification](docs/distribution-verification.md).
 
@@ -139,7 +139,7 @@ Keep binaries and helpers on the same release. Use the supplied
 and notarize your finished application for distribution.
 
 [Packaging guide](https://swiftpython.dev/docs/packaging/) ·
-[API guide](docs/api-guide/) ·
+[Documentation](https://swiftpython.dev/docs/) ·
 [All releases](https://github.com/mikhutchinson/swiftpython-commercial/releases)
 
 ## License

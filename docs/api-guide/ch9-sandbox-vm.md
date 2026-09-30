@@ -1,5 +1,7 @@
 # Chapter 9 - Isolated Sandboxes
 
+[Linux sandboxes](https://swiftpython.dev/docs/sandboxes/)
+
 `SandboxProvider` creates strongly isolated Python execution pools without
 exposing the provider's boot mechanism, transport, kernel assets, or storage
 layout. Use a sandbox for tenant-specific dependencies, shell tools, untrusted

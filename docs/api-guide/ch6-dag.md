@@ -1,5 +1,7 @@
 # Chapter 6 - DAG Orchestration
 
+[Task graphs](https://swiftpython.dev/docs/dag/)
+
 `ProcessPoolDAG` runs dependency-aware Swift operations over a
 `PythonProcessPool`. Use it when your work is naturally a graph: load data,
 preprocess, fan out independent work, then reduce results.
