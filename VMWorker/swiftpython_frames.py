@@ -107,13 +107,24 @@ def _inject_into_remote_value_descriptors(
     return args, kwargs
 
 
-def receive_frame(sock: socket.socket, max_payload: int) -> tuple:
-    """Apply the same body limit on every command socket before read or skip."""
+class FrameValidationError(ValueError):
+    """An invalid header leaves unread bytes: its connection must be retired."""
+
+
+def receive_frame(
+    sock: socket.socket, max_payload: int, *,
+    expected_type: int | None = None, allow_binary: bool = True,
+) -> tuple:
+    """Validate size and the caller's framing contract before any body read."""
     header = recv_exact(sock, HEADER_SIZE)
     json_len, bin_len, msg_type = struct.unpack_from("<IIB", header)
     total = json_len + bin_len
     if total > max_payload:
-        raise ValueError(f"Payload too large: {total} > {max_payload}")
+        raise FrameValidationError(f"Payload too large: {total} > {max_payload}")
+    if expected_type is not None and msg_type != expected_type:
+        raise FrameValidationError(f"Unexpected message type: {msg_type}")
+    if not allow_binary and bin_len:
+        raise FrameValidationError("Binary payload is not supported on this channel")
     payload = recv_exact(sock, total)
     return msg_type, payload[:json_len], payload[json_len:]
 

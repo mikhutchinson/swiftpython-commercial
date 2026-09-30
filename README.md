@@ -8,16 +8,16 @@ SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
 [Website](https://swiftpython.dev) ·
-[Download 0.7.0-preview.1](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1)
+[Download 0.7.0-preview.1.1](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.1)
 
 ## Make your first call
 
-Add the package in Xcode with **Exact Version** `0.7.0-preview.1`, or use SwiftPM:
+Add the package in Xcode with **Exact Version** `0.7.0-preview.1.1`, or use SwiftPM:
 
 ```swift
 .package(
     url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-    exact: "0.7.0-preview.1"
+    exact: "0.7.0-preview.1.1"
 )
 ```
 
@@ -74,7 +74,14 @@ Examples/IrisDemo/scripts/build_app.sh --open
 The example builders download their dependencies and create development apps
 that run offline. [See both examples and their prerequisites.](Examples/)
 
-## What's new in Preview 1
+## What's new in Preview 1.1
+
+Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
+and stale responses after worker replacement. Public APIs are unchanged.
+
+Current release: `0.7.0-preview.1.1`. [Distribution verification](docs/distribution-verification.md).
+
+## Preview 1
 
 Preview 1 adds app-owned XPC and ExtensionFoundation workers through
 `SwiftPythonWorkerService` and the [consumer assembly kit](Consumer/).

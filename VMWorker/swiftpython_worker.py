@@ -50,6 +50,7 @@ from _swiftpython_wire import (  # noqa: E402
 )
 import _swiftpython_duplex as _duplex_helper  # noqa: E402
 from swiftpython_frames import (  # noqa: E402
+    FrameValidationError,
     HEADER_SIZE,
     HOST_CID,
     MAX_PAYLOAD_BYTES,
@@ -68,6 +69,7 @@ from swiftpython_frames import (  # noqa: E402
     worker_capability_declaration,
 )
 from swiftpython_guest_duplex import (  # noqa: E402
+    _GuestDuplexCleanupError,
     _GuestDuplexAcceleratorResourceError,
     _GuestDuplexError,
     _GuestDuplexResourceError,
@@ -547,7 +549,7 @@ class Worker:
                 else:
                     target_pool = child_command_pool if self._has_active_callback_waiters() else command_pool
                     target_pool.submit(self._handle_and_send, cmd_name, cmd_data)
-            except ConnectionError:
+            except (ConnectionError, FrameValidationError):
                 break
             except Exception as e:
                 if self.sock.fileno() < 0:
@@ -583,6 +585,17 @@ class Worker:
             self._send_response(resp_name, resp_data, resp_binary, channel_id=channel_id)
             if cmd_name == "duplexOpen":
                 self.duplex_sessions.session(cmd_data["sessionID"]).start()
+        except _GuestDuplexCleanupError as e:
+            # An unquiesced session cannot yield a reusable worker. Wake the
+            # main reader so main() retires this process and the host's exact
+            # lifecycle owner observes EOF; never manufacture close success.
+            try:
+                self._send_response("error", {
+                    "code": "executionError", "message": str(e),
+                }, b"", channel_id=channel_id)
+            finally:
+                self.running = False
+                self.sock.shutdown(socket.SHUT_RDWR)
         except _GuestDuplexAcceleratorResourceError as e:
             self._send_response("error", {
                 "code": "acceleratorResourceError",
@@ -635,8 +648,11 @@ class Worker:
         channel_id: int,
     ) -> "queue.Queue[tuple[str, dict, bytes]]":
         waiter: "queue.Queue[tuple[str, dict, bytes]]" = queue.Queue()
-        with self._callback_waiters_lock:
-            self._callback_waiters[call_id] = (waiter, channel_id)
+        with self.duplex_sessions.callback_admission(
+            getattr(self.active_command_channel, "duplex_token", None)
+        ):
+            with self._callback_waiters_lock:
+                self._callback_waiters[call_id] = (waiter, channel_id)
         return waiter
 
     def _unregister_callback_waiter(self, call_id: int):
@@ -645,8 +661,11 @@ class Worker:
 
     def _register_async_callback_waiter(self, call_id: int, channel_id: int) -> "queue.Queue[tuple[str, dict, bytes]]":
         waiter: "queue.Queue[tuple[str, dict, bytes]]" = queue.Queue()
-        with self._async_callback_waiters_lock:
-            self._async_callback_waiters[call_id] = (waiter, channel_id)
+        with self.duplex_sessions.callback_admission(
+            getattr(self.active_command_channel, "duplex_token", None)
+        ):
+            with self._async_callback_waiters_lock:
+                self._async_callback_waiters[call_id] = (waiter, channel_id)
         return waiter
 
     def _async_callback_waiter(self, call_id: int) -> tuple["queue.Queue[tuple[str, dict, bytes]]", int] | None:
@@ -828,8 +847,8 @@ class Worker:
         return "capabilities", declaration, b""
 
     def _handle_shutdown(self, cmd_data: dict) -> tuple:
-        self.duplex_sessions.shutdown_all()
         self.running = False
+        self.duplex_sessions.shutdown_all()
         return "success", {}, b""
 
     def _handle_duplex_open(self, cmd_data: dict) -> tuple:
@@ -871,12 +890,10 @@ class Worker:
         return "success", {}, b""
 
     def _handle_duplex_close(self, cmd_data: dict) -> tuple:
-        try:
-            session = self.duplex_sessions.session(cmd_data["sessionID"])
-        except _GuestDuplexError:
-            return "success", {}, b""
-        session.close(int(cmd_data["controlSequence"]))
-        session.wait_for_cleanup(2)
+        self.duplex_sessions.close(
+            cmd_data["sessionID"], int(cmd_data["controlChannelID"]),
+            int(cmd_data["controlSequence"]),
+        )
         return "success", {}, b""
 
     def _handle_stream_cancel(self, cmd_data: dict) -> tuple:

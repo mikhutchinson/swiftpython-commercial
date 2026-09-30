@@ -59,6 +59,12 @@ with tempfile.TemporaryDirectory(prefix="swiftpython-demo-metadata-audit-") as t
         raise SystemExit("Demo metadata lost the complete SDK version")
 sealed = validated_sealed_bytecode(root) if host_contract else set()
 readme = (root / "README.md").read_text()
+# Consumer onboarding and distribution verification have separate documents.
+# Keep the same required facts and require the README to link the reference.
+reference = "docs/distribution-verification.md"
+if reference not in readme:
+    raise SystemExit("README must link distribution verification")
+readme += "\n" + (root / reference).read_text()
 license_text = (root / "LICENSE").read_text()
 required = [
     f"Current release: `{version}`",

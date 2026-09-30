@@ -4,6 +4,7 @@ and envelopes, credit, the accelerator lane and the session manager."""
 import _swiftpython_duplex as _duplex_helper
 import base64
 import collections
+import contextlib
 import hashlib
 import hmac
 import importlib
@@ -57,6 +58,9 @@ class _GuestDuplexError(RuntimeError):
 
 class _GuestDuplexResourceError(_GuestDuplexError):
     pass
+
+class _GuestDuplexCleanupError(_GuestDuplexError):
+    """The incarnation must retire; session thread exit was not proven."""
 
 class _GuestDuplexAcceleratorResourceError(_GuestDuplexResourceError):
     pass
@@ -587,7 +591,9 @@ class _GuestAcceleratorLane:
                 "rejected_steps": self.rejected_steps,
             }
 
-    def shutdown(self):
+    def shutdown(self, deadline=None):
+        if deadline is None:
+            deadline = time.monotonic() + 2
         with self.cv:
             self.stopping = True
             states = list(self.sessions.values())
@@ -601,7 +607,9 @@ class _GuestAcceleratorLane:
                 )
                 job["done"].set()
         if self.thread is not None:
-            self.thread.join(timeout=2)
+            self.thread.join(timeout=max(0, deadline - time.monotonic()))
+            return not self.thread.is_alive()
+        return True
 
     def _run_loop(self):
         with self.cv:
@@ -819,6 +827,7 @@ class _GuestDuplexSessionManager:
         self._lock = threading.Lock()
         self._sessions: dict[str, _GuestDuplexSession] = {}
         self._tokens: dict[int, _GuestDuplexSession] = {}
+        self._closed_routes = collections.OrderedDict()
         self._next_token = 1
         self.accelerator_lane = _GuestAcceleratorLane()
         self.native_bridge = _GuestDuplexNativeBridge(self)
@@ -861,7 +870,7 @@ class _GuestDuplexSessionManager:
             authentication,
         )
         with self._lock:
-            if session_id in self._sessions:
+            if session_id in self._sessions or session_id in self._closed_routes:
                 raise _GuestDuplexError("duplicate guest duplex session")
             if len(self._sessions) >= DUPLEX_MAXIMUM_ACTIVE_SESSIONS:
                 raise _GuestDuplexResourceError(
@@ -926,7 +935,7 @@ class _GuestDuplexSessionManager:
             self.accelerator_lane.register(token, configuration)
             accelerator_registered = True
             with self._lock:
-                if session_id in self._sessions:
+                if session_id in self._sessions or session_id in self._closed_routes:
                     raise _GuestDuplexError(
                         "duplicate guest duplex session appeared during open"
                     )
@@ -1234,9 +1243,56 @@ class _GuestDuplexSessionManager:
         self.accelerator_lane.unregister(session.token)
         with self._lock:
             if self._sessions.get(session.session_id) is session:
+                self._record_closed_route_locked(session)
                 self._sessions.pop(session.session_id, None)
             if self._tokens.get(session.token) is session:
                 self._tokens.pop(session.token, None)
+
+    def _record_closed_route_locked(self, session):
+        with session.cv:
+            channel = session.control_channel_id
+            last = session.last_control_sequence
+            accepted = session.accepted_close_sequence
+        existing = self._closed_routes.get(session.session_id)
+        if existing is not None:
+            if existing[0] == channel:
+                self._closed_routes[session.session_id] = (
+                    channel, max(existing[1], last),
+                    existing[2] if existing[2] is not None else accepted,
+                )
+            return
+        self._closed_routes[session.session_id] = (channel, last, accepted)
+        if len(self._closed_routes) > 64:
+            self._closed_routes.popitem(last=False)
+
+    def close(self, session_id: str, channel: int, sequence: int):
+        key = str(uuid.UUID(str(session_id))).upper()
+        if not 0 < sequence <= (1 << 64) - 1:
+            raise _GuestDuplexError("invalid duplex close sequence")
+        with self._lock:
+            session = self._sessions.get(key)
+            if session is None:
+                route = self._closed_routes.get(key)
+                if route is None or route[0] != channel:
+                    raise _GuestDuplexError("unknown or mismatched duplex close route")
+                _, last, accepted = route
+                if accepted is not None:
+                    if sequence != accepted:
+                        raise _GuestDuplexError("mismatched duplex close route sequence")
+                elif sequence > last:
+                    self._closed_routes[key] = (channel, sequence, sequence)
+                else:
+                    raise _GuestDuplexError("stale duplex close route sequence")
+                return
+        if session.control_channel_id != channel:
+            raise _GuestDuplexError("duplex close route mismatch")
+        session.close(sequence)
+        with self._lock:
+            # Autonomous removal may have won after the active-route lookup.
+            if key not in self._sessions:
+                self._record_closed_route_locked(session)
+        if not session.wait_for_cleanup(2):
+            raise _GuestDuplexCleanupError("duplex cleanup did not prove thread exit within 2 seconds")
 
     def cancel_callback_waiters(self, channel_id: int, reason: str):
         self.worker._fail_callback_waiters_for_channel(
@@ -1244,14 +1300,33 @@ class _GuestDuplexSessionManager:
             RuntimeError(f"duplex session cancelled: {reason}"),
         )
 
+    @contextlib.contextmanager
+    def callback_admission(self, token):
+        if token is None:
+            yield
+            return
+        with self._lock:
+            session = self._tokens.get(token)
+        if session is None:
+            raise RuntimeError("duplex session callback admission is closed")
+        with session.cv:
+            if session.terminal is not None or session.cancellation_reason is not None:
+                raise RuntimeError("duplex session callback admission is closed")
+            yield
+
     def shutdown_all(self):
+        deadline = time.monotonic() + 2
         with self._lock:
             sessions = list(self._sessions.values())
         for session in sessions:
             session.cancel((1 << 64) - 1, "shutdown")
+        lane_stopped = self.accelerator_lane.shutdown(deadline)
+        sessions_stopped = True
         for session in sessions:
-            session.wait_for_cleanup(2)
-        self.accelerator_lane.shutdown()
+            if not session.wait_for_cleanup(max(0, deadline - time.monotonic())):
+                sessions_stopped = False
+        if not lane_stopped or not sessions_stopped:
+            raise _GuestDuplexCleanupError("guest duplex shutdown did not prove thread exit")
 
 class _GuestIngressCompletionLedger:
     """Bounded contiguous watermark plus coalesced completed ranges."""
@@ -1377,6 +1452,7 @@ class _GuestDuplexSession:
         self.output_acknowledged_through = None
 
         self.last_control_sequence = 0
+        self.accepted_close_sequence = None
         self.interruption_count = 0
         self.latest_interruption_value = None
         self.pending_interruption_ids: set[str] = set()
@@ -1388,6 +1464,7 @@ class _GuestDuplexSession:
         self.handler_ident = 0
         self.terminal = None
         self.cleanup_started = False
+        self.cleanup_complete = False
         self.cleanup_done = threading.Event()
 
         # Data frames are already bounded by negotiated egress credit. Four
@@ -1779,6 +1856,7 @@ class _GuestDuplexSession:
 
     def _handler_loop(self):
         self.worker.active_command_channel.channel_id = self.control_channel_id
+        self.worker.active_command_channel.duplex_token = self.token
         try:
             with self.cv:
                 self.handler_ident = threading.get_ident()
@@ -1815,6 +1893,7 @@ class _GuestDuplexSession:
                 )
             return
         finally:
+            self.worker.active_command_channel.duplex_token = None
             if (
                 getattr(
                     self.worker.active_command_channel,
@@ -2471,10 +2550,15 @@ class _GuestDuplexSession:
 
     def close(self, sequence: int):
         with self.cv:
-            self.last_control_sequence = max(
-                self.last_control_sequence,
-                sequence,
-            )
+            if self.accepted_close_sequence is not None:
+                if sequence != self.accepted_close_sequence:
+                    raise _GuestDuplexError("duplex close sequence differs from accepted close")
+            elif sequence <= self.last_control_sequence:
+                raise _GuestDuplexError("duplex close control sequence regressed")
+            self.last_control_sequence = sequence
+            self.accepted_close_sequence = sequence
+            if self.terminal is None and self.cancellation_reason is None:
+                self.cancellation_reason = "user"
         self.finish(
             {"cancelled": {"reason": "user"}},
             drain_writer=False,
@@ -2688,26 +2772,28 @@ class _GuestDuplexSession:
                 self.last_control_sequence,
             )
             self.cv.notify_all()
-        self.manager.cancel_callback_waiters(
-            self.control_channel_id,
-            "terminal",
-        )
-        if emit_terminal:
-            self.worker._send_response(
-                "duplexTerminal",
-                {
-                    "sessionID": self.session_id,
-                    "controlSequence": watermarks[4],
-                    "terminal": terminal,
-                    "inputAcceptedThrough": watermarks[0],
-                    "inputProcessedThrough": watermarks[1],
-                    "outputProducedThrough": watermarks[2],
-                    "outputAcknowledgedThrough": watermarks[3],
-                },
-                b"",
-                channel_id=self.control_channel_id,
+        try:
+            self.manager.cancel_callback_waiters(
+                self.control_channel_id,
+                "terminal",
             )
-        self._begin_cleanup(drain_writer)
+            if emit_terminal:
+                self.worker._send_response(
+                    "duplexTerminal",
+                    {
+                        "sessionID": self.session_id,
+                        "controlSequence": watermarks[4],
+                        "terminal": terminal,
+                        "inputAcceptedThrough": watermarks[0],
+                        "inputProcessedThrough": watermarks[1],
+                        "outputProducedThrough": watermarks[2],
+                        "outputAcknowledgedThrough": watermarks[3],
+                    },
+                    b"",
+                    channel_id=self.control_channel_id,
+                )
+        finally:
+            self._begin_cleanup(drain_writer)
 
     def _begin_cleanup(self, drain_writer: bool):
         with self.cv:
@@ -2716,14 +2802,17 @@ class _GuestDuplexSession:
             self.cleanup_started = True
 
         def cleanup():
+            deadline = time.monotonic() + 2
+            def remaining():
+                return max(0, deadline - time.monotonic())
             try:
                 if drain_writer:
                     try:
-                        self.writer_queue.put(None, timeout=2)
+                        self.writer_queue.put(None, timeout=remaining())
                     except queue.Full:
                         pass
                     if self.writer_thread is not None:
-                        self.writer_thread.join(timeout=2)
+                        self.writer_thread.join(timeout=remaining())
                 else:
                     while True:
                         try:
@@ -2748,21 +2837,28 @@ class _GuestDuplexSession:
                     self.sock.close()
                 except Exception:
                     pass
-                for thread in (self.reader_thread, self.handler_thread):
+                threads = (self.writer_thread, self.reader_thread, self.handler_thread)
+                for thread in threads:
                     if (
                         thread is not None
                         and thread is not threading.current_thread()
                     ):
-                        thread.join(timeout=2)
-            finally:
+                        thread.join(timeout=remaining())
+                if any(thread is not None and thread.is_alive() for thread in threads):
+                    # Keep the route/token quarantined. A timed join is not an
+                    # exit receipt, and a later close must fail the incarnation.
+                    return
                 with self.cv:
                     self.application_controls.clear()
                     self.interruptions.clear()
                     self.pending_interruption_ids.clear()
                     self.ingress.clear()
+                    self.ingress_messages.clear()
                     self.ingress_bytes = 0
+                    self.cleanup_complete = True
                     self.cv.notify_all()
                 self.manager.remove(self)
+            finally:
                 self.cleanup_done.set()
 
         threading.Thread(
@@ -2772,7 +2868,7 @@ class _GuestDuplexSession:
         ).start()
 
     def wait_for_cleanup(self, timeout: float) -> bool:
-        return self.cleanup_done.wait(timeout)
+        return self.cleanup_done.wait(timeout) and self.cleanup_complete
 
     def _is_terminal(self) -> bool:
         with self.cv:

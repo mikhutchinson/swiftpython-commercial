@@ -75,7 +75,15 @@ from swiftpython_protocol import (  # noqa: E402
     observed_undeclared_keys,
     registered_commands,
 )
-from swiftpython_frames import worker_capability_declaration  # noqa: E402
+from swiftpython_frames import (  # noqa: E402
+    FrameValidationError,
+    MAX_PAYLOAD_BYTES,
+    MSG_TYPE_COMMAND,
+    encode_response,
+    receive_frame,
+    send_all,
+    worker_capability_declaration,
+)
 from _swiftpython_wire import CURRENT_PROTOCOL_VERSION  # noqa: E402
 
 # <linux/random.h>: _IOW('R', 0x03, int[2]) and _IO('R', 0x07).
@@ -124,9 +132,6 @@ def _guest_artifact_sha256() -> dict[str, str]:
 # Constants
 # ---------------------------------------------------------------------------
 
-HEADER_SIZE = 9
-MSG_TYPE_COMMAND = 0
-MSG_TYPE_RESPONSE = 1
 HOST_CID = 2
 CONTROL_PORT = 1024
 VSOCK_CID_ANY = -1
@@ -154,27 +159,19 @@ WORKER_SCRIPT = _find_worker_script()
 # ---------------------------------------------------------------------------
 
 
-def recv_exact(sock: socket.socket, nbytes: int) -> bytes:
-    buf = bytearray()
-    while len(buf) < nbytes:
-        chunk = sock.recv(nbytes - len(buf))
-        if not chunk:
-            raise ConnectionError("Control channel closed")
-        buf.extend(chunk)
-    return bytes(buf)
-
-
 def recv_command(sock: socket.socket) -> dict:
-    header = recv_exact(sock, HEADER_SIZE)
-    json_len, bin_len, msg_type = struct.unpack_from("<IIB", header)
-    payload = recv_exact(sock, json_len + bin_len)
-    return json.loads(payload[:json_len])
+    _, payload, _ = receive_frame(
+        sock, MAX_PAYLOAD_BYTES, expected_type=MSG_TYPE_COMMAND, allow_binary=False,
+    )
+    command = json.loads(payload)
+    if (not isinstance(command, dict) or len(command) != 1
+            or not isinstance(next(iter(command.values())), dict)):
+        raise ValueError("Expected one supervisor command with an object payload")
+    return command
 
 
 def send_response(sock: socket.socket, response: dict):
-    json_bytes = json.dumps(response, separators=(",", ":")).encode("utf-8")
-    header = struct.pack("<IIB", len(json_bytes), 0, MSG_TYPE_RESPONSE)
-    sock.sendall(header + json_bytes)
+    send_all(sock, encode_response(response))
 
 
 # ---------------------------------------------------------------------------
@@ -232,8 +229,10 @@ class Supervisor:
                     print("[supervisor] Snapshot prep complete, returning to listen",
                           file=sys.stderr, flush=True)
                     break
-            except ConnectionError:
-                print("[supervisor] Control channel closed, shutting down", file=sys.stderr, flush=True)
+            except (ConnectionError, FrameValidationError, TimeoutError) as error:
+                # Header rejection or a partial timed-out frame cannot be
+                # resynchronized. Never reinterpret its unread body as commands.
+                print(f"[supervisor] Control channel terminated: {error}", file=sys.stderr, flush=True)
                 if self.poweroff_on_disconnect:
                     threading.Thread(target=self._poweroff_after_parent_disconnect, daemon=True).start()
                 break

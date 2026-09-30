@@ -251,6 +251,8 @@ class ConsumerTimeoutWrapperTests(unittest.TestCase):
         readme = pathlib.Path(__file__).parents[1].joinpath("README.md").read_text(
             encoding="utf-8"
         )
+        self.assertIn("docs/distribution-verification.md", readme)
+        readme += pathlib.Path(__file__).parents[1].joinpath("docs/distribution-verification.md").read_text(encoding="utf-8")
         self.assertIn("Notary `ready` mode requires an explicit stable", readme)
         self.assertIn("SWIFTPYTHON_SMOKE_ID_SUFFIX=releasegate", readme)
         self.assertIn("Bootstrap the two grants once", readme)

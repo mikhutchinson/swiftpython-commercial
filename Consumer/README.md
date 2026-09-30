@@ -1,30 +1,34 @@
-# Host Python workers in your Mac app
+# Commercial Apple worker consumer kit
 
-The Preview 1 consumer kit builds a minimal macOS app with app-owned XPC services
-or ExtensionFoundation workers. It uses the `SwiftPythonRuntime` and
-`SwiftPythonWorkerService` products and bundles Python with the app.
+**Unshipped implementation in progress.** The published 8.4 package does not
+contain this kit or WorkerService. Passing preflight proves assembly and signing;
+it does not certify execution, foreign-team reproducibility or notarization.
 
-## Before you start
+The kit creates a minimal macOS application using the commercial Runtime and
+WorkerService products. Its app-owned XPC services or ExtensionFoundation
+extensions embed the matched private Python runtime through the binary package.
+The installed app does not need a separate Python installation.
 
-Install Xcode, XcodeGen and Python 3.9 or later for the build scripts, and choose
-your Apple signing identity. Your finished app does not need an installed Python.
+Build prerequisites are Python 3.9 or later for these scripts, Xcode with the
+SDK required by the selected host, XcodeGen, and a real Apple signing identity.
+The deployment target is the greater of the API availability and the actual
+requirements recorded in the candidate's Mach-O binaries. It is not an OS
+execution-support claim. The local signing mode uses no secure timestamp;
+distribution mode requires publisher-attested inputs and timestamped Developer
+ID signatures. Personal Team entitlement availability must be tested separately.
+The producer's sealed-bytecode audit additionally requires its matching CPython
+3.13 build interpreter. It recompiles packaged standard-library source without
+executing it and checks every compiled code field against the sealed cache,
+including hash invalidation, optimization and public traceback filenames. The
+payload inventory binds the final serialized bytes. This is a producer
+gate; normal consumer assembly and app execution do not need an installed
+Python 3.13 runtime.
 
-| Worker host | Requirements |
-|---|---|
-| XPC service | macOS 15 or later; the service is nonsandboxed, with either parent sandbox policy |
-| ExtensionFoundation | macOS 26 or later and an SDK with ExtensionFoundation support; sandboxed worker extension |
-
-The generated deployment target also accounts for the supplied binary's minimum
-OS requirements. These recipes do not establish App Store eligibility.
-
-Download `SwiftPythonCommercial-0.7.0-preview.1.zip` and `manifest.json` from the
-[same release](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1).
-Extract the archive into a new directory and keep it intact. Run the commands
-below from that directory. The release's inventory validates the complete kit,
-including its documentation; use the release archive for assembly even when
-reading newer documentation on GitHub.
-
-## Generate an XPC application
+Obtain the complete distribution plus its external `manifest.json` from the
+same release. The manifest attests `payload.json`, which inventories the six
+XCFrameworks, worker, audio probe, VM helpers, entitlements and this recipe.
+Keep that external manifest as the trusted publisher input. A development
+inventory alone detects changes but cannot establish release provenance.
 
 ```sh
 python3 Consumer/assemble.py generate \
@@ -33,33 +37,11 @@ python3 Consumer/assemble.py generate \
   --output /path/to/new-consumer-project \
   --host xpc-service --bundle-id com.example.MyApplication \
   --worker-count 2 --parent-sandbox no --service-sandbox no
-```
 
-Use your own bundle identifier. The example requires 2 through 64 worker
-identities so it can demonstrate worker replacement. Use a distinct bundle
-identifier for each installed development app.
-
-For an ExtensionFoundation application, select
-`--host extension-foundation --service-sandbox yes`. The parent application's
-sandbox policy is independent of the worker's policy. Sandboxed XPC services
-are not supported by this recipe.
-
-## Build and sign
-
-```sh
 python3 Consumer/assemble.py build \
   --project /path/to/new-consumer-project \
   --identity '<Apple-signing-identity>' --signing-mode local-development
-```
 
-The builder embeds the matched runtime and signs nested code before the app.
-It handles clean and incremental builds. Local development signing does not
-request a secure timestamp. Distribution signing requires the release manifest
-and a Developer ID identity; select `--signing-mode distribution`.
-
-## Check and run
-
-```sh
 python3 Consumer/assemble.py preflight \
   --project /path/to/new-consumer-project \
   --receipt /path/to/new-consumer-project/signing-receipt.json
@@ -70,23 +52,59 @@ python3 Consumer/execute.py \
   --output /path/to/new-execution-evidence
 ```
 
-Preflight checks the generated app against its inputs and signing receipt; it
-does not modify or repair the app. The example performs Python work, replaces a
-worker and shuts down. The runner checks fresh results, process cleanup and the
-app's signature, and writes the results into the chosen output directory.
+For a local developer candidate, replace `--manifest` with the explicit
+`--allow-development` option. This path records development provenance and
+refuses distribution signing. For ExtensionFoundation, use
+`--host extension-foundation --service-sandbox yes`. The app and service sandbox
+policies are independent. These templates do not assert App Store eligibility.
+The XPC recipe requires nonsandboxed services under either parent policy.
+Sandboxed XPC services are not qualified: their current bootstrap needs access
+to the containing app's signed inventory, which the service sandbox can deny.
+The generator rejects that policy before building. ExtensionFoundation is the
+recipe for the independently sandboxed worker proof in this kit.
 
-The runner rejects duplicate registered applications with the same bundle ID.
-Remove the obsolete development registration or give the new app a distinct ID.
+The worker count declares a finite inventory; the minimal respawn smoke requires
+2 through 64 identities. Every identity derives from your bundle identifier.
+Use a unique consumer prefix for each installed candidate. This minimal kit has
+no extra wheels or app-owned Python command; it does not discover PATH Python.
+The execution verifier rejects another registered app with the same bundle ID
+before launch. Superseded development copies must be explicitly unregistered or
+given distinct identities; refreshing the newest copy alone is insufficient.
 
-## Distribute your application
+`build` reruns the same finalizer for clean and incremental Xcode builds. All
+copying and loader-route fixes precede signing native images, frameworks, worker
+bundles and finally the app. Preflight never repairs an app. It verifies input
+provenance, exact generated inputs, worker inventory, linker maps bound to the
+attested Runtime/WorkerService archives for every target and architecture, bundle-contained native
+dependencies, actual signatures and sandbox entitlements, then checks the sealed
+output against the separate signing receipt. Publisher hashes describe the
+inputs before consumer signing; output hashes describe the resulting app.
 
-Keep the release manifest with your build inputs. After building and signing,
-notarize your application, staple Apple's ticket and verify Gatekeeper acceptance.
-Preflight supports a valid stapled ticket without changing the original signing
-receipt. Running preflight by itself does not notarize an app.
+For distribution-signed apps, preflight also supports Apple's stapled ticket at
+`Contents/CodeResources`. It validates the ticket with `stapler validate` and
+records its digest without rewriting the original signing receipt. Every
+pre-existing file must remain identical; other additions, removed or changed
+files and invalid tickets are rejected. Execution rechecks the same ticket and
+sealed output afterward. This ticket check does not submit an app for
+notarization or replace the separate Gatekeeper and release qualification gates.
+The generated fixtures declare no App Intents and disable only that optional
+metadata extraction task; ExtensionFoundation point generation remains enabled.
 
-The minimal example includes the Python standard library. Add your application's
-Python modules and compatible third-party packages as part of your integration.
+The generated application performs Python work, requests a public respawn and
+shuts down. Manual launches write to the bundle identifier's cache directory.
+Automated verification uses LaunchServices' explicit stdout/stderr files in the
+new evidence directory and does not read another app's protected container.
+The execution verifier requires fresh results, samples exact executable paths,
+matches acquisitions to kernel retirement receipts, checks owned descendants
+have exited, and verifies the app seal remains unchanged. It records the exact
+OS version/build and CPU architecture. Full execution qualification additionally
+requires the release corpus and source-inaccessible execution. Those gates and
+notarization remain distinct from this minimal smoke.
 
-[Runtime API guide](../docs/api-guide/) ·
-[App packaging](https://swiftpython.dev/docs/packaging/)
+For an enforced private-source read-denial run, generate an ExtensionFoundation project with both
+`--parent-sandbox yes` and `--service-sandbox yes`. Add one or more
+`--deny-source /absolute/path/to/private/source/file` arguments to `execute.py`.
+The runner verifies that each file exists and is readable outside the app, then
+requires both the native host and Python worker to receive `EACCES` or `EPERM`.
+A missing file is a failed probe. The receipt records this sandbox-specific
+result separately; it does not claim a clean-machine test of a nonsandboxed host.

@@ -8,16 +8,19 @@
     <key>com.apple.security.device.audio-input</key>
     <true/>
 
-    <!-- Hardened-runtime exceptions for the supplied Python runtime.
-         Re-sign bundled native code with your application's identity.
+    <!-- REQUIRED: Your app links libpython via the XCFramework static lib.
+         Homebrew libpython is ad-hoc signed and uses mmap(PROT_EXEC).
          See: https://developer.apple.com/documentation/security/hardened-runtime -->
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
 
-    <!-- APP SANDBOX: Enable the capabilities your application needs, and use
-         SwiftPythonWorker-sandbox.entitlements for the inherited helper.
+    <!-- OPTIONAL: Uncomment if your Python env needs DYLD_LIBRARY_PATH (non-Homebrew installs) -->
+    <!-- <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/> -->
+
+    <!-- APP SANDBOX (Mac App Store): Enable these for App Sandbox distribution.
+         The worker already carries app-sandbox + inherit, so it inherits your sandbox.
          See: https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app -->
     <!-- <key>com.apple.security.app-sandbox</key><true/> -->
     <!-- <key>com.apple.security.network.client</key><true/> -->
