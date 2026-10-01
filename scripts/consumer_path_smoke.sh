@@ -8,6 +8,9 @@ if [ "$#" -gt 1 ]; then
 fi
 REPO_DIR="$(cd "${1:-$SCRIPT_DIR/..}" && pwd)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/swiftpython-consumer-path-smoke.XXXXXX")"
+# Foundation temporary files can remain shared despite a private TMPDIR.
+# This fixture owns its persistence explicitly, including LaunchServices runs.
+export SWIFTPYTHON_SPAWN_LEDGER_PATH="$WORK_DIR/spawn-ledger.json"
 LOCAL_PACKAGE_DIR="$WORK_DIR/swiftpython-commercial-local"
 HOST_PYTHON_LOAD_COMMAND="@rpath/Python.framework/Versions/3.13/Python"
 EMBEDDED_PYTHON_FRAMEWORK_RUN_PATH="@executable_path/../Frameworks"
@@ -1958,6 +1961,7 @@ run_app_via_launchservices() {
         --env "SWIFTPYTHON_AUDIO_PROBE_GATE=$AUDIO_PROBE_GATE"
         --env "PYTHONHOME=/swiftpython-host-environment-must-not-win"
         --env "PYTHONPATH="
+        --env "SWIFTPYTHON_SPAWN_LEDGER_PATH=$SWIFTPYTHON_SPAWN_LEDGER_PATH"
         --env "SWIFTPYTHON_AUDIO_PERMISSION_POLICY=$AUDIO_PERMISSION_POLICY"
         --env "SWIFTPYTHON_LAUNCH_SERVICES_RECEIPT_NONCE=$nonce"
         --env "PYTHONNOUSERSITE=1"
