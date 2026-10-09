@@ -20,10 +20,14 @@
     <!-- <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/> -->
 
     <!-- APP SANDBOX (Mac App Store): Enable these for App Sandbox distribution.
-         The worker already carries app-sandbox + inherit, so it inherits your sandbox.
+         Sign the worker with SwiftPythonWorker-sandbox.entitlements so it inherits your sandbox.
          See: https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app -->
     <!-- <key>com.apple.security.app-sandbox</key><true/> -->
     <!-- <key>com.apple.security.network.client</key><true/> -->
     <!-- <key>com.apple.security.files.user-selected.read-write</key><true/> -->
+    <!-- POSIX IPC under App Sandbox (multiprocessing, shared_memory, managed tensors):
+         one application group of at most 17 bytes. With several groups, name this one
+         with SwiftPythonIPCApplicationGroup in Info.plist. Unshipped runtime behavior. -->
+    <!-- <key>com.apple.security.application-groups</key><array><string>TEAMID.ipc</string></array> -->
 </dict>
 </plist>

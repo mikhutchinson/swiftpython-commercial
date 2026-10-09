@@ -8,7 +8,7 @@ import shutil
 import subprocess
 
 from contract import exact_value, require, tree_inventory
-from project import entitlements
+from project import INTERPRETER, entitlements, interpreter_entitlements
 from release_manifest import inspect_binary, version_tuple
 
 
@@ -205,9 +205,10 @@ def sign(app, config, identity, mode, entitlement_directory):
     bundle_executables = {(bundle / "Contents/MacOS" / info(bundle)["CFBundleExecutable"]).resolve()
                           for bundle in [app] + workers}
     bundle_executables.update((framework / framework.stem).resolve() for framework in frameworks)
+    interpreter = (app / "Contents/Frameworks" / INTERPRETER).resolve()
     for binary in binaries:
         if binary.resolve() not in bundle_executables:
-            seal(binary)
+            seal(binary, "Interpreter" if binary.resolve() == interpreter else None)
     for framework in frameworks:
         seal(framework)
     for worker in workers:
@@ -239,4 +240,13 @@ def verify_signatures(app, config, mode):
         receipts.append({"bundle": str(bundle.relative_to(app.parent)), "team": actual,
                          "identifier": fields["Identifier"], "cdhash": fields.get("CDHash"),
                          "entitlements": observed})
+    interpreter = app / "Contents/Frameworks" / INTERPRETER
+    require(interpreter.is_file(), f"Missing packaged Python interpreter: {interpreter}")
+    text = command("codesign", "-d", "--verbose=4", interpreter, stderr=True)
+    require(f"TeamIdentifier={team}" in text, f"Foreign-team packaged interpreter: {interpreter}")
+    require(re.search(r"flags=.+\(.*runtime.*\)", text), f"Hardened runtime missing: {interpreter}")
+    signed = command("codesign", "-d", "--entitlements", ":-", interpreter)
+    observed = plistlib.loads(signed.encode()) if signed.strip() else {}
+    require(exact_value(observed, interpreter_entitlements()),
+            f"Unexpected packaged interpreter entitlements: {interpreter}: {observed}")
     return receipts

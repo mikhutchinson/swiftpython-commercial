@@ -1,0 +1,2 @@
+Mozilla CA bundle, MPL 2.0. https://www.mozilla.org/MPL/2.0/
+Source: https://curl.se/docs/caextract.html

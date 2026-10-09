@@ -152,6 +152,25 @@ def _remove_temp_dir(rmtree, tempdir):
     if current_process is not None:
         current_process._config['tempdir'] = None
 
+def _sandbox_group_tempdir():
+    if sys.platform != 'darwin':
+        return None
+    try:
+        from _multiprocessing import sandbox_ipc_group
+    except ImportError:
+        return None
+    group = sandbox_ipc_group()
+    if group is None:
+        return None
+    import pwd
+    path = os.path.join(pwd.getpwuid(os.getuid()).pw_dir,
+                        'Library', 'Group Containers', group)
+    try:
+        os.makedirs(path, mode=0o700, exist_ok=True)
+    except OSError:
+        return None
+    return path
+
 def _get_base_temp_dir(tempfile):
     """Get a temporary directory where socket files will be created.
 
@@ -181,6 +200,12 @@ def _get_base_temp_dir(tempfile):
     # See https://github.com/python/cpython/issues/140734.
     if sun_path_len < _SUN_PATH_MAX:
         return base_tempdir
+    # SwiftPython: inside the App Sandbox the container path can overflow
+    # sun_path and /tmp is not writable; the sandbox's application group
+    # container is short and shared by every process in that sandbox.
+    group_tempdir = _sandbox_group_tempdir()
+    if group_tempdir is not None and len(group_tempdir) + 14 + 14 < _SUN_PATH_MAX:
+        return group_tempdir
     # Fallback to the default system-wide temporary directory.
     # This ignores user-defined environment variables.
     #

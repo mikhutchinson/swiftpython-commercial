@@ -32,10 +32,21 @@ def configuration(payload, host, bundle_id, workers, parent_sandbox, service_san
             "minimumOS": minimum}
 
 
+# x86_64 libffi maps ctypes callback trampolines writable and executable. Under
+# the hardened runtime without this key the first callback never returns, in
+# the host, in each worker, and in the packaged interpreter they launch.
+EXECUTABLE_MEMORY = {"com.apple.security.cs.allow-unsigned-executable-memory": True}
+INTERPRETER = "Python.framework/Versions/3.13/bin/python3.13"
+
+
 def entitlements(sandbox):
-    return {"com.apple.security.app-sandbox": True,
-            "com.apple.security.network.client": True,
-            "com.apple.security.network.server": True} if sandbox else {}
+    return dict(EXECUTABLE_MEMORY, **({"com.apple.security.app-sandbox": True,
+                                        "com.apple.security.network.client": True,
+                                        "com.apple.security.network.server": True} if sandbox else {}))
+
+
+def interpreter_entitlements():
+    return dict(EXECUTABLE_MEMORY)
 
 
 def local_package():

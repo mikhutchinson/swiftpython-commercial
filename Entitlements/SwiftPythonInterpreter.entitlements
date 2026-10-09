@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Python.framework/Versions/3.13/bin/python3.13: the packaged command
+         that subprocess and multiprocessing run. It is a separate hardened
+         process, so it needs its own exceptions.
+         x86_64 libffi maps callback trampolines writable and executable;
+         without this key the first ctypes callback never returns. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Xcode "Embed & Sign" re-signs the framework's Python image with the
+         app's team while this command keeps the producer signature. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- No allow-dyld-environment-variables: the parent app does not accept
+         DYLD_* injection, and its child must not either. -->
+</dict>
+</plist>

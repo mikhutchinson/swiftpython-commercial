@@ -363,14 +363,17 @@ import sys
 
 with open(sys.argv[1], "rb") as handle:
     payload = plistlib.load(handle)
+# No sandbox capability beyond inheritance. The one hardened-runtime exception
+# keeps x86_64 ctypes callbacks from hanging; the parent template carries it too.
 expected = {
     "com.apple.security.app-sandbox": True,
     "com.apple.security.inherit": True,
+    "com.apple.security.cs.allow-unsigned-executable-memory": True,
 }
 if payload != expected:
     raise SystemExit(
-        "inherited worker entitlements must contain exactly app-sandbox + inherit; "
-        f"found {payload}"
+        "inherited worker entitlements must contain exactly app-sandbox + inherit "
+        f"+ allow-unsigned-executable-memory; found {payload}"
     )
 PY
 

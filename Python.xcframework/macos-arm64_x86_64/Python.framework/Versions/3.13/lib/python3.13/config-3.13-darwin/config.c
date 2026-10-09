@@ -1,4 +1,4 @@
-/* Generated automatically from /Users/nad/build_macos_installer/installer/variant/binaries/build_source/Modules/config.c.in by makesetup. */
+/* Generated automatically from /private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16/Modules/config.c.in by makesetup. */
 /* -*- C -*- ***********************************************
 Copyright (c) 2000, BeOpen.com.
 Copyright (c) 1995-2000, Corporation for National Research Initiatives.

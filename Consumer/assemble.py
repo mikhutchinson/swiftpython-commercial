@@ -20,7 +20,7 @@ sys.dont_write_bytecode = True
 
 from contract import ContractError, exact_value, load_json, relative_path, require, sha256, tree_inventory, verify_inventory
 from native import command, finalize_runtime, native_closure, sign, verify_signatures
-from project import configuration, entitlements, local_package, project, sources
+from project import configuration, entitlements, interpreter_entitlements, local_package, project, sources
 from release_manifest import PAYLOAD_NAME, PAYLOAD_ROOTS, verified_payload
 
 
@@ -68,6 +68,7 @@ def generate(args):
     (output / "Config").mkdir()
     for name, sandbox in (("App", config["parentSandbox"]), ("Worker", config["serviceSandbox"])):
         (output / "Config" / (name + ".entitlements")).write_bytes(plistlib.dumps(entitlements(sandbox)))
+    (output / "Config/Interpreter.entitlements").write_bytes(plistlib.dumps(interpreter_entitlements()))
     (inputs / "Package.swift").write_text(local_package())
     write_json(output / "project.json", project(config))
     record = {"schemaVersion": 1, "configuration": config,
@@ -112,6 +113,8 @@ def load_project(root):
     for name, sandbox in (("App", config["parentSandbox"]), ("Worker", config["serviceSandbox"])):
         require(exact_value(plistlib.loads((root / "Config" / (name + ".entitlements")).read_bytes()), entitlements(sandbox)),
                 f"Altered target policy: {name}")
+    require(exact_value(plistlib.loads((root / "Config/Interpreter.entitlements").read_bytes()),
+                        interpreter_entitlements()), "Altered target policy: Interpreter")
     return root, record
 
 

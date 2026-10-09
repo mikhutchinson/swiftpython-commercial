@@ -1,5 +1,5 @@
 # See: man pkg-config
-prefix=/Library/Frameworks/Python.framework/Versions/3.13
+prefix=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

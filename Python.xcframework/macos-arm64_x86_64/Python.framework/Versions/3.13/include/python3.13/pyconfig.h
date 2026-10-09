@@ -925,7 +925,7 @@
 /* #undef HAVE_PANEL */
 
 /* Define if you have the 'panelw' library */
-#define HAVE_PANELW 1
+/* #undef HAVE_PANELW */
 
 /* Define to 1 if you have the <panel.h> header file. */
 #define HAVE_PANEL_H 1
@@ -1695,7 +1695,7 @@
 /* #undef PY_HAVE_PERF_TRAMPOLINE */
 
 /* Define to 1 to build the sqlite module with loadable extensions support. */
-/* #undef PY_SQLITE_ENABLE_LOAD_EXTENSION */
+#define PY_SQLITE_ENABLE_LOAD_EXTENSION 1
 
 /* Define if SQLite was compiled with the serialize API */
 #define PY_SQLITE_HAVE_SERIALIZE 1
@@ -1906,7 +1906,7 @@
 
 
 /* Define if WINDOW in curses.h offers a field _flags. */
-/* #undef WINDOW_HAS_FLAGS */
+#define WINDOW_HAS_FLAGS 1
 
 /* Define if you want build the _decimal module using a coroutine-local rather
    than a thread-local context */

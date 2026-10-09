@@ -8,16 +8,16 @@ SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
 Product page: [SwiftPython](https://swiftpython.dev/) ·
-[Download 0.7.0-preview.1.2](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.2)
+[Download 0.7.0-preview.1.3](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.3)
 
 ## Make your first call
 
-Add the package in Xcode with **Exact Version** `0.7.0-preview.1.2`, or use SwiftPM:
+Add the package in Xcode with **Exact Version** `0.7.0-preview.1.3`, or use SwiftPM:
 
 ```swift
 .package(
     url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-    exact: "0.7.0-preview.1.2"
+    exact: "0.7.0-preview.1.3"
 )
 ```
 
@@ -74,7 +74,23 @@ Examples/IrisDemo/scripts/build_app.sh --open
 The example builders download their dependencies and create development apps
 that run offline. [See both examples and their prerequisites.](Examples/)
 
-## What's new in Preview 1.2
+## What's new in Preview 1.3
+
+Preview 1.3 updates the bundled interpreter to Python 3.13.16. Python child
+processes, including `multiprocessing` workers, now run the bundled
+interpreter. In a sandboxed Mac app, `multiprocessing`,
+`concurrent.futures.ProcessPoolExecutor`, `shared_memory`, and managed tensors
+work when the app is signed with an application group of at most 17 bytes,
+such as `TEAMID.ipc`. If the app declares several groups, name the short one
+with the `SwiftPythonIPCApplicationGroup` key in its Info.plist. Without a
+usable group, Python's IPC calls fail with an error naming the missing
+entitlement, and managed tensors are refused. Public APIs are unchanged.
+
+Preview 1.3 also preserves `CancellationError` when an admitted duplex message
+writer is cancelled while waiting for credit. Partial write progress is retained
+so the session can continue.
+
+## Preview 1.2
 
 Preview 1.2 fixes cross-process worker ownership and shared worker-ledger
 persistence. Another live process's workers remain protected, while confirmed
@@ -85,7 +101,7 @@ orphan cleanup remains available. Public APIs are unchanged.
 Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
 and stale responses after worker replacement. Public APIs are unchanged. [Mac and iPad duplex benchmarks](https://swiftpython.dev/benchmarks/duplex/).
 
-Current release: `0.7.0-preview.1.2`. [Distribution verification](docs/distribution-verification.md).
+Current release: `0.7.0-preview.1.3`. [Distribution verification](docs/distribution-verification.md).
 
 ## Preview 1
 

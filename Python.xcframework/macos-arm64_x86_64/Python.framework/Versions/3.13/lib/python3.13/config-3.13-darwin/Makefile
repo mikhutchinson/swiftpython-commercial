@@ -21,21 +21,21 @@
 
 # === Variables set by makesetup ===
 
-MODBUILT_NAMES=      array  _asyncio  _bisect  _contextvars  _csv  _heapq  _json  _lsprof  _opcode  _pickle  _queue  _random  _struct  _interpreters  _interpchannels  _interpqueues  _zoneinfo  math  cmath  _statistics  _datetime  _decimal  binascii  _bz2  _lzma  zlib  _dbm  readline  _md5  _sha1  _sha2  _sha3  _blake2  pyexpat  _elementtree  _codecs_cn  _codecs_hk  _codecs_iso2022  _codecs_jp  _codecs_kr  _codecs_tw  _multibytecodec  unicodedata  fcntl  grp  mmap  _posixsubprocess  resource  select  _socket  syslog  termios  _posixshmem  _multiprocessing  _ctypes  _curses  _curses_panel  _sqlite3  _ssl  _hashlib  _uuid  _tkinter  _scproxy  xxsubtype  _xxtestfuzz  _testbuffer  _testinternalcapi  _testcapi  _testlimitedcapi  _testclinic  _testclinic_limited  _testimportmultiple  _testmultiphase  _testsinglephase  _testexternalinspection  _ctypes_test  xxlimited  xxlimited_35  atexit  faulthandler  posix  _signal  _tracemalloc  _suggestions  _codecs  _collections  errno  _io  itertools  _sre  _sysconfig  _thread  time  _typing  _weakref  _abc  _functools  _locale  _operator  _stat  _symtable  pwd
-MODSHARED_NAMES=    array _asyncio _bisect _contextvars _csv _heapq _json _lsprof _opcode _pickle _queue _random _struct _interpreters _interpchannels _interpqueues _zoneinfo math cmath _statistics _datetime _decimal binascii _bz2 _lzma zlib _dbm readline _md5 _sha1 _sha2 _sha3 _blake2 pyexpat _elementtree _codecs_cn _codecs_hk _codecs_iso2022 _codecs_jp _codecs_kr _codecs_tw _multibytecodec unicodedata fcntl grp mmap _posixsubprocess resource select _socket syslog termios _posixshmem _multiprocessing _ctypes _curses _curses_panel _sqlite3 _ssl _hashlib _uuid _tkinter _scproxy xxsubtype _xxtestfuzz _testbuffer _testinternalcapi _testcapi _testlimitedcapi _testclinic _testclinic_limited _testimportmultiple _testmultiphase _testsinglephase _testexternalinspection _ctypes_test xxlimited xxlimited_35
+MODBUILT_NAMES=      array  _asyncio  _bisect  _contextvars  _csv  _heapq  _json  _lsprof  _opcode  _pickle  _queue  _random  _struct  _interpreters  _interpchannels  _interpqueues  _zoneinfo  math  cmath  _statistics  _datetime  _decimal  binascii  _bz2  _lzma  zlib  _dbm  readline  _md5  _sha1  _sha2  _sha3  _blake2  pyexpat  _elementtree  _codecs_cn  _codecs_hk  _codecs_iso2022  _codecs_jp  _codecs_kr  _codecs_tw  _multibytecodec  unicodedata  fcntl  grp  mmap  _posixsubprocess  resource  select  _socket  syslog  termios  _posixshmem  _multiprocessing  _ctypes  _curses  _curses_panel  _sqlite3  _ssl  _hashlib  _uuid  _scproxy  xxsubtype  _xxtestfuzz  _testbuffer  _testinternalcapi  _testcapi  _testlimitedcapi  _testclinic  _testclinic_limited  _testimportmultiple  _testmultiphase  _testsinglephase  _testexternalinspection  _ctypes_test  xxlimited  xxlimited_35  atexit  faulthandler  posix  _signal  _tracemalloc  _suggestions  _codecs  _collections  errno  _io  itertools  _sre  _sysconfig  _thread  time  _typing  _weakref  _abc  _functools  _locale  _operator  _stat  _symtable  pwd
+MODSHARED_NAMES=    array _asyncio _bisect _contextvars _csv _heapq _json _lsprof _opcode _pickle _queue _random _struct _interpreters _interpchannels _interpqueues _zoneinfo math cmath _statistics _datetime _decimal binascii _bz2 _lzma zlib _dbm readline _md5 _sha1 _sha2 _sha3 _blake2 pyexpat _elementtree _codecs_cn _codecs_hk _codecs_iso2022 _codecs_jp _codecs_kr _codecs_tw _multibytecodec unicodedata fcntl grp mmap _posixsubprocess resource select _socket syslog termios _posixshmem _multiprocessing _ctypes _curses _curses_panel _sqlite3 _ssl _hashlib _uuid _scproxy xxsubtype _xxtestfuzz _testbuffer _testinternalcapi _testcapi _testlimitedcapi _testclinic _testclinic_limited _testimportmultiple _testmultiphase _testsinglephase _testexternalinspection _ctypes_test xxlimited xxlimited_35
 MODDISABLED_NAMES= 
 MODOBJS=             Modules/atexitmodule.o  Modules/faulthandler.o  Modules/posixmodule.o  Modules/signalmodule.o  Modules/_tracemalloc.o  Modules/_suggestions.o  Modules/_codecsmodule.o  Modules/_collectionsmodule.o  Modules/errnomodule.o  Modules/_io/_iomodule.o Modules/_io/iobase.o Modules/_io/fileio.o Modules/_io/bytesio.o Modules/_io/bufferedio.o Modules/_io/textio.o Modules/_io/stringio.o  Modules/itertoolsmodule.o  Modules/_sre/sre.o  Modules/_sysconfig.o  Modules/_threadmodule.o  Modules/timemodule.o  Modules/_typingmodule.o  Modules/_weakref.o  Modules/_abc.o  Modules/_functoolsmodule.o  Modules/_localemodule.o  Modules/_operator.o  Modules/_stat.o  Modules/symtablemodule.o  Modules/pwdmodule.o
 MODLIBS=           $(LOCALMODLIBS) $(BASEMODLIBS)
 
 # === Variables set by configure
 VERSION=	3.13
-srcdir=		/Users/nad/build_macos_installer/installer/variant/binaries/build_source
-VPATH=		/Users/nad/build_macos_installer/installer/variant/binaries/build_source
-abs_srcdir=	/Users/nad/build_macos_installer/installer/variant/binaries/build_source
-abs_builddir=	/Users/nad/build_macos_installer/installer/variant/binaries/build/_bld/python
+srcdir=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
+VPATH=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
+abs_srcdir=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
+abs_builddir=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-build
 
 
-CC=		clang
+CC=		/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
 CXX=		clang++
 LINKCC=		$(PURIFY) $(CC)
 AR=		/usr/bin/xcrun ar
@@ -77,7 +77,7 @@ INSTALL_DATA=	${INSTALL} -m 644
 # rather than figuring out exactly which, we always give them executable mode.
 INSTALL_SHARED= ${INSTALL} -m 755
 
-MKDIR_P=	/Users/nad/build_macos_installer/installer/variant/binaries/build_source/install-sh -c -d
+MKDIR_P=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16/install-sh -c -d
 
 MAKESETUP=      $(srcdir)/Modules/makesetup
 
@@ -85,7 +85,7 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 OPT=		-DNDEBUG -g -O3 -Wall
 BASECFLAGS=	 -fno-strict-overflow -Wsign-compare -Wunreachable-code -fno-common -dynamic
 BASECPPFLAGS=	-IObjects -IInclude -IPython
-CONFIGURE_CFLAGS=	-arch arm64 -arch x86_64 
+CONFIGURE_CFLAGS=	-arch arm64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk 
 # CFLAGS_NODIST is used for building the interpreter and stdlib C extensions.
 # Use it when a compiler flag should _not_ be part of the distutils CFLAGS
 # once Python is installed (Issue #21121).
@@ -97,8 +97,8 @@ CONFIGURE_LDFLAGS_NODIST= -flto=full -Wl,-export_dynamic -Wl,-object_path_lto,"$
 # LDFLAGS_NOLTO is an extra flag to disable lto. It is used to speed up building
 # of _bootstrap_python and _freeze_module tools, which don't need LTO.
 CONFIGURE_LDFLAGS_NOLTO=-flto=thin
-CONFIGURE_CPPFLAGS=	
-CONFIGURE_LDFLAGS=	-arch arm64 -arch x86_64 
+CONFIGURE_CPPFLAGS=	-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
+CONFIGURE_LDFLAGS=	-arch arm64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -Wl,-headerpad_max_install_names
 # Avoid assigning CFLAGS, LDFLAGS, etc. so users can use them on the
 # command line to append to these values without stomping the pre-set
 # values.
@@ -137,7 +137,7 @@ MULTIARCH=	darwin
 MULTIARCH_CPPFLAGS = -DMULTIARCH=\"darwin\"
 
 # Install prefix for architecture-independent files
-prefix=		/Library/Frameworks/Python.framework/Versions/3.13
+prefix=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13
 
 # Install prefix for architecture-dependent files
 exec_prefix=	${prefix}
@@ -178,23 +178,23 @@ EXPORTSFROM=
 
 # Executable suffix (.exe on Windows and Mac OS X)
 EXE=		
-BUILDEXE=	
+BUILDEXE=	.exe
 
 # Name of the patch file to apply for app store compliance
 APP_STORE_COMPLIANCE_PATCH=
 
 # Short name and location for Mac OS X Python framework
-UNIVERSALSDK=/
+UNIVERSALSDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
 PYTHONFRAMEWORK=	Python
 PYTHONFRAMEWORKDIR=	Python.framework
-PYTHONFRAMEWORKPREFIX=	/Library/Frameworks
-PYTHONFRAMEWORKINSTALLDIR= /Library/Frameworks/Python.framework
-PYTHONFRAMEWORKINSTALLNAMEPREFIX= /Library/Frameworks/Python.framework/Versions/3.13
+PYTHONFRAMEWORKPREFIX=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks
+PYTHONFRAMEWORKINSTALLDIR= /private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework
+PYTHONFRAMEWORKINSTALLNAMEPREFIX= /private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13
 RESSRCDIR= Mac/Resources/framework
 # macOS deployment target selected during configure, to be checked
 # by distutils. The export statement is needed to ensure that the
 # deployment target is active during build.
-MACOSX_DEPLOYMENT_TARGET=10.13
+MACOSX_DEPLOYMENT_TARGET=15.0
 export MACOSX_DEPLOYMENT_TARGET
 
 # iOS Deployment target selected during configure. Unlike macOS, the iOS
@@ -213,7 +213,7 @@ LIPO_32BIT_FLAGS=
 LIPO_INTEL64_FLAGS=-extract x86_64
 
 # Environment to run shared python without installed libraries
-RUNSHARED=       DYLD_FRAMEWORK_PATH=/Users/nad/build_macos_installer/installer/variant/binaries/build/_bld/python
+RUNSHARED=       DYLD_FRAMEWORK_PATH=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-build
 
 # ensurepip options
 ENSUREPIP=      no
@@ -305,19 +305,19 @@ MODULE__BLAKE2_STATE=yes
 MODULE__BLAKE2_CFLAGS=
 MODULE__BLAKE2_LDFLAGS=
 MODULE__CTYPES_STATE=yes
-MODULE__CTYPES_CFLAGS=-fno-strict-overflow -I/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ffi -DUSING_APPLE_OS_LIBFFI=1 -DUSING_MALLOC_CLOSURE_DOT_C=1
+MODULE__CTYPES_CFLAGS=-fno-strict-overflow -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/ffi -DUSING_APPLE_OS_LIBFFI=1 -DUSING_MALLOC_CLOSURE_DOT_C=1
 MODULE__CTYPES_LDFLAGS=-lffi -ldl
 MODULE__CURSES_STATE=yes
-MODULE__CURSES_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include -D_XOPEN_SOURCE_EXTENDED=1
-MODULE__CURSES_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lncurses
+MODULE__CURSES_CFLAGS= -D_XOPEN_SOURCE_EXTENDED=1
+MODULE__CURSES_LDFLAGS=-lncurses
 
 MODULE__CURSES_PANEL_STATE=yes
-MODULE__CURSES_PANEL_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include -I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include -D_XOPEN_SOURCE_EXTENDED=1
-MODULE__CURSES_PANEL_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lpanel -L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lncurses
+MODULE__CURSES_PANEL_CFLAGS=  -D_XOPEN_SOURCE_EXTENDED=1
+MODULE__CURSES_PANEL_LDFLAGS=-lpanel -lncurses
 
 MODULE__DECIMAL_STATE=yes
-MODULE__DECIMAL_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include
-MODULE__DECIMAL_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lmpdec -lm
+MODULE__DECIMAL_CFLAGS=-I$(srcdir)/Modules/_decimal/libmpdec -DUNIVERSAL=1
+MODULE__DECIMAL_LDFLAGS=-lm $(LIBMPDEC_A)
 MODULE__DBM_STATE=yes
 MODULE__DBM_CFLAGS=-DUSE_NDBM
 MODULE__DBM_LDFLAGS=
@@ -326,11 +326,9 @@ MODULE_READLINE_STATE=yes
 MODULE_READLINE_CFLAGS=
 MODULE_READLINE_LDFLAGS=-lreadline
 MODULE__SQLITE3_STATE=yes
-MODULE__SQLITE3_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include -I$(srcdir)/Modules/_sqlite
-MODULE__SQLITE3_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lsqlite3
-MODULE__TKINTER_STATE=yes
-MODULE__TKINTER_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include -Wno-strict-prototypes -DWITH_APPINIT=1
-MODULE__TKINTER_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -ltcl -ltk
+MODULE__SQLITE3_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include -I$(srcdir)/Modules/_sqlite
+MODULE__SQLITE3_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -lsqlite3
+MODULE__TKINTER_STATE=missing
 MODULE__UUID_STATE=yes
 MODULE__UUID_CFLAGS=
 MODULE__UUID_LDFLAGS=
@@ -344,14 +342,14 @@ MODULE__BZ2_STATE=yes
 MODULE__BZ2_CFLAGS=
 MODULE__BZ2_LDFLAGS=-lbz2
 MODULE__LZMA_STATE=yes
-MODULE__LZMA_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include
-MODULE__LZMA_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -llzma
+MODULE__LZMA_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
+MODULE__LZMA_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -llzma
 MODULE__SSL_STATE=yes
-MODULE__SSL_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include
-MODULE__SSL_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib  -lssl -lcrypto
+MODULE__SSL_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
+MODULE__SSL_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib  -lssl -lcrypto
 MODULE__HASHLIB_STATE=yes
-MODULE__HASHLIB_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include
-MODULE__HASHLIB_LDFLAGS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib   -lcrypto
+MODULE__HASHLIB_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
+MODULE__HASHLIB_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib   -lcrypto
 MODULE__TESTCAPI_STATE=yes
 MODULE__TESTCAPI_LDFLAGS=
 MODULE__TESTCLINIC_STATE=yes
@@ -384,7 +382,7 @@ EXEMODE=	755
 FILEMODE=	644
 
 # configure script arguments
-CONFIG_ARGS=	 '--enable-framework' '--with-framework-name=Python' '--enable-universalsdk=/' '--with-universal-archs=universal2' '--enable-optimizations' '--with-lto=full' '--with-computed-gotos' '--without-ensurepip' '--with-system-libmpdec' '--with-openssl=/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local' 'CURSES_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'CURSES_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lncurses' 'PANEL_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'PANEL_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lpanel' 'LIBLZMA_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'LIBLZMA_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -llzma' 'LIBMPDEC_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'LIBMPDEC_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lmpdec -lm' 'LIBSQLITE3_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'LIBSQLITE3_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -lsqlite3' 'TCLTK_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include' 'TCLTK_LIBS=-L/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/lib -ltcl -ltk' 'CC=clang'
+CONFIG_ARGS=	 '--enable-framework=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks' '--enable-universalsdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk' '--with-universal-archs=universal2' '--with-pkg-config=no' '--enable-loadable-sqlite-extensions' '--with-openssl=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps' '--with-openssl-rpath=no' '--enable-optimizations' '--with-lto=full' '--with-computed-gotos' '--without-ensurepip' 'CC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang' 'LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -Wl,-headerpad_max_install_names' 'CPPFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBSQLITE3_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBSQLITE3_LIBS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -lsqlite3' 'LIBLZMA_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBLZMA_LIBS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -llzma'
 
 
 # Subdirectories with code
@@ -452,8 +450,8 @@ FREEZE_MODULE=$(PYTHON_FOR_FREEZE) $(srcdir)/Programs/_freeze_module.py
 FREEZE_MODULE_DEPS=_bootstrap_python $(srcdir)/Programs/_freeze_module.py
 
 _PYTHON_HOST_PLATFORM=
-BUILD_GNU_TYPE=	aarch64-apple-darwin25.6.0
-HOST_GNU_TYPE=	aarch64-apple-darwin25.6.0
+BUILD_GNU_TYPE=	aarch64-apple-darwin25.2.0
+HOST_GNU_TYPE=	aarch64-apple-darwin25.2.0
 
 # The task to run while instrumented when building the profile-opt target.
 # To speed up profile generation, we don't run the full unit test suite
@@ -473,7 +471,7 @@ COVERAGE_REPORT_OPTIONS=--rc lcov_branch_coverage=1 --branch-coverage --title "C
 
 LOCALMODLIBS= $(MODULE_ATEXIT_LDFLAGS) $(MODULE_FAULTHANDLER_LDFLAGS) $(MODULE_POSIX_LDFLAGS) $(MODULE__SIGNAL_LDFLAGS) $(MODULE__TRACEMALLOC_LDFLAGS) $(MODULE__SUGGESTIONS_LDFLAGS) $(MODULE__CODECS_LDFLAGS) $(MODULE__COLLECTIONS_LDFLAGS) $(MODULE_ERRNO_LDFLAGS) $(MODULE__IO_LDFLAGS) $(MODULE_ITERTOOLS_LDFLAGS) $(MODULE__SRE_LDFLAGS) $(MODULE__SYSCONFIG_LDFLAGS) $(MODULE__THREAD_LDFLAGS) $(MODULE_TIME_LDFLAGS) $(MODULE__TYPING_LDFLAGS) $(MODULE__WEAKREF_LDFLAGS) $(MODULE__ABC_LDFLAGS) $(MODULE__FUNCTOOLS_LDFLAGS) $(MODULE__LOCALE_LDFLAGS) $(MODULE__OPERATOR_LDFLAGS) $(MODULE__STAT_LDFLAGS) $(MODULE__SYMTABLE_LDFLAGS) $(MODULE_PWD_LDFLAGS)
 BASEMODLIBS=
-SHAREDMODS= Modules/array$(EXT_SUFFIX) Modules/_asyncio$(EXT_SUFFIX) Modules/_bisect$(EXT_SUFFIX) Modules/_contextvars$(EXT_SUFFIX) Modules/_csv$(EXT_SUFFIX) Modules/_heapq$(EXT_SUFFIX) Modules/_json$(EXT_SUFFIX) Modules/_lsprof$(EXT_SUFFIX) Modules/_opcode$(EXT_SUFFIX) Modules/_pickle$(EXT_SUFFIX) Modules/_queue$(EXT_SUFFIX) Modules/_random$(EXT_SUFFIX) Modules/_struct$(EXT_SUFFIX) Modules/_interpreters$(EXT_SUFFIX) Modules/_interpchannels$(EXT_SUFFIX) Modules/_interpqueues$(EXT_SUFFIX) Modules/_zoneinfo$(EXT_SUFFIX) Modules/math$(EXT_SUFFIX) Modules/cmath$(EXT_SUFFIX) Modules/_statistics$(EXT_SUFFIX) Modules/_datetime$(EXT_SUFFIX) Modules/_decimal$(EXT_SUFFIX) Modules/binascii$(EXT_SUFFIX) Modules/_bz2$(EXT_SUFFIX) Modules/_lzma$(EXT_SUFFIX) Modules/zlib$(EXT_SUFFIX) Modules/_dbm$(EXT_SUFFIX) Modules/readline$(EXT_SUFFIX) Modules/_md5$(EXT_SUFFIX) Modules/_sha1$(EXT_SUFFIX) Modules/_sha2$(EXT_SUFFIX) Modules/_sha3$(EXT_SUFFIX) Modules/_blake2$(EXT_SUFFIX) Modules/pyexpat$(EXT_SUFFIX) Modules/_elementtree$(EXT_SUFFIX) Modules/_codecs_cn$(EXT_SUFFIX) Modules/_codecs_hk$(EXT_SUFFIX) Modules/_codecs_iso2022$(EXT_SUFFIX) Modules/_codecs_jp$(EXT_SUFFIX) Modules/_codecs_kr$(EXT_SUFFIX) Modules/_codecs_tw$(EXT_SUFFIX) Modules/_multibytecodec$(EXT_SUFFIX) Modules/unicodedata$(EXT_SUFFIX) Modules/fcntl$(EXT_SUFFIX) Modules/grp$(EXT_SUFFIX) Modules/mmap$(EXT_SUFFIX) Modules/_posixsubprocess$(EXT_SUFFIX) Modules/resource$(EXT_SUFFIX) Modules/select$(EXT_SUFFIX) Modules/_socket$(EXT_SUFFIX) Modules/syslog$(EXT_SUFFIX) Modules/termios$(EXT_SUFFIX) Modules/_posixshmem$(EXT_SUFFIX) Modules/_multiprocessing$(EXT_SUFFIX) Modules/_ctypes$(EXT_SUFFIX) Modules/_curses$(EXT_SUFFIX) Modules/_curses_panel$(EXT_SUFFIX) Modules/_sqlite3$(EXT_SUFFIX) Modules/_ssl$(EXT_SUFFIX) Modules/_hashlib$(EXT_SUFFIX) Modules/_uuid$(EXT_SUFFIX) Modules/_tkinter$(EXT_SUFFIX) Modules/_scproxy$(EXT_SUFFIX) Modules/xxsubtype$(EXT_SUFFIX) Modules/_xxtestfuzz$(EXT_SUFFIX) Modules/_testbuffer$(EXT_SUFFIX) Modules/_testinternalcapi$(EXT_SUFFIX) Modules/_testcapi$(EXT_SUFFIX) Modules/_testlimitedcapi$(EXT_SUFFIX) Modules/_testclinic$(EXT_SUFFIX) Modules/_testclinic_limited$(EXT_SUFFIX) Modules/_testimportmultiple$(EXT_SUFFIX) Modules/_testmultiphase$(EXT_SUFFIX) Modules/_testsinglephase$(EXT_SUFFIX) Modules/_testexternalinspection$(EXT_SUFFIX) Modules/_ctypes_test$(EXT_SUFFIX) Modules/xxlimited$(EXT_SUFFIX) Modules/xxlimited_35$(EXT_SUFFIX)
+SHAREDMODS= Modules/array$(EXT_SUFFIX) Modules/_asyncio$(EXT_SUFFIX) Modules/_bisect$(EXT_SUFFIX) Modules/_contextvars$(EXT_SUFFIX) Modules/_csv$(EXT_SUFFIX) Modules/_heapq$(EXT_SUFFIX) Modules/_json$(EXT_SUFFIX) Modules/_lsprof$(EXT_SUFFIX) Modules/_opcode$(EXT_SUFFIX) Modules/_pickle$(EXT_SUFFIX) Modules/_queue$(EXT_SUFFIX) Modules/_random$(EXT_SUFFIX) Modules/_struct$(EXT_SUFFIX) Modules/_interpreters$(EXT_SUFFIX) Modules/_interpchannels$(EXT_SUFFIX) Modules/_interpqueues$(EXT_SUFFIX) Modules/_zoneinfo$(EXT_SUFFIX) Modules/math$(EXT_SUFFIX) Modules/cmath$(EXT_SUFFIX) Modules/_statistics$(EXT_SUFFIX) Modules/_datetime$(EXT_SUFFIX) Modules/_decimal$(EXT_SUFFIX) Modules/binascii$(EXT_SUFFIX) Modules/_bz2$(EXT_SUFFIX) Modules/_lzma$(EXT_SUFFIX) Modules/zlib$(EXT_SUFFIX) Modules/_dbm$(EXT_SUFFIX) Modules/readline$(EXT_SUFFIX) Modules/_md5$(EXT_SUFFIX) Modules/_sha1$(EXT_SUFFIX) Modules/_sha2$(EXT_SUFFIX) Modules/_sha3$(EXT_SUFFIX) Modules/_blake2$(EXT_SUFFIX) Modules/pyexpat$(EXT_SUFFIX) Modules/_elementtree$(EXT_SUFFIX) Modules/_codecs_cn$(EXT_SUFFIX) Modules/_codecs_hk$(EXT_SUFFIX) Modules/_codecs_iso2022$(EXT_SUFFIX) Modules/_codecs_jp$(EXT_SUFFIX) Modules/_codecs_kr$(EXT_SUFFIX) Modules/_codecs_tw$(EXT_SUFFIX) Modules/_multibytecodec$(EXT_SUFFIX) Modules/unicodedata$(EXT_SUFFIX) Modules/fcntl$(EXT_SUFFIX) Modules/grp$(EXT_SUFFIX) Modules/mmap$(EXT_SUFFIX) Modules/_posixsubprocess$(EXT_SUFFIX) Modules/resource$(EXT_SUFFIX) Modules/select$(EXT_SUFFIX) Modules/_socket$(EXT_SUFFIX) Modules/syslog$(EXT_SUFFIX) Modules/termios$(EXT_SUFFIX) Modules/_posixshmem$(EXT_SUFFIX) Modules/_multiprocessing$(EXT_SUFFIX) Modules/_ctypes$(EXT_SUFFIX) Modules/_curses$(EXT_SUFFIX) Modules/_curses_panel$(EXT_SUFFIX) Modules/_sqlite3$(EXT_SUFFIX) Modules/_ssl$(EXT_SUFFIX) Modules/_hashlib$(EXT_SUFFIX) Modules/_uuid$(EXT_SUFFIX) Modules/_scproxy$(EXT_SUFFIX) Modules/xxsubtype$(EXT_SUFFIX) Modules/_xxtestfuzz$(EXT_SUFFIX) Modules/_testbuffer$(EXT_SUFFIX) Modules/_testinternalcapi$(EXT_SUFFIX) Modules/_testcapi$(EXT_SUFFIX) Modules/_testlimitedcapi$(EXT_SUFFIX) Modules/_testclinic$(EXT_SUFFIX) Modules/_testclinic_limited$(EXT_SUFFIX) Modules/_testimportmultiple$(EXT_SUFFIX) Modules/_testmultiphase$(EXT_SUFFIX) Modules/_testsinglephase$(EXT_SUFFIX) Modules/_testexternalinspection$(EXT_SUFFIX) Modules/_ctypes_test$(EXT_SUFFIX) Modules/xxlimited$(EXT_SUFFIX) Modules/xxlimited_35$(EXT_SUFFIX)
 PYTHONPATH=$(COREPYTHONPATH)
 COREPYTHONPATH=$(DESTPATH)$(SITEPATH)$(TESTPATH)
 TESTPATH=
@@ -778,6 +776,7 @@ LIBEXPAT_HEADERS= \
 		Modules/expat/expat_config.h \
 		Modules/expat/expat_external.h \
 		Modules/expat/fallthrough.h \
+		Modules/expat/hash_table.h \
 		Modules/expat/iasciitab.h \
 		Modules/expat/internal.h \
 		Modules/expat/latin1tab.h \
@@ -1431,7 +1430,7 @@ PYTHON_HEADERS= \
 
 ##########################################################################
 # Build static libmpdec.a
-LIBMPDEC_CFLAGS=-I/Users/nad/build_macos_installer/installer/variant/binaries/build/libraries/usr/local/include $(PY_STDMODULE_CFLAGS) $(CCSHARED)
+LIBMPDEC_CFLAGS=-I$(srcdir)/Modules/_decimal/libmpdec -DUNIVERSAL=1 $(PY_STDMODULE_CFLAGS) $(CCSHARED)
 
 # "%.o: %c" is not portable
 Modules/_decimal/libmpdec/basearith.o: $(srcdir)/Modules/_decimal/libmpdec/basearith.c $(LIBMPDEC_HEADERS) $(PYTHON_HEADERS)
@@ -3281,7 +3280,7 @@ MODULE_UNICODEDATA_DEPS=$(srcdir)/Modules/unicodedata_db.h $(srcdir)/Modules/uni
 MODULE__BLAKE2_DEPS=$(srcdir)/Modules/_blake2/impl/blake2-config.h $(srcdir)/Modules/_blake2/impl/blake2-impl.h $(srcdir)/Modules/_blake2/impl/blake2.h $(srcdir)/Modules/_blake2/impl/blake2b-load-sse2.h $(srcdir)/Modules/_blake2/impl/blake2b-load-sse41.h $(srcdir)/Modules/_blake2/impl/blake2b-ref.c $(srcdir)/Modules/_blake2/impl/blake2b-round.h $(srcdir)/Modules/_blake2/impl/blake2b.c $(srcdir)/Modules/_blake2/impl/blake2s-load-sse2.h $(srcdir)/Modules/_blake2/impl/blake2s-load-sse41.h $(srcdir)/Modules/_blake2/impl/blake2s-load-xop.h $(srcdir)/Modules/_blake2/impl/blake2s-ref.c $(srcdir)/Modules/_blake2/impl/blake2s-round.h $(srcdir)/Modules/_blake2/impl/blake2s.c $(srcdir)/Modules/_blake2/blake2module.h $(srcdir)/Modules/hashlib.h
 MODULE__CTYPES_DEPS=$(srcdir)/Modules/_ctypes/ctypes.h
 MODULE__CTYPES_MALLOC_CLOSURE=_ctypes/malloc_closure.c
-MODULE__DECIMAL_DEPS=$(srcdir)/Modules/_decimal/docstrings.h 
+MODULE__DECIMAL_DEPS=$(srcdir)/Modules/_decimal/docstrings.h $(LIBMPDEC_HEADERS) $(LIBMPDEC_A)
 MODULE__ELEMENTTREE_DEPS=$(srcdir)/Modules/pyexpat.c $(LIBEXPAT_HEADERS) $(LIBEXPAT_A)
 MODULE__HASHLIB_DEPS=$(srcdir)/Modules/hashlib.h
 MODULE__IO_DEPS=$(srcdir)/Modules/_io/_iomodule.h
@@ -3454,9 +3453,6 @@ Modules/_hashopenssl.o: $(srcdir)/Modules/_hashopenssl.c $(MODULE__HASHLIB_DEPS)
 Modules/_hashlib$(EXT_SUFFIX):  Modules/_hashopenssl.o; $(BLDSHARED)  Modules/_hashopenssl.o $(MODULE__HASHLIB_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_hashlib$(EXT_SUFFIX)
 Modules/_uuidmodule.o: $(srcdir)/Modules/_uuidmodule.c $(MODULE__UUID_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__UUID_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_uuidmodule.c -o Modules/_uuidmodule.o
 Modules/_uuid$(EXT_SUFFIX):  Modules/_uuidmodule.o; $(BLDSHARED)  Modules/_uuidmodule.o $(MODULE__UUID_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_uuid$(EXT_SUFFIX)
-Modules/_tkinter.o: $(srcdir)/Modules/_tkinter.c $(MODULE__TKINTER_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TKINTER_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_tkinter.c -o Modules/_tkinter.o
-Modules/tkappinit.o: $(srcdir)/Modules/tkappinit.c $(MODULE__TKINTER_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TKINTER_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/tkappinit.c -o Modules/tkappinit.o
-Modules/_tkinter$(EXT_SUFFIX):  Modules/_tkinter.o Modules/tkappinit.o; $(BLDSHARED)  Modules/_tkinter.o Modules/tkappinit.o $(MODULE__TKINTER_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_tkinter$(EXT_SUFFIX)
 Modules/_scproxy.o: $(srcdir)/Modules/_scproxy.c $(MODULE__SCPROXY_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__SCPROXY_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_scproxy.c -o Modules/_scproxy.o
 Modules/_scproxy$(EXT_SUFFIX):  Modules/_scproxy.o; $(BLDSHARED)  Modules/_scproxy.o $(MODULE__SCPROXY_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_scproxy$(EXT_SUFFIX)
 Modules/xxsubtype.o: $(srcdir)/Modules/xxsubtype.c $(MODULE_XXSUBTYPE_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE_XXSUBTYPE_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/xxsubtype.c -o Modules/xxsubtype.o
@@ -3523,6 +3519,7 @@ Modules/_testlimitedcapi/long.o: $(srcdir)/Modules/_testlimitedcapi/long.c $(MOD
 Modules/_testlimitedcapi/object.o: $(srcdir)/Modules/_testlimitedcapi/object.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/object.c -o Modules/_testlimitedcapi/object.o
 Modules/_testlimitedcapi/pyos.o: $(srcdir)/Modules/_testlimitedcapi/pyos.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/pyos.c -o Modules/_testlimitedcapi/pyos.o
 Modules/_testlimitedcapi/set.o: $(srcdir)/Modules/_testlimitedcapi/set.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/set.c -o Modules/_testlimitedcapi/set.o
+Modules/_testlimitedcapi/slice.o: $(srcdir)/Modules/_testlimitedcapi/slice.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/slice.c -o Modules/_testlimitedcapi/slice.o
 Modules/_testlimitedcapi/sys.o: $(srcdir)/Modules/_testlimitedcapi/sys.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/sys.c -o Modules/_testlimitedcapi/sys.o
 Modules/_testlimitedcapi/tuple.o: $(srcdir)/Modules/_testlimitedcapi/tuple.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/tuple.c -o Modules/_testlimitedcapi/tuple.o
 Modules/_testlimitedcapi/unicode.o: $(srcdir)/Modules/_testlimitedcapi/unicode.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/unicode.c -o Modules/_testlimitedcapi/unicode.o
@@ -3530,7 +3527,7 @@ Modules/_testlimitedcapi/vectorcall_limited.o: $(srcdir)/Modules/_testlimitedcap
 Modules/_testlimitedcapi/file.o: $(srcdir)/Modules/_testlimitedcapi/file.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/file.c -o Modules/_testlimitedcapi/file.o
 Modules/_testlimitedcapi/weakref.o: $(srcdir)/Modules/_testlimitedcapi/weakref.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/weakref.c -o Modules/_testlimitedcapi/weakref.o
 Modules/_testlimitedcapi/run.o: $(srcdir)/Modules/_testlimitedcapi/run.c $(MODULE__TESTLIMITEDCAPI_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTLIMITEDCAPI_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testlimitedcapi/run.c -o Modules/_testlimitedcapi/run.o
-Modules/_testlimitedcapi$(EXT_SUFFIX):  Modules/_testlimitedcapi.o Modules/_testlimitedcapi/abstract.o Modules/_testlimitedcapi/bytearray.o Modules/_testlimitedcapi/bytes.o Modules/_testlimitedcapi/capsule.o Modules/_testlimitedcapi/complex.o Modules/_testlimitedcapi/dict.o Modules/_testlimitedcapi/eval.o Modules/_testlimitedcapi/float.o Modules/_testlimitedcapi/heaptype_relative.o Modules/_testlimitedcapi/import.o Modules/_testlimitedcapi/list.o Modules/_testlimitedcapi/long.o Modules/_testlimitedcapi/object.o Modules/_testlimitedcapi/pyos.o Modules/_testlimitedcapi/set.o Modules/_testlimitedcapi/sys.o Modules/_testlimitedcapi/tuple.o Modules/_testlimitedcapi/unicode.o Modules/_testlimitedcapi/vectorcall_limited.o Modules/_testlimitedcapi/file.o Modules/_testlimitedcapi/weakref.o Modules/_testlimitedcapi/run.o; $(BLDSHARED)  Modules/_testlimitedcapi.o Modules/_testlimitedcapi/abstract.o Modules/_testlimitedcapi/bytearray.o Modules/_testlimitedcapi/bytes.o Modules/_testlimitedcapi/capsule.o Modules/_testlimitedcapi/complex.o Modules/_testlimitedcapi/dict.o Modules/_testlimitedcapi/eval.o Modules/_testlimitedcapi/float.o Modules/_testlimitedcapi/heaptype_relative.o Modules/_testlimitedcapi/import.o Modules/_testlimitedcapi/list.o Modules/_testlimitedcapi/long.o Modules/_testlimitedcapi/object.o Modules/_testlimitedcapi/pyos.o Modules/_testlimitedcapi/set.o Modules/_testlimitedcapi/sys.o Modules/_testlimitedcapi/tuple.o Modules/_testlimitedcapi/unicode.o Modules/_testlimitedcapi/vectorcall_limited.o Modules/_testlimitedcapi/file.o Modules/_testlimitedcapi/weakref.o Modules/_testlimitedcapi/run.o $(MODULE__TESTLIMITEDCAPI_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_testlimitedcapi$(EXT_SUFFIX)
+Modules/_testlimitedcapi$(EXT_SUFFIX):  Modules/_testlimitedcapi.o Modules/_testlimitedcapi/abstract.o Modules/_testlimitedcapi/bytearray.o Modules/_testlimitedcapi/bytes.o Modules/_testlimitedcapi/capsule.o Modules/_testlimitedcapi/complex.o Modules/_testlimitedcapi/dict.o Modules/_testlimitedcapi/eval.o Modules/_testlimitedcapi/float.o Modules/_testlimitedcapi/heaptype_relative.o Modules/_testlimitedcapi/import.o Modules/_testlimitedcapi/list.o Modules/_testlimitedcapi/long.o Modules/_testlimitedcapi/object.o Modules/_testlimitedcapi/pyos.o Modules/_testlimitedcapi/set.o Modules/_testlimitedcapi/slice.o Modules/_testlimitedcapi/sys.o Modules/_testlimitedcapi/tuple.o Modules/_testlimitedcapi/unicode.o Modules/_testlimitedcapi/vectorcall_limited.o Modules/_testlimitedcapi/file.o Modules/_testlimitedcapi/weakref.o Modules/_testlimitedcapi/run.o; $(BLDSHARED)  Modules/_testlimitedcapi.o Modules/_testlimitedcapi/abstract.o Modules/_testlimitedcapi/bytearray.o Modules/_testlimitedcapi/bytes.o Modules/_testlimitedcapi/capsule.o Modules/_testlimitedcapi/complex.o Modules/_testlimitedcapi/dict.o Modules/_testlimitedcapi/eval.o Modules/_testlimitedcapi/float.o Modules/_testlimitedcapi/heaptype_relative.o Modules/_testlimitedcapi/import.o Modules/_testlimitedcapi/list.o Modules/_testlimitedcapi/long.o Modules/_testlimitedcapi/object.o Modules/_testlimitedcapi/pyos.o Modules/_testlimitedcapi/set.o Modules/_testlimitedcapi/slice.o Modules/_testlimitedcapi/sys.o Modules/_testlimitedcapi/tuple.o Modules/_testlimitedcapi/unicode.o Modules/_testlimitedcapi/vectorcall_limited.o Modules/_testlimitedcapi/file.o Modules/_testlimitedcapi/weakref.o Modules/_testlimitedcapi/run.o $(MODULE__TESTLIMITEDCAPI_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_testlimitedcapi$(EXT_SUFFIX)
 Modules/_testclinic.o: $(srcdir)/Modules/_testclinic.c $(MODULE__TESTCLINIC_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTCLINIC_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testclinic.c -o Modules/_testclinic.o
 Modules/_testclinic$(EXT_SUFFIX):  Modules/_testclinic.o; $(BLDSHARED)  Modules/_testclinic.o $(MODULE__TESTCLINIC_LDFLAGS) $(MODULE_LDFLAGS_SHARED) -o Modules/_testclinic$(EXT_SUFFIX)
 Modules/_testclinic_limited.o: $(srcdir)/Modules/_testclinic_limited.c $(MODULE__TESTCLINIC_LIMITED_DEPS) $(MODULE_DEPS_SHARED) $(PYTHON_HEADERS); $(CC) $(MODULE__TESTCLINIC_LIMITED_CFLAGS) $(PY_STDMODULE_CFLAGS) $(CCSHARED) -c $(srcdir)/Modules/_testclinic_limited.c -o Modules/_testclinic_limited.o
