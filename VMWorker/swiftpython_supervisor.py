@@ -31,6 +31,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 import pty
 import fcntl
 import termios
@@ -52,6 +53,7 @@ from swiftpython_protocol import (  # noqa: E402
     ENTROPY_RESEEDED,
     ERROR,
     EXEC_ERROR,
+    EXEC_CLEANUP,
     EXEC_RESULT,
     EXEC_SIGNAL_ACK,
     EXEC_STARTED,
@@ -190,6 +192,10 @@ class Supervisor:
         self.workers: dict[int, subprocess.Popen] = {}
         self.execs: dict[int, dict] = {}
         self.execs_lock = threading.Lock()
+        self.incarnation = str(uuid.uuid4()).upper()
+        self.exec_tracking = {}
+        self.cleanup_condition = threading.Condition(self.execs_lock)
+        self.cleanup_observer = None
         self.send_lock = threading.Lock()
         self.worker_cgroups: dict[int, str] = {}
         self.auth_secret = (
@@ -302,6 +308,9 @@ class Supervisor:
         emits = data.get("emits") if isinstance(data, dict) else None
         self._report_host_emit_skew(emits or [])
         return DESCRIBED(
+            execCleanup={"feature": "supervisor.exec-cleanup.v1", "schema": 1,
+                         "supervisorIncarnation": self.incarnation,
+                         "scope": "leader-runner-session-io-owned-cgroup"},
             **declaration(
                 worker_capabilities=worker_capability_declaration(
                     CURRENT_PROTOCOL_VERSION,
@@ -729,7 +738,84 @@ class Supervisor:
         return None
 
     def _start_exec(self, data: dict, use_pty: bool):
-        threading.Thread(target=self._run_exec, args=(data, use_pty), daemon=True).start()
+        request_id = data.get("requestID")
+        record = None
+        if request_id is not None:
+            request_id = str(uuid.UUID(request_id)).upper()
+            if data.get("supervisorIncarnation") != self.incarnation:
+                raise ValueError("supervisor.exec-cleanup.v1 incarnation mismatch")
+            with self.cleanup_condition:
+                if (request_id in self.exec_tracking or len(self.exec_tracking) >= 68
+                        or sum(r.get("receipt", {}).get("status") != "complete" for r in self.exec_tracking.values()) >= 4):
+                    raise ValueError("exec cleanup tracking exhausted or duplicate request")
+                record = {"channelID": int(data["channelID"]), "requestID": request_id,
+                          "supervisorIncarnation": self.incarnation, "observed": False}
+                self.exec_tracking[request_id] = record
+                runner = threading.Thread(target=self._run_exec, args=(data, use_pty), daemon=True)
+                record["runner"] = runner
+                runner.start()
+                if self.cleanup_observer is None:
+                    self.cleanup_observer = threading.Thread(target=self._observe_exec_cleanup, daemon=True)
+                    self.cleanup_observer.start()
+                self.cleanup_condition.notify_all()
+        else:
+            threading.Thread(target=self._run_exec, args=(data, use_pty), daemon=True).start()
+
+    def _observe_exec_cleanup(self):
+        while self.running:
+            with self.cleanup_condition:
+                records = [r for r in self.exec_tracking.values() if not r["observed"]]
+                if not records:
+                    self.cleanup_condition.wait(timeout=0.1)
+                    continue
+            for record in records:
+                runner = record["runner"]
+                runner.join(timeout=0.01)
+                if runner.is_alive():
+                    continue
+                with self.cleanup_condition:
+                    evidence = record.get("cleanup", {})
+                    complete = all(evidence.get(key) is True for key in (
+                        "leaderReaped", "sessionIOClosed", "registryReleased", "cgroupCleaned"))
+                    receipt = {key: record[key] for key in ("channelID", "requestID", "supervisorIncarnation")}
+                    receipt.update(evidence)
+                    receipt["status"] = "complete" if complete else "pending"
+                    record["receipt"] = receipt
+                    record["observed"] = True
+                try:
+                    self._send_response(EXEC_CLEANUP(**receipt))
+                except (OSError, ConnectionError):
+                    return
+
+    def _cleanup_record(self, data):
+        if data.get("supervisorIncarnation") != self.incarnation:
+            raise ValueError("exec cleanup incarnation mismatch")
+        identity = str(uuid.UUID(data["requestID"])).upper()
+        record = self.exec_tracking.get(identity)
+        if record is None or record["channelID"] != int(data["channelID"]):
+            raise ValueError("unknown exact exec cleanup request")
+        return identity, record
+
+    @command("exec_cleanup_status", replies_on_channel=True, channel_keyed=True)
+    def _exec_cleanup_status(self, data):
+        with self.cleanup_condition:
+            _, record = self._cleanup_record(data)
+            receipt = record.get("receipt")
+            if receipt is None:
+                receipt = {key: record[key] for key in ("channelID", "requestID", "supervisorIncarnation")}
+                receipt.update(status="pending", leaderReaped=False, sessionIOClosed=False,
+                               registryReleased=False, cgroupCleaned=False, descendantCoverage="unknown")
+            return EXEC_CLEANUP(**receipt)
+
+    @command("exec_cleanup_ack", replies_on_channel=True, channel_keyed=True)
+    def _exec_cleanup_ack(self, data):
+        with self.cleanup_condition:
+            identity, record = self._cleanup_record(data)
+            receipt = record.get("receipt")
+            if receipt is None or receipt["status"] != "complete":
+                raise ValueError("cannot acknowledge pending cleanup")
+            del self.exec_tracking[identity]
+            return EXEC_CLEANUP(**receipt)
 
     def _run_exec(self, data: dict, use_pty: bool):
         channel_id = int(data["channelID"])
@@ -742,6 +828,7 @@ class Supervisor:
         proc = None
         selector = None
         master_fd = None
+        slave_fd = None
         cgroup_path = None
 
         try:
@@ -768,6 +855,7 @@ class Supervisor:
                     preexec_fn=preexec,
                 )
                 os.close(slave_fd)
+                slave_fd = None
                 os.set_blocking(master_fd, False)
                 selector = selectors.DefaultSelector()
                 selector.register(master_fd, selectors.EVENT_READ, "stdout")
@@ -799,6 +887,8 @@ class Supervisor:
                     "pty": use_pty,
                     "master_fd": master_fd,
                     "stdin": proc.stdin if not use_pty else None,
+                    "requestID": data.get("requestID"),
+                    "supervisorIncarnation": self.incarnation,
                 }
             self._send_response(EXEC_STARTED(channelID=channel_id))
 
@@ -887,16 +977,31 @@ class Supervisor:
             else:
                 self._send_exec_error(channel_id, ExecErrorCode.INTERNAL_ERROR, message)
         finally:
-            with self.execs_lock:
-                self.execs.pop(channel_id, None)
-            self._remove_cgroup(cgroup_path)
+            reaped = proc is None or proc.poll() is not None
+            closed = True
             if selector is not None:
-                selector.close()
-            if master_fd is not None:
-                try:
-                    os.close(master_fd)
-                except OSError:
-                    pass
+                try: selector.close()
+                except Exception: closed = False
+            for descriptor in (master_fd, slave_fd):
+                if descriptor is not None:
+                    try: os.close(descriptor)
+                    except OSError: closed = False
+            if proc is not None:
+                for stream in (proc.stdin, proc.stdout, proc.stderr):
+                    if stream is not None:
+                        try: stream.close()
+                        except Exception: closed = False
+            self._remove_cgroup(cgroup_path)
+            cgroup_cleaned = cgroup_path is None or not os.path.exists(cgroup_path)
+            with self.execs_lock:
+                if reaped and closed and cgroup_cleaned:
+                    self.execs.pop(channel_id, None)
+                identity = str(data.get("requestID", "")).upper()
+                record = self.exec_tracking.get(identity)
+                if record is not None:
+                    record["cleanup"] = dict(leaderReaped=reaped, sessionIOClosed=closed,
+                        registryReleased=channel_id not in self.execs, cgroupCleaned=cgroup_cleaned,
+                        descendantCoverage="owned-cgroup" if cgroup_path else "process-only")
 
     @command("exec_stdin", channel_keyed=True)
     def _exec_stdin(self, data: dict) -> dict:
@@ -915,6 +1020,7 @@ class Supervisor:
             if eof and not payload:
                 return EXEC_STDIN_ACK(channelID=channel_id)
             return self._stdin_unavailable(channel_id)
+        self._validate_exec_owner(data, entry)
         if entry.get("pty") and entry.get("master_fd") is not None:
             if payload:
                 os.write(entry["master_fd"], payload)
@@ -982,6 +1088,12 @@ class Supervisor:
                 except Exception:
                     pass
 
+    def _validate_exec_owner(self, data, entry):
+        if entry.get("requestID") is not None and (
+                data.get("requestID") != entry["requestID"]
+                or data.get("supervisorIncarnation") != entry["supervisorIncarnation"]):
+            raise ValueError("exec control owner mismatch")
+
     @command("exec_signal", channel_keyed=True)
     def _exec_signal(self, data: dict) -> dict:
         channel_id = int(data["channelID"])
@@ -993,6 +1105,7 @@ class Supervisor:
                 code=ExecErrorCode.INTERNAL_ERROR.value,
                 message="exec channel not found",
             )
+        self._validate_exec_owner(data, entry)
         if data.get("terminalSize") and entry.get("master_fd") is not None:
             self._set_winsize(entry["master_fd"], data["terminalSize"])
         signal_number = int(data.get("signal", 0))

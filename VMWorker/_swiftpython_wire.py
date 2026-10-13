@@ -33,6 +33,7 @@ COMMAND_CASES = frozenset({
     "duplexOpen",
     "duplexOutputAcknowledged",
     "eval",
+    "evalResult",
     "evalStream",
     "execAuthResponse",
     "execShell",
@@ -85,6 +86,7 @@ RESPONSE_CASES = frozenset({
     "pythonError",
     "result",
     "sharedBufferCreated",
+    "sideExecutionFinished",
     "streamChunk",
     "streamEnd",
     "streamKeepalive",
@@ -112,15 +114,70 @@ SESSION_ROUTED_RESPONSES = frozenset({
 # Capability names known to this host source.
 WORKER_CAPABILITY_NAMES = frozenset({
     "callback.owned-reentry.v1",
+    "command.scheduling.v1",
+    "control.independent-recording.v1",
     "duplex.accelerator.backend.v1",
     "duplex.arena-ingress.v1",
     "duplex.messages.v1",
     "duplex.sessions.v1",
     "duplex.transferred-arena.v1",
     "duplex.transferred-socket.v1",
+    "eval.result.v1",
+    "side.execution.v1",
     "stream.credit.v1",
     "worker.memory-admission.v1",
 })
+
+# Closed scheduling priority vocabulary.
+SCHEDULING_PRIORITIES = frozenset({
+    "background",
+    "foreground",
+})
+
+# Closed scheduling cost vocabulary.
+SCHEDULING_COSTS = frozenset({
+    "cpuBound",
+    "ioBound",
+    "unspecified",
+})
+
+# Commands in the general execution family.
+SCHEDULING_GENERAL_COMMANDS = frozenset({
+    "attachSharedMemory",
+    "copyToShared",
+    "eval",
+    "evalResult",
+    "getArrayInfo",
+    "invoke",
+    "invokeResult",
+    "method",
+    "methodResult",
+    "registerCallback",
+    "release",
+    "setResourceLimits",
+    "store",
+    "unregisterCallback",
+})
+
+# Commands in the stream execution family.
+SCHEDULING_STREAM_COMMANDS = frozenset({
+    "evalStream",
+    "invokeStream",
+    "methodStream",
+})
+
+# Commands in the duplex execution family.
+SCHEDULING_DUPLEX_COMMANDS = frozenset({
+    "duplexOpen",
+})
+
+# Commands in the side execution family.
+SCHEDULING_SIDE_COMMANDS = frozenset({
+
+})
+
+# Fixed producer policy; publishing it still requires installed mechanisms.
+WORKER_SCHEDULING_LIMITS = {"cleanup":1,"computeDuplex":2,"computeStreams":2,"general":1,"io":2,"ioDuplex":2,"ioStreams":2,"management":1,"maximumDependencies":64,"maximumDependencyBytes":4194304,"maximumDependencyDepth":32,"maximumPendingBytes":16777216,"maximumPendingBytesPerGroup":2097152,"maximumPendingRequests":256,"maximumPendingRequestsPerGroup":32,"side":1}
 
 # Duplex media transport names known to this host source.
 DUPLEX_MEDIA_TRANSPORT_NAMES = frozenset({
@@ -155,15 +212,6 @@ DUPLEX_TERMINAL_CASES = frozenset({
     "completed",
     "failed",
 })
-
-# Namespace keys `eval` scrubs before running new code, from
-# `EvalResultSentinel.keys`. Order matters only for readability.
-RESULT_SENTINEL_KEYS = (
-    "__result__",
-    "__swiftpython_return_pickled_result__",
-    "__swiftpython_result_object__",
-    "__swiftpython_pickled_result__",
-)
 
 # Binary sidecar framing: a little-endian u32 entry count, then one
 # little-endian u32 length per entry, then the entries back to back.
@@ -203,6 +251,15 @@ DUPLEX_MAXIMUM_ACCELERATOR_SCHEDULING_WEIGHT = 4096
 DUPLEX_MAXIMUM_ACCELERATOR_PROCESS_LANES = 64
 DUPLEX_MAXIMUM_INGRESS_CREDIT_BYTES = 67108864
 DUPLEX_MAXIMUM_EGRESS_CREDIT_BYTES = 67108864
+FRAME_WRITE_LIMITS = {
+    "ordinaryCount": 256,
+    "ordinaryBytes": 16777216,
+    "progressCount": 64,
+    "progressBytes": 2097152,
+    "progressPerOwner": 16,
+    "progressFrameBytes": 65536,
+    "progressBurst": 8,
+}
 
 DUPLEX_MEDIA_ENVELOPE_KINDS = {
     "arenaReference": 9,

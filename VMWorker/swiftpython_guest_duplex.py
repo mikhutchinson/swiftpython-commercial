@@ -1266,6 +1266,11 @@ class _GuestDuplexSessionManager:
             self._closed_routes.popitem(last=False)
 
     def close(self, session_id: str, channel: int, sequence: int):
+        barrier = self.record_close(session_id, channel, sequence)
+        if barrier is not None:
+            barrier()
+
+    def record_close(self, session_id: str, channel: int, sequence: int):
         key = str(uuid.UUID(str(session_id))).upper()
         if not 0 < sequence <= (1 << 64) - 1:
             raise _GuestDuplexError("invalid duplex close sequence")
@@ -1291,8 +1296,10 @@ class _GuestDuplexSessionManager:
             # Autonomous removal may have won after the active-route lookup.
             if key not in self._sessions:
                 self._record_closed_route_locked(session)
-        if not session.wait_for_cleanup(2):
-            raise _GuestDuplexCleanupError("duplex cleanup did not prove thread exit within 2 seconds")
+        def barrier():
+            if not session.wait_for_cleanup(2):
+                raise _GuestDuplexCleanupError("duplex cleanup did not prove thread exit within 2 seconds")
+        return barrier
 
     def cancel_callback_waiters(self, channel_id: int, reason: str):
         self.worker._fail_callback_waiters_for_channel(
@@ -1977,8 +1984,8 @@ class _GuestDuplexSession:
             if self.interruptions:
                 return self.interruptions.popleft()
             if self.application_controls:
-                return self.application_controls.popleft()
-            if self.ingress:
+                control = self.application_controls.popleft()
+            elif self.ingress:
                 frame = self.ingress.popleft()
                 if frame["kind"] == "message_aborted":
                     return frame
@@ -2015,10 +2022,34 @@ class _GuestDuplexSession:
                         "chunk_count": frame["chunk_count"],
                     })
                 return result
-            return {
-                "kind": "input_finished",
-                "final_sequence": self.input_accepted_through,
-            }
+            else:
+                return {"kind": "input_finished", "final_sequence": self.input_accepted_through}
+        return self._apply_application_control(control)
+
+    def _apply_application_control(self, control):
+        token = control.pop("payload_token")
+        try:
+            try:
+                payload = self.worker.control_payloads.resolve(token)
+            except Exception:
+                with self.cv:
+                    if self.terminal is None and self.cancellation_reason is None:
+                        self._send_application_event(
+                            f"controlApplicationRejected.{control['sequence']}.{control['control_kind']}",
+                            control_sequence=control["sequence"])
+                raise
+            with self.cv:
+                if self.cancellation_reason is not None:
+                    return {"kind": "cancelled", "reason": self.cancellation_reason}
+                if self.terminal is not None:
+                    raise RuntimeError("duplex session is closed")
+                self._send_application_event(
+                    f"controlApplied.{control['sequence']}.{control['control_kind']}",
+                    control_sequence=control["sequence"])
+                control["payload"] = payload
+                return control
+        finally:
+            self.worker.control_payloads.settle(token)
 
     def _release_python_input(self, sequence: int, byte_count: int):
         accounting_failure = False
@@ -2334,6 +2365,8 @@ class _GuestDuplexSession:
             not kind
             or len(kind.encode("utf-8")) > 256
             or kind.startswith("swiftpython.")
+            or kind.startswith("controlRecorded.")
+            or kind.startswith("controlApplicationRejected.")
             or kind.startswith("controlApplied.")
             or kind.startswith("controlRejected.")
             or kind.startswith("interruptionCompleted.")
@@ -2409,6 +2442,8 @@ class _GuestDuplexSession:
             or len(kind.encode("utf-8")) > 256
             or kind.startswith((
                 "swiftpython.",
+                "controlRecorded.",
+                "controlApplicationRejected.",
                 "controlApplied.",
                 "controlRejected.",
                 "interruptionCompleted.",
@@ -2430,11 +2465,6 @@ class _GuestDuplexSession:
                 control_sequence=sequence,
             )
             return
-        payload = (
-            None
-            if payload_descriptor is None
-            else self.worker._resolve_value_descriptor(payload_descriptor)
-        )
         rejected_for_capacity = False
         with self.cv:
             if self.terminal is not None or self.cancellation_reason is not None:
@@ -2445,24 +2475,22 @@ class _GuestDuplexSession:
             ):
                 rejected_for_capacity = True
             else:
-                self.application_controls.append({
-                    "kind": "application",
-                    "sequence": sequence,
-                    "control_kind": kind,
-                    "payload": payload,
-                    "acknowledged_output_through": acknowledged_output_through,
-                })
-                self.cv.notify_all()
+                try:
+                    token = self.worker.control_payloads.record(payload_descriptor, self.session_id)
+                except Exception:
+                    rejected_for_capacity = True
+                else:
+                    self.application_controls.append({
+                        "kind": "application", "sequence": sequence, "control_kind": kind,
+                        "payload_token": token, "acknowledged_output_through": acknowledged_output_through})
+                    self._send_application_event(f"controlRecorded.{sequence}.{kind}", control_sequence=sequence)
+                    self.cv.notify_all()
         if rejected_for_capacity:
             self._send_application_event(
                 f"controlRejected.{sequence}.resourceLimit",
                 control_sequence=sequence,
             )
             return
-        self._send_application_event(
-            f"controlApplied.{sequence}.{kind}",
-            control_sequence=sequence,
-        )
 
     def interrupt(
         self,
@@ -2848,6 +2876,7 @@ class _GuestDuplexSession:
                     # Keep the route/token quarantined. A timed join is not an
                     # exit receipt, and a later close must fail the incarnation.
                     return
+                self.worker.control_payloads.settle_session(self.session_id)
                 with self.cv:
                     self.application_controls.clear()
                     self.interruptions.clear()
@@ -2860,6 +2889,8 @@ class _GuestDuplexSession:
                 self.manager.remove(self)
             finally:
                 self.cleanup_done.set()
+                if self.cleanup_complete:
+                    self.worker.execution_admission.complete_duplex(self)
 
         threading.Thread(
             target=cleanup,

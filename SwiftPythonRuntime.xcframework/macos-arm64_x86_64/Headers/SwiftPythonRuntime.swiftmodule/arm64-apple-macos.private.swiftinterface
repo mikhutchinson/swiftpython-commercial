@@ -1081,6 +1081,7 @@ public struct ProcessPoolConfiguration : Swift.Sendable, Swift.Equatable {
   public var respawnOnTimeout: Swift.Bool
   public var streamKeepaliveInterval: Foundation.TimeInterval
   public var broadcastsResourceSamples: Swift.Bool
+  public var scheduling: SwiftPythonRuntime.ProcessPoolSchedulingConfiguration
   public var minimumWorkerAvailableMemoryBytes: Swift.UInt64?
   public init(sendTimeout: Foundation.TimeInterval = 30, receiveTimeout: Foundation.TimeInterval = 30, healthCheckTimeout: Foundation.TimeInterval = 5, respawnOnTimeout: Swift.Bool = false, streamKeepaliveInterval: Foundation.TimeInterval = 5, broadcastsResourceSamples: Swift.Bool = false)
   public static let `default`: SwiftPythonRuntime.ProcessPoolConfiguration
@@ -1218,6 +1219,31 @@ public struct AcceleratorResourceEvidence : Swift.Sendable, Swift.Equatable {
   public init(processPhysicalFootprintBytes: Swift.UInt64? = nil, managedBufferCapacityBytes: Swift.UInt64 = 0, managedBufferAllocatedBytes: Swift.UInt64 = 0, hostMetalBufferPoolBytes: Swift.UInt64? = nil, mlxActiveBytes: Swift.UInt64? = nil, mlxPeakBytes: Swift.UInt64? = nil, mlxCacheBytes: Swift.UInt64? = nil, acceleratorQueueDepth: Swift.Int = 0, executingLaneCount: Swift.Int = 0, admittedMLXLaneCount: Swift.Int = 0, admittedMLXSessionCount: Swift.Int = 0, backendStats: [SwiftPythonRuntime.AcceleratorBackendID : SwiftPythonRuntime.AcceleratorBackendResourceStats] = [:])
   public static func == (a: SwiftPythonRuntime.AcceleratorResourceEvidence, b: SwiftPythonRuntime.AcceleratorResourceEvidence) -> Swift.Bool
 }
+public struct ResourceObservationMetadata : Swift.Sendable {
+  public enum Availability : Swift.Sendable {
+    case measured, unavailable, unmonitored
+    public static func == (a: SwiftPythonRuntime.ResourceObservationMetadata.Availability, b: SwiftPythonRuntime.ResourceObservationMetadata.Availability) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum WorkerCPUCoverage : Swift.Sendable {
+    case processOnly, processTree, unavailable
+    public static func == (a: SwiftPythonRuntime.ResourceObservationMetadata.WorkerCPUCoverage, b: SwiftPythonRuntime.ResourceObservationMetadata.WorkerCPUCoverage) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let memory: SwiftPythonRuntime.ResourceObservationMetadata.Availability
+  public let thermal: SwiftPythonRuntime.ResourceObservationMetadata.Availability
+  public let hostCPU: SwiftPythonRuntime.ResourceObservationMetadata.Availability
+  public let monitorRunID: Foundation.UUID?
+  public let sampleSequence: Swift.UInt64?
+  public let workerLifetimes: [Swift.Int : SwiftPythonRuntime.WorkerLifetimeToken]
+  public let workerCPUCoverage: [Swift.Int : SwiftPythonRuntime.ResourceObservationMetadata.WorkerCPUCoverage]
+}
 public struct ResourceSnapshot : Swift.Sendable {
   public let timestamp: _Concurrency.ContinuousClock.Instant
   public let systemMemoryPressure: Swift.Double
@@ -1226,7 +1252,8 @@ public struct ResourceSnapshot : Swift.Sendable {
   public let systemCPUFraction: Swift.Double
   public let workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats]
   public let acceleratorEvidence: SwiftPythonRuntime.AcceleratorResourceEvidence
-  public init(timestamp: _Concurrency.ContinuousClock.Instant, systemMemoryPressure: Swift.Double, freeMemoryBytes: Swift.UInt64, thermalLevel: SwiftPythonRuntime.ThermalLevel, workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats], systemCPUFraction: Swift.Double = 0.0, acceleratorEvidence: SwiftPythonRuntime.AcceleratorResourceEvidence = .init())
+  public let observations: SwiftPythonRuntime.ResourceObservationMetadata
+  public init(timestamp: _Concurrency.ContinuousClock.Instant, systemMemoryPressure: Swift.Double, freeMemoryBytes: Swift.UInt64, thermalLevel: SwiftPythonRuntime.ThermalLevel, workerStats: [Swift.Int : SwiftPythonRuntime.WorkerResourceStats], systemCPUFraction: Swift.Double = .nan, acceleratorEvidence: SwiftPythonRuntime.AcceleratorResourceEvidence = .init())
 }
 public struct ResourceMonitorConfig : Swift.Sendable {
   public var sampleInterval: Foundation.TimeInterval
@@ -1288,6 +1315,64 @@ public enum BufferDType : Swift.String, Swift.Sendable, Swift.Codable, Swift.Cas
   public var rawValue: Swift.String {
     get
   }
+}
+public struct ProcessPoolSchedulingOptions : Swift.Sendable {
+  public enum Priority : Swift.Sendable {
+    case foreground, background
+    public static func == (a: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority, b: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum Cost : Swift.Sendable {
+    case unspecified, cpuBound, ioBound
+    public static func == (a: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost, b: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public var priority: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority
+  public var cost: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost
+  public var groupID: Foundation.UUID?
+  public var admissionTimeout: Foundation.TimeInterval?
+  public var eligibleWorkers: Swift.Set<Swift.Int>?
+  public init(priority: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority = .background, cost: SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost = .unspecified, groupID: Foundation.UUID? = nil, admissionTimeout: Foundation.TimeInterval? = nil, eligibleWorkers: Swift.Set<Swift.Int>? = nil)
+  public static let `default`: SwiftPythonRuntime.ProcessPoolSchedulingOptions
+}
+public struct ProcessPoolSchedulingConfiguration : Swift.Sendable, Swift.Equatable {
+  public var maximumPendingRequests: Swift.Int
+  public var maximumPendingBytes: Swift.Int
+  public var maximumPendingRequestsPerGroup: Swift.Int
+  public var maximumPendingBytesPerGroup: Swift.Int
+  public init(maximumPendingRequests: Swift.Int = 256, maximumPendingBytes: Swift.Int = 16 * 1024 * 1024, maximumPendingRequestsPerGroup: Swift.Int = 32, maximumPendingBytesPerGroup: Swift.Int = 2 * 1024 * 1024)
+  public static func == (a: SwiftPythonRuntime.ProcessPoolSchedulingConfiguration, b: SwiftPythonRuntime.ProcessPoolSchedulingConfiguration) -> Swift.Bool
+}
+public enum ProcessPoolScheduling {
+  public static func withOptions<R>(_ options: SwiftPythonRuntime.ProcessPoolSchedulingOptions, operation: @Sendable () async throws -> R) async rethrows -> R where R : Swift.Sendable
+}
+public struct ProcessPoolAdmissionError : Swift.Error, Swift.Sendable {
+  public enum Reason : Swift.Sendable {
+    case queueFull, deadlineExceeded, unsupportedCapability, pressureUnavailable
+    case scopeClosed, scopeUnsettled
+    public static func == (a: SwiftPythonRuntime.ProcessPoolAdmissionError.Reason, b: SwiftPythonRuntime.ProcessPoolAdmissionError.Reason) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum Phase : Swift.Sendable {
+    case queue, lifecycleWait, writer
+    public static func == (a: SwiftPythonRuntime.ProcessPoolAdmissionError.Phase, b: SwiftPythonRuntime.ProcessPoolAdmissionError.Phase) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let reason: SwiftPythonRuntime.ProcessPoolAdmissionError.Reason
+  public let phase: SwiftPythonRuntime.ProcessPoolAdmissionError.Phase
+  public let requiredFeature: Swift.String?
 }
 public struct ProcessPoolTelemetryContext : Swift.Sendable, Swift.Equatable {
   public let traceID: Swift.String?
@@ -1528,6 +1613,8 @@ public struct ProcessPoolRespawnTelemetry : Swift.Sendable, Swift.Equatable {
   public static func == (a: SwiftPythonRuntime.ProcessPoolRespawnTelemetry, b: SwiftPythonRuntime.ProcessPoolRespawnTelemetry) -> Swift.Bool
 }
 public struct ProcessPoolStateTelemetry : Swift.Sendable {
+  public let scheduling: SwiftPythonRuntime.ProcessPoolSchedulingTelemetry?
+  public let startup: SwiftPythonRuntime.ProcessPoolStartupTelemetry?
   public let from: SwiftPythonRuntime.PythonProcessPool.State
   public let to: SwiftPythonRuntime.PythonProcessPool.State
   public let timestamp: Foundation.Date
@@ -1539,6 +1626,50 @@ public struct ProcessPoolWorkerStateTelemetry : Swift.Sendable {
   public let to: SwiftPythonRuntime.PythonProcessPool.WorkerState
   public let timestamp: Foundation.Date
   public init(workerID: Swift.Int, from: SwiftPythonRuntime.PythonProcessPool.WorkerState, to: SwiftPythonRuntime.PythonProcessPool.WorkerState, timestamp: Foundation.Date = Date())
+}
+public struct ProcessPoolSchedulingTelemetry : Swift.Sendable {
+  public enum Stage : Swift.String, Swift.Sendable {
+    case submitted, queued, admitted, lifecycleWaiting, workerSelected, writerQueued, committed, kernelAccepted, connected, settled, refused
+    public init?(rawValue: Swift.String)
+    public typealias RawValue = Swift.String
+    public var rawValue: Swift.String {
+      get
+    }
+  }
+  public let requestID: Foundation.UUID
+  public let groupID: Foundation.UUID
+  public let poolID: Foundation.UUID
+  public let context: SwiftPythonRuntime.ProcessPoolTelemetryContext
+  public let stage: SwiftPythonRuntime.ProcessPoolSchedulingTelemetry.Stage
+  public let timestamp: _Concurrency.ContinuousClock.Instant
+  public let elapsedMilliseconds: Swift.Double
+  public let workerID: Swift.Int?
+  public let lifecycleOperationID: Foundation.UUID?
+  public let queueDepth: Swift.Int
+  public let retainedBytes: Swift.Int
+  public let foreground: Swift.Bool
+  public let ioBound: Swift.Bool
+  public var workerLifetime: SwiftPythonRuntime.WorkerLifetimeToken?
+  public var lane: Swift.String?
+  public var activeCompute: Swift.Int?
+  public var activeIO: Swift.Int?
+  public var diagnostic: SwiftPythonRuntime.ProcessPoolErrorDiagnostic?
+}
+public struct ProcessPoolStartupTelemetry : Swift.Sendable {
+  public enum Stage : Swift.String, Swift.Sendable {
+    case waiting, acquiring, healthReplied, capabilitiesReceived, configured, connected, failed
+    public init?(rawValue: Swift.String)
+    public typealias RawValue = Swift.String
+    public var rawValue: Swift.String {
+      get
+    }
+  }
+  public let operationID: Foundation.UUID
+  public let poolID: Foundation.UUID
+  public let workerID: Swift.Int
+  public let stage: SwiftPythonRuntime.ProcessPoolStartupTelemetry.Stage
+  public let timestamp: _Concurrency.ContinuousClock.Instant
+  public let elapsedMilliseconds: Swift.Double
 }
 public enum ProcessPoolTelemetryEvent : Swift.Sendable {
   case commandStarted(SwiftPythonRuntime.ProcessPoolCommandTelemetry)
@@ -1553,6 +1684,14 @@ public enum ProcessPoolTelemetryEvent : Swift.Sendable {
   case workerStateSnapshot(SwiftPythonRuntime.ProcessPoolWorkerStateTelemetry)
   case workerStateChanged(SwiftPythonRuntime.ProcessPoolWorkerStateTelemetry)
   case eventsDropped(count: Swift.Int)
+}
+extension SwiftPythonRuntime.ProcessPoolTelemetryEvent {
+  public var scheduling: SwiftPythonRuntime.ProcessPoolSchedulingTelemetry? {
+    get
+  }
+  public var startup: SwiftPythonRuntime.ProcessPoolStartupTelemetry? {
+    get
+  }
 }
 extension SwiftPythonRuntime.PythonWorkerError {
   public var processPoolDiagnostic: SwiftPythonRuntime.ProcessPoolErrorDiagnostic {
@@ -2834,13 +2973,13 @@ public typealias ShellChunk = SwiftPythonRuntime.SandboxShellChunk
   final public let channelID: Swift.UInt32
   final public let chunks: _Concurrency.AsyncThrowingStream<SwiftPythonRuntime.SandboxShellChunk, any Swift.Error>
   final public let result: _Concurrency.Task<SwiftPythonRuntime.SandboxShellResult, any Swift.Error>
+  @objc deinit
   final public func sendStdin(_ data: Foundation.Data) async throws
   final public func finishStdin() async throws
   final public func signal(_ signal: SwiftPythonRuntime.PosixSignal) async throws
   final public func resize(to size: SwiftPythonRuntime.TerminalSize) async throws
   final public func cancel() async
   final public func terminateAndWait(gracePeriod: Swift.Duration = .seconds(1)) async throws -> SwiftPythonRuntime.SandboxShellResult
-  @objc deinit
 }
 public struct TerminalSize : Swift.Sendable, Swift.Codable, Swift.Hashable {
   public let columns: Swift.UInt16
@@ -3133,6 +3272,20 @@ public struct WorkerCallbackContext : @unchecked Swift.Sendable {
   public func eval(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:]) throws -> SwiftPythonRuntime.PyHandle
   public func evalResult<T>(_ code: Swift.String, bindings: [Swift.String : SwiftPythonRuntime.PyHandle] = [:]) throws -> T where T : SwiftPythonRuntime.PythonConvertible
   public func release(_ handle: SwiftPythonRuntime.PyHandle) throws
+}
+public struct WorkerReservation : Swift.Sendable {
+  public let workerIndex: Swift.Int
+  public let lifetime: SwiftPythonRuntime.WorkerLifetimeToken
+}
+extension SwiftPythonRuntime.PythonProcessPool {
+  public func withWorkerReservation<R>(options: SwiftPythonRuntime.ProcessPoolSchedulingOptions = .default, operation: @Sendable (SwiftPythonRuntime.WorkerReservation) async throws -> R) async throws -> R where R : Swift.Sendable
+}
+@_hasMissingDesignatedInitializers final public class WorkerRetentionLease : Swift.Sendable {
+  final public func release() async
+  @objc deinit
+}
+extension SwiftPythonRuntime.PythonProcessPool {
+  public func retainWorker(of handle: SwiftPythonRuntime.PyHandle) async throws -> SwiftPythonRuntime.WorkerRetentionLease
 }
 final public class PyCapsuleRef<T> : @unchecked Swift.Sendable where T : AnyObject {
   final public let pyObject: SwiftPythonRuntime.PyObjectRef
@@ -3907,10 +4060,22 @@ extension SwiftPythonRuntime.WorkloadType : Swift.Equatable {}
 extension SwiftPythonRuntime.WorkloadType : Swift.Hashable {}
 extension SwiftPythonRuntime.ThermalLevel : Swift.Hashable {}
 extension SwiftPythonRuntime.ThermalLevel : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.ResourceObservationMetadata.Availability : Swift.Equatable {}
+extension SwiftPythonRuntime.ResourceObservationMetadata.Availability : Swift.Hashable {}
+extension SwiftPythonRuntime.ResourceObservationMetadata.WorkerCPUCoverage : Swift.Equatable {}
+extension SwiftPythonRuntime.ResourceObservationMetadata.WorkerCPUCoverage : Swift.Hashable {}
 extension SwiftPythonRuntime.ManagedTensorConfiguration.Preset : Swift.Hashable {}
 extension SwiftPythonRuntime.BufferDType : Swift.Equatable {}
 extension SwiftPythonRuntime.BufferDType : Swift.Hashable {}
 extension SwiftPythonRuntime.BufferDType : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingOptions.Priority : Swift.Hashable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingOptions.Cost : Swift.Hashable {}
+extension SwiftPythonRuntime.ProcessPoolAdmissionError.Reason : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolAdmissionError.Reason : Swift.Hashable {}
+extension SwiftPythonRuntime.ProcessPoolAdmissionError.Phase : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolAdmissionError.Phase : Swift.Hashable {}
 extension SwiftPythonRuntime.ProcessPoolCommandSurface : Swift.Hashable {}
 extension SwiftPythonRuntime.ProcessPoolCommandSurface : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.ProcessPoolErrorClassification : Swift.Hashable {}
@@ -3921,6 +4086,12 @@ extension SwiftPythonRuntime.ProcessPoolSideChannelState : Swift.Hashable {}
 extension SwiftPythonRuntime.ProcessPoolSideChannelState : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.ProcessPoolCallbackState : Swift.Hashable {}
 extension SwiftPythonRuntime.ProcessPoolCallbackState : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingTelemetry.Stage : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingTelemetry.Stage : Swift.Hashable {}
+extension SwiftPythonRuntime.ProcessPoolSchedulingTelemetry.Stage : Swift.RawRepresentable {}
+extension SwiftPythonRuntime.ProcessPoolStartupTelemetry.Stage : Swift.Equatable {}
+extension SwiftPythonRuntime.ProcessPoolStartupTelemetry.Stage : Swift.Hashable {}
+extension SwiftPythonRuntime.ProcessPoolStartupTelemetry.Stage : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Equatable {}
 extension SwiftPythonRuntime.PythonProcessPool.State : Swift.Hashable {}
 extension SwiftPythonRuntime.RecoverableReplayPolicy : Swift.Equatable {}

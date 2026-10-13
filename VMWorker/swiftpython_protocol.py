@@ -328,6 +328,12 @@ def declaration(
 # Frame declarations
 # ---------------------------------------------------------------------------
 
+EXEC_CLEANUP = frame(FrameSpec(
+    "exec_cleanup", Routing.CHANNEL,
+    fields=("channelID", "requestID", "supervisorIncarnation", "status", "leaderReaped",
+            "sessionIOClosed", "registryReleased", "cgroupCleaned", "descendantCoverage"),
+))
+
 # --- exec channel ----------------------------------------------------------
 
 EXEC_STARTED = frame(
@@ -441,6 +447,7 @@ DESCRIBED = frame(
             "observedUndeclaredKeys",
             "workerCapabilities",
             "guestArtifactSHA256",
+            "execCleanup",
         ),
     )
 )

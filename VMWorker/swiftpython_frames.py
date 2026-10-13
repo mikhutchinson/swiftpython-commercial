@@ -1,13 +1,20 @@
 """MessageFrame encoding, binary-sidecar injection and the socket read/write
-helpers for the SwiftPython VM worker. `recv_exact` and `send_all` are the
-worker's only socket I/O helpers."""
+helpers for the SwiftPython VM worker, including shared-endpoint writes that
+preserve the reader's socket mode."""
 
 import json
+import select
 import socket
 import struct
+import sys
 import time
+import uuid
 from _swiftpython_duplex import capability_declaration as _duplex_capability_declaration  # noqa: E402
-from _swiftpython_wire import SIDECAR_LENGTH_STRUCT  # noqa: E402
+from _swiftpython_wire import (  # noqa: E402
+    SIDECAR_LENGTH_STRUCT, COMMAND_CASES, SCHEDULING_PRIORITIES,
+    SCHEDULING_COSTS, SCHEDULING_GENERAL_COMMANDS, SCHEDULING_STREAM_COMMANDS,
+    SCHEDULING_DUPLEX_COMMANDS, WORKER_SCHEDULING_LIMITS,
+)
 
 
 STREAM_CREDIT_FEATURE = "stream.credit.v1"
@@ -21,8 +28,57 @@ def worker_capability_declaration(protocol_version: int, transport: str) -> dict
     declaration = _duplex_capability_declaration(protocol_version, transport)
     # The run loop reads commands while streams run, so credit grants reach a
     # paced producer.
-    declaration["features"] = list(declaration.get("features", [])) + [STREAM_CREDIT_FEATURE, "callback.owned-reentry.v1"]
+    declaration["features"] = list(declaration.get("features", [])) + [
+        STREAM_CREDIT_FEATURE, "callback.owned-reentry.v1", "command.scheduling.v1", "side.execution.v1"]
+    declaration["schedulingLimits"] = dict(WORKER_SCHEDULING_LIMITS)
     return declaration
+
+
+def decode_command_envelope(payload: bytes):
+    """Validate the flat producer envelope before argument/sidecar injection."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate command field")
+            result[key] = value
+        return result
+
+    root = json.loads(payload, object_pairs_hook=unique_object)
+    if type(root) is not dict or len(root) != 1:
+        raise ValueError("A command envelope requires exactly one root")
+    name, data = next(iter(root.items()))
+    metadata = None
+    owner = None
+    if name in ("scheduledCommand", "reentrantCommand"):
+        if type(data) is not dict:
+            raise ValueError("Malformed command envelope")
+        if name == "scheduledCommand":
+            required = {"requestID", "priority", "cost", "groupID", "command"}
+            if not required <= data.keys() or not data.keys() <= required | {"callId"}:
+                raise ValueError("Unknown or missing scheduled command metadata")
+            if data["priority"] not in SCHEDULING_PRIORITIES or data["cost"] not in SCHEDULING_COSTS:
+                raise ValueError("Unknown scheduling priority or cost")
+            metadata = {"requestID": str(uuid.UUID(data["requestID"])).upper(),
+                        "groupID": str(uuid.UUID(data["groupID"])).upper(),
+                        "priority": data["priority"], "cost": data["cost"]}
+        elif set(data) != {"callId", "command"}:
+            raise ValueError("Owned command requires only callId and command")
+        if "callId" in data:
+            owner = data["callId"]
+            if type(owner) is not int or not 0 <= owner <= (1 << 64) - 1:
+                raise ValueError("Malformed callback owner")
+        command = data["command"]
+        if type(command) is not dict or len(command) != 1:
+            raise ValueError("Envelope requires exactly one inner command")
+        name, data = next(iter(command.items()))
+    if name not in COMMAND_CASES or type(data) is not dict:
+        raise ValueError("Unknown or nested worker command")
+    if metadata is not None and name not in (
+        SCHEDULING_GENERAL_COMMANDS | SCHEDULING_STREAM_COMMANDS | SCHEDULING_DUPLEX_COMMANDS
+    ):
+        raise ValueError("Protocol progress cannot carry ordinary scheduling metadata")
+    return name, data, metadata, owner
 
 
 HEADER_SIZE = 9  # 4 (json_len) + 4 (bin_len) + 1 (type)
@@ -175,6 +231,52 @@ def send_all(sock: socket.socket, *buffers, timeout: float | None = None) -> Non
     finally:
         if deadline is not None:
             sock.settimeout(previous_timeout)
+
+def send_all_shared(sock: socket.socket, data: bytes, *, timeout: float | None = None) -> None:
+    """Bound a shared endpoint write without changing reader blocking mode."""
+    deadline = None if timeout is None else time.monotonic() + timeout
+    view = memoryview(data)
+    offset = 0
+    # Darwin send does not enforce MSG_DONTWAIT on a blocking descriptor.
+    # The serialized writer owns SO_SNDTIMEO; it does not affect the reader.
+    kernel_deadline = sys.platform == "darwin" and deadline is not None
+    previous_timeout = None
+    if kernel_deadline:
+        previous_timeout = sock.getsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO,
+                                          struct.calcsize("@ll"))
+    try:
+        while offset < len(view):
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise TimeoutError("socket write deadline expired")
+            if kernel_deadline:
+                microseconds = max(1, int(remaining * 1_000_000))
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO,
+                                struct.pack("@ll", microseconds // 1_000_000,
+                                            microseconds % 1_000_000))
+            try:
+                count = sock.send(view[offset:], 0 if kernel_deadline else socket.MSG_DONTWAIT)
+                if count <= 0:
+                    raise ConnectionError("socket write made no progress")
+                offset += count
+            except InterruptedError:
+                continue
+            except BlockingIOError:
+                while True:
+                    remaining = None if deadline is None else deadline - time.monotonic()
+                    if remaining is not None and remaining <= 0:
+                        raise TimeoutError("socket write deadline expired")
+                    try:
+                        _, writable, _ = select.select([], [sock], [], remaining)
+                        break
+                    except InterruptedError:
+                        continue
+                if not writable:
+                    raise TimeoutError("socket write deadline expired")
+    finally:
+        if previous_timeout is not None:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, previous_timeout)
+
 
 def connect_vsock(host_cid: int, port: int) -> socket.socket:
     """Connect to host via AF_VSOCK."""
