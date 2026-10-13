@@ -145,6 +145,28 @@ must talk to lower-level Python constructs. Prefer `Python.run`, `PyObjectRef`,
 and `PythonConvertible` first. Use raw C calls only when you have a specific
 reason and are already inside a GIL-held scope.
 
+## macOS `fork()` Safety and System TLS Trust
+
+On macOS, SwiftPython installs a child-only `pthread_atfork` guard at image load
+(`OS_ACTIVITY_MODE=disable` with `overwrite=0` in the forked child only) before
+any networking or Python code runs, preventing the macOS 26.2 `Network.framework`
+post-fork child crash without mutating the parent environment.
+
+- Query installation state with `PythonRuntime.forkChildOSLogGuardInstalled`.
+- Set `SWIFTPYTHON_DISABLE_FORK_OSLOG_GUARD=1` before image load to opt out.
+- Children `exec`'d with an inherited environment (`env=None`) inherit
+  `OS_ACTIVITY_MODE=disable`; explicit-`env` and `posix_spawn` children do not.
+- When neither `SSL_CERT_FILE` nor `SSL_CERT_DIR` is set by the operator,
+  SwiftPython exports macOS system, admin, and user TLS trust roots (excluding
+  explicitly denied roots) merged with the shipped CA bundle into a private
+  `0600` PEM file so embedded Python verifies enterprise and user roots without
+  calling `Security.framework` in-process. Inspect the active source via
+  `PythonRuntime.activeTrustSource` (`shipped-bundle`, `system-export`, or
+  `environment`), or configure via
+  `PythonRuntime.configureSystemTrustExport(enabled:refreshInterval:directory:)`.
+- Python code can also import `swiftpython.spawn` (`Popen`, `run`, `open_pty`)
+  for fork-free `posix_spawn` and PTY process launches on macOS.
+
 ## Common Pitfalls
 
 | Issue | Fix |

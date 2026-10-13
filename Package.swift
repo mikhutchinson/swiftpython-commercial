@@ -33,36 +33,36 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "SwiftPythonWorkerService",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/SwiftPythonWorkerService.xcframework.zip",
-            checksum: "3915cb56909044a9d7ddab715f1f9f4365706e924ed3df4a3ec12c95fda8c0cb"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/SwiftPythonWorkerService.xcframework.zip",
+            checksum: "50f39b99de662aaead1386a0520fa8022e0edbd44587323b1e8e0dff7888aa6a"
         ),
         .binaryTarget(
             name: "SwiftPythonRuntime",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/SwiftPythonRuntime.xcframework.zip",
-            checksum: "81404f1f75810d5924fee38fd25fe4512ce4ec40aed4081ecbea6c183f438ee3"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/SwiftPythonRuntime.xcframework.zip",
+            checksum: "29913cdcd252486490c7a3e27256cfa0108c45a7a22abdae8cf70e2453a30278"
         ),
         // Link/embed dependency only. Deliberately absent from products.
         .binaryTarget(
             name: "SwiftPythonEngine",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/SwiftPythonEngine.xcframework.zip",
-            checksum: "b418bac66fb78dd5123c9235b67c288b1dd158e3836241a58a4e37d53422427f"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/SwiftPythonEngine.xcframework.zip",
+            checksum: "26900b5af9d9b5d4ea35c28646367514269429e528419b2189c0fed33c76be43"
         ),
         // Private CPython runtime. Inclusion in each product makes Xcode embed
         // and sign it automatically; consumers install no system Python.
         .binaryTarget(
             name: "Python",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/Python.xcframework.zip",
-            checksum: "67283176a5fa69598a77c65fca1b4385e55157b58a1a2262bb001024e2c691c3"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/Python.xcframework.zip",
+            checksum: "cda177986c532b31f20b2396247b60adb4753d34af8138ca5f4758a3809b837e"
         ),
         .binaryTarget(
             name: "SwiftPythonAudioInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/SwiftPythonAudioInterop.xcframework.zip",
-            checksum: "36214ea4de98316e46f8b25c4dc02dbeeb8d317c14d3440e3cc1824e96c1df3f"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/SwiftPythonAudioInterop.xcframework.zip",
+            checksum: "311c750d2136249e5832bd3cbdcb91456802765938bc80b7b94b70624da635ce"
         ),
         .binaryTarget(
             name: "SwiftPythonMetalInterop",
-            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.4/SwiftPythonMetalInterop.xcframework.zip",
-            checksum: "a72844a5a4f669b9fa86cbad3cda6ef78c0dcc9fd9aa21448397bf4759b93bdc"
+            url: "https://github.com/mikhutchinson/swiftpython-commercial/releases/download/v0.7.0-preview.1.5/SwiftPythonMetalInterop.xcframework.zip",
+            checksum: "ee05e950c80544c127b28cbdff91646936aa70a2b5a983f075ded70b5a5fb355"
         ),
     ]
 )

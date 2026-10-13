@@ -3702,6 +3702,12 @@ public func PyCapsule_SetContext(_ capsule: SwiftPythonRuntime.PyObjectPointer?,
   public var initialized: Swift.Bool {
     get
   }
+  nonisolated public var forkChildOSLogGuardInstalled: Swift.Bool {
+    get
+  }
+  nonisolated public var activeTrustSource: SwiftPythonRuntime.PythonTLSTrustSource {
+    get
+  }
   @objc deinit
   @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
   @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
@@ -3710,6 +3716,31 @@ public func PyCapsule_SetContext(_ capsule: SwiftPythonRuntime.PyObjectPointer?,
 }
 @_hasMissingDesignatedInitializers final public class PythonRuntime : @unchecked Swift.Sendable {
   public static let shared: SwiftPythonRuntime.PythonRuntime
+  public static var forkChildOSLogGuardInstalled: Swift.Bool {
+    get
+  }
+  final public var forkChildOSLogGuardInstalled: Swift.Bool {
+    get
+  }
+  public static var systemTrustExportEnabled: Swift.Bool {
+    get
+    set
+  }
+  public static func configureSystemTrustExport(enabled: Swift.Bool, refreshInterval: Foundation.TimeInterval = 300, directory: Foundation.URL? = nil)
+  public static var activeTrustSource: SwiftPythonRuntime.PythonTLSTrustSource {
+    get
+  }
+  final public var activeTrustSource: SwiftPythonRuntime.PythonTLSTrustSource {
+    get
+  }
+  public static var exportedSystemTrustBundleURL: Foundation.URL? {
+    get
+  }
+  final public var exportedSystemTrustBundleURL: Foundation.URL? {
+    get
+  }
+  @discardableResult
+  public static func refreshSystemTrustBundle(force: Swift.Bool = false) -> Foundation.URL?
   final public func configureFileBackedObjectArenas(directory: Foundation.URL, maximumBytes: Swift.Int) throws
   final public var builtins: SwiftPythonRuntime.PyObjectRef {
     get
@@ -3915,6 +3946,20 @@ public struct MultiIndex : Swift.Sendable {
   public init(_ elements: SwiftPythonRuntime.IndexElement...)
   public func toPyObject() throws -> SwiftPythonRuntime.PyObjectRef
 }
+public enum PythonTLSTrustSource : Swift.String, Swift.Sendable, Swift.Codable, Swift.Equatable, Swift.CaseIterable {
+  case shippedBundle
+  case systemExport
+  case environment
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [SwiftPythonRuntime.PythonTLSTrustSource]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [SwiftPythonRuntime.PythonTLSTrustSource] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
 @_hasMissingDesignatedInitializers final public class PythonThreadExecutor : @unchecked Swift.Sendable {
   public static let shared: SwiftPythonRuntime.PythonThreadExecutor
   @discardableResult
@@ -4106,3 +4151,5 @@ extension SwiftPythonRuntime.SandboxConfiguration.IntegrityPolicy : Swift.RawRep
 extension SwiftPythonRuntime.SandboxConfiguration.NetworkPolicy : Swift.RawRepresentable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Equatable {}
 extension SwiftPythonRuntime.SliceMarker : Swift.Hashable {}
+extension SwiftPythonRuntime.PythonTLSTrustSource : Swift.Hashable {}
+extension SwiftPythonRuntime.PythonTLSTrustSource : Swift.RawRepresentable {}

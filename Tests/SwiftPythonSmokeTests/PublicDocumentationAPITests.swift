@@ -88,6 +88,12 @@ final class PublicDocumentationAPITests: XCTestCase {
             )
         )
         XCTAssertEqual(ledger.snapshot.copiedBytes, 16)
+
+        let _: Bool = PythonRuntime.forkChildOSLogGuardInstalled
+        let _: PythonTLSTrustSource = PythonRuntime.activeTrustSource
+        let _: Bool = PythonRuntime.systemTrustExportEnabled
+        let _: URL? = PythonRuntime.exportedSystemTrustBundleURL
+        XCTAssertEqual(PythonTLSTrustSource.allCases.count, 3)
     }
 
     /// Never invoked. Keeping the calls in a type-checked function makes stale
