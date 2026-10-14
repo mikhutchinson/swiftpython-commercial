@@ -34,6 +34,14 @@ try await withProcessPool(workers: 4) { pool in
 
 ## Configuration
 
+Optional `resourceLimits` configure an absolute virtual address-space cap, not
+an RSS budget. The cap includes mappings already present in the interpreter.
+On macOS a 512 MiB or 4 GiB cap may therefore be refused. A refused cap throws
+a resource error before the pool becomes usable; a supported cap is installed
+again after crash recovery or explicit replacement. Select a supported cap for
+your deployment, and inspect Python `resource.getrlimit(resource.RLIMIT_AS)`
+when validating it.
+
 ```swift
 let configuration = ProcessPoolConfiguration(
     receiveTimeout: 60,
@@ -45,7 +53,6 @@ let pool = try await PythonProcessPool(
     workerExecutablePath: "/path/to/SwiftPythonWorker",
     configuration: configuration,
     maxRespawns: 3,
-    resourceLimits: WorkerResourceLimits(maxMemoryBytes: 4 * 1024 * 1024 * 1024),
     backpressure: .suspend(maxInFlight: 32)
 )
 ```

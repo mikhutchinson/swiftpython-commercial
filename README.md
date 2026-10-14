@@ -8,16 +8,16 @@ SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
 Product page: [SwiftPython](https://swiftpython.dev/) ·
-[Download 0.7.0-preview.1.5](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.5)
+[Download 0.7.0-preview.1.6](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.6)
 
 ## Make your first call
 
-Add the package in Xcode with **Exact Version** `0.7.0-preview.1.5`, or use SwiftPM:
+Add the package in Xcode with **Exact Version** `0.7.0-preview.1.6`, or use SwiftPM:
 
 ```swift
 .package(
     url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-    exact: "0.7.0-preview.1.5"
+    exact: "0.7.0-preview.1.6"
 )
 ```
 
@@ -74,6 +74,20 @@ Examples/IrisDemo/scripts/build_app.sh --open
 The example builders download their dependencies and create development apps
 that run offline. [See both examples and their prerequisites.](Examples/)
 
+## What’s new in Preview 1.6
+
+Preview 1.6 fixes a stall when many concurrent operations create a retained
+Python object, call a method and release it. Worker memory-limit application
+now fails before a pool becomes usable if the operating system refuses the
+requested limit, and successful limits are reapplied during worker replacement.
+Public Swift APIs and worker wire versions are unchanged.
+
+`WorkerResourceLimits.maxMemoryBytes` is an absolute virtual address-space limit, including
+existing mappings. It is not an RSS budget. On macOS, a small value such as
+512 MiB may be below the interpreter’s existing virtual mappings and will be
+rejected with an actionable resource error. Choose a limit that the worker can
+install; removing the limit is not required for replacement.
+
 ## What's new in Preview 1.3
 
 Preview 1.3 updates the bundled interpreter to Python 3.13.16. Python child
@@ -101,7 +115,7 @@ orphan cleanup remains available. Public APIs are unchanged.
 Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
 and stale responses after worker replacement. Public APIs are unchanged. [Mac and iPad duplex benchmarks](https://swiftpython.dev/benchmarks/duplex/).
 
-Current release: `0.7.0-preview.1.5`. [Distribution verification](docs/distribution-verification.md).
+Current release: `0.7.0-preview.1.6`. [Distribution verification](docs/distribution-verification.md).
 
 ## Preview 1
 

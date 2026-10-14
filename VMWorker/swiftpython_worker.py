@@ -1857,11 +1857,21 @@ class Worker:
     def _set_resource_limits(self, cmd_data: dict) -> tuple:
         max_memory = cmd_data.get("maxMemoryBytes")
         if max_memory is not None:
+            previous = "unavailable"
             try:
                 import resource
+                if not isinstance(max_memory, int) or isinstance(max_memory, bool) or max_memory <= 0:
+                    raise ValueError("requested_bytes must be a positive integer")
+                old_limits = resource.getrlimit(resource.RLIMIT_AS)
+                previous = f"soft={old_limits[0]} hard={old_limits[1]}"
                 resource.setrlimit(resource.RLIMIT_AS, (max_memory, max_memory))
+                installed = resource.getrlimit(resource.RLIMIT_AS)
+                if installed != (max_memory, max_memory):
+                    raise RuntimeError(f"RLIMIT_AS readback differs from requested limit: {installed}")
             except Exception as e:
-                return "error", {"code": "resourceError", "message": str(e)}, b""
+                return "error", {"code": "resourceError", "message":
+                    f"RLIMIT_AS requested_bytes={max_memory} existing_{previous}: {type(e).__name__}: {e}. "
+                    "This is a virtual address-space ceiling, not resident memory; it must accommodate existing mappings."}, b""
         return "success", {}, b""
 
     # -----------------------------------------------------------------------

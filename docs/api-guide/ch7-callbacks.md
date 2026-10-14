@@ -22,6 +22,7 @@ let value: Int = try await pool.evalResult("""
 import swift_bridge
 swift_bridge.call("add", 3, 7)
 """)
+withExtendedLifetime(registration) {}
 ```
 
 Keep `registration` alive for as long as Python should be able to call it.
@@ -124,14 +125,16 @@ fails with guidance to use `swift_bridge.call_stream`.
 
 ## Streaming Callbacks
 
-Streaming callbacks let Swift provide an iterator to Python.
+Streaming callbacks let Swift provide an iterator to Python. Each yielded item
+is a JSON array containing exactly one result, such as `[i]`, even for a scalar.
+Keep the registration alive through the Python call.
 
 ```swift
 let registration = try await pool.registerStreamingCallback(name: "numbers") {
     @Sendable (count: Int) throws -> StreamingCallbackIterator in
     StreamingCallbackIterator(bufferCapacity: 8) { yield in
         for i in 0..<count {
-            let data = try JSONSerialization.data(withJSONObject: i)
+            let data = try JSONSerialization.data(withJSONObject: [i])
             try yield(data)
         }
     }

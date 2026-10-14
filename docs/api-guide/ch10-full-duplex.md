@@ -163,6 +163,9 @@ for chunk in message.chunks():
 payload = message.read(max_bytes=64 * 1024 * 1024)
 ```
 
+After the host finishes input, `receive_message()` raises `RuntimeError("input ended before a logical message arrived")`; it does not return `None`. A finite-message handler should
+read its known count. Frame iteration ends normally at input completion.
+
 Retaining a Python chunk intentionally withholds ingress credit. Duplicate,
 missing, overlapping, out-of-order, incomplete, and over-limit messages fail
 without allocating an unbounded full-message buffer.
