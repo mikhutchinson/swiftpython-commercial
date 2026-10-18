@@ -8,16 +8,16 @@ SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
 Product page: [SwiftPython](https://swiftpython.dev/) ·
-[Download 0.7.0-preview.1.6](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.6)
+[Download 0.7.0-preview.1.7](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.7)
 
 ## Make your first call
 
-Add the package in Xcode with **Exact Version** `0.7.0-preview.1.6`, or use SwiftPM:
+Add the package in Xcode with **Exact Version** `0.7.0-preview.1.7`, or use SwiftPM:
 
 ```swift
 .package(
     url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-    exact: "0.7.0-preview.1.6"
+    exact: "0.7.0-preview.1.7"
 )
 ```
 
@@ -74,6 +74,19 @@ Examples/IrisDemo/scripts/build_app.sh --open
 The example builders download their dependencies and create development apps
 that run offline. [See both examples and their prerequisites.](Examples/)
 
+## What’s new in Preview 1.7
+
+Resource pressure no longer rejects work or blocks worker startup, growth,
+reactivation or replacement. Idle reclamation preserves a healthy endpoint,
+queued requests wait through replacement, and side-channel progress remains
+available while compute capacity is occupied. Caller limits, cancellation,
+shutdown and physical transport/allocation failures retain their authority.
+
+Semantic duplex controls pace through their existing replies so concurrent
+bursts preserve every request within the worker’s bounded management queues.
+Linux source compilation also uses the portable trust-digest fallback.
+Public Swift APIs and wire protocols are unchanged.
+
 ## What’s new in Preview 1.6
 
 Preview 1.6 fixes a stall when many concurrent operations create a retained
@@ -115,7 +128,7 @@ orphan cleanup remains available. Public APIs are unchanged.
 Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
 and stale responses after worker replacement. Public APIs are unchanged. [Mac and iPad duplex benchmarks](https://swiftpython.dev/benchmarks/duplex/).
 
-Current release: `0.7.0-preview.1.6`. [Distribution verification](docs/distribution-verification.md).
+Current release: `0.7.0-preview.1.7`. [Distribution verification](docs/distribution-verification.md).
 
 ## Preview 1
 
