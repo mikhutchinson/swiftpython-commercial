@@ -8,16 +8,16 @@ SwiftPython includes Python 3.13, so your users do not need to install Python.
 
 [Get started](docs/api-guide/) · [Examples](Examples/) ·
 Product page: [SwiftPython](https://swiftpython.dev/) ·
-[Download 0.7.0-preview.1.7](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0-preview.1.7)
+[Download 0.7.0](https://github.com/mikhutchinson/swiftpython-commercial/releases/tag/v0.7.0)
 
 ## Make your first call
 
-Add the package in Xcode with **Exact Version** `0.7.0-preview.1.7`, or use SwiftPM:
+Add the package in Xcode with **Exact Version** `0.7.0`, or use SwiftPM:
 
 ```swift
 .package(
     url: "https://github.com/mikhutchinson/swiftpython-commercial.git",
-    exact: "0.7.0-preview.1.7"
+    exact: "0.7.0"
 )
 ```
 
@@ -74,6 +74,19 @@ Examples/IrisDemo/scripts/build_app.sh --open
 The example builders download their dependencies and create development apps
 that run offline. [See both examples and their prerequisites.](Examples/)
 
+## What’s new in 0.7.0
+
+The first stable SwiftPython release preserves the public interfaces and existing wire versions of Preview 1.7 while updating the bundled interpreter and certificate trust.
+
+- Python 3.13.17 with explicit security backports for CVE-2026-114583 and CVE-2026-115557.
+- VM image provisioning builds a patched Python 3.12.15 with the same protections and current trust/bootstrap inputs, preserving the Linux package ABI.
+- Native shared-ring streaming publishes headers atomically and preserves concurrent abort flags. It requires a matching worker that declares `stream.atomic-ring.v1`; older workers are refused safely for this operation.
+- Tar extraction rejects links that replace the extraction destination.
+- TLS verification rejects the eight compromised eMudhra intermediate public keys, including when an older CA bundle is supplied.
+- The October 20, 2026 Mozilla CA bundle and ensurepip with pip 26.2.2 / certifi 2026.10.19.
+
+Applications must adopt this SDK release and refresh their own package environments. Existing installed applications and virtual environments are not updated by installing the SDK.
+
 ## What’s new in Preview 1.7
 
 Resource pressure no longer rejects work or blocks worker startup, growth,
@@ -128,7 +141,7 @@ orphan cleanup remains available. Public APIs are unchanged.
 Preview 1.1 fixes concurrent duplex writes, session completion and cleanup,
 and stale responses after worker replacement. Public APIs are unchanged. [Mac and iPad duplex benchmarks](https://swiftpython.dev/benchmarks/duplex/).
 
-Current release: `0.7.0-preview.1.7`. [Distribution verification](docs/distribution-verification.md).
+Current release: `0.7.0`. [Distribution verification](docs/distribution-verification.md).
 
 ## Preview 1
 

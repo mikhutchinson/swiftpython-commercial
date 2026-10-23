@@ -29,10 +29,10 @@ MODLIBS=           $(LOCALMODLIBS) $(BASEMODLIBS)
 
 # === Variables set by configure
 VERSION=	3.13
-srcdir=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
-VPATH=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
-abs_srcdir=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16
-abs_builddir=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-build
+srcdir=		/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-src/Python-3.13.17
+VPATH=		/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-src/Python-3.13.17
+abs_srcdir=	/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-src/Python-3.13.17
+abs_builddir=	/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-build
 
 
 CC=		/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
@@ -77,7 +77,7 @@ INSTALL_DATA=	${INSTALL} -m 644
 # rather than figuring out exactly which, we always give them executable mode.
 INSTALL_SHARED= ${INSTALL} -m 755
 
-MKDIR_P=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-src/Python-3.13.16/install-sh -c -d
+MKDIR_P=	/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-src/Python-3.13.17/install-sh -c -d
 
 MAKESETUP=      $(srcdir)/Modules/makesetup
 
@@ -97,8 +97,8 @@ CONFIGURE_LDFLAGS_NODIST= -flto=full -Wl,-export_dynamic -Wl,-object_path_lto,"$
 # LDFLAGS_NOLTO is an extra flag to disable lto. It is used to speed up building
 # of _bootstrap_python and _freeze_module tools, which don't need LTO.
 CONFIGURE_LDFLAGS_NOLTO=-flto=thin
-CONFIGURE_CPPFLAGS=	-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
-CONFIGURE_LDFLAGS=	-arch arm64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -Wl,-headerpad_max_install_names
+CONFIGURE_CPPFLAGS=	-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include
+CONFIGURE_LDFLAGS=	-arch arm64 -arch x86_64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -Wl,-headerpad_max_install_names
 # Avoid assigning CFLAGS, LDFLAGS, etc. so users can use them on the
 # command line to append to these values without stomping the pre-set
 # values.
@@ -137,7 +137,7 @@ MULTIARCH=	darwin
 MULTIARCH_CPPFLAGS = -DMULTIARCH=\"darwin\"
 
 # Install prefix for architecture-independent files
-prefix=		/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13
+prefix=		/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks/Python.framework/Versions/3.13
 
 # Install prefix for architecture-dependent files
 exec_prefix=	${prefix}
@@ -187,9 +187,9 @@ APP_STORE_COMPLIANCE_PATCH=
 UNIVERSALSDK=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
 PYTHONFRAMEWORK=	Python
 PYTHONFRAMEWORKDIR=	Python.framework
-PYTHONFRAMEWORKPREFIX=	/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks
-PYTHONFRAMEWORKINSTALLDIR= /private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework
-PYTHONFRAMEWORKINSTALLNAMEPREFIX= /private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13
+PYTHONFRAMEWORKPREFIX=	/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks
+PYTHONFRAMEWORKINSTALLDIR= /Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks/Python.framework
+PYTHONFRAMEWORKINSTALLNAMEPREFIX= /Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks/Python.framework/Versions/3.13
 RESSRCDIR= Mac/Resources/framework
 # macOS deployment target selected during configure, to be checked
 # by distutils. The export statement is needed to ensure that the
@@ -213,7 +213,7 @@ LIPO_32BIT_FLAGS=
 LIPO_INTEL64_FLAGS=-extract x86_64
 
 # Environment to run shared python without installed libraries
-RUNSHARED=       DYLD_FRAMEWORK_PATH=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/python-build
+RUNSHARED=       DYLD_FRAMEWORK_PATH=/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/python-build
 
 # ensurepip options
 ENSUREPIP=      no
@@ -326,8 +326,8 @@ MODULE_READLINE_STATE=yes
 MODULE_READLINE_CFLAGS=
 MODULE_READLINE_LDFLAGS=-lreadline
 MODULE__SQLITE3_STATE=yes
-MODULE__SQLITE3_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include -I$(srcdir)/Modules/_sqlite
-MODULE__SQLITE3_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -lsqlite3
+MODULE__SQLITE3_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include -I$(srcdir)/Modules/_sqlite
+MODULE__SQLITE3_LDFLAGS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -lsqlite3
 MODULE__TKINTER_STATE=missing
 MODULE__UUID_STATE=yes
 MODULE__UUID_CFLAGS=
@@ -342,14 +342,14 @@ MODULE__BZ2_STATE=yes
 MODULE__BZ2_CFLAGS=
 MODULE__BZ2_LDFLAGS=-lbz2
 MODULE__LZMA_STATE=yes
-MODULE__LZMA_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
-MODULE__LZMA_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -llzma
+MODULE__LZMA_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include
+MODULE__LZMA_LDFLAGS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -llzma
 MODULE__SSL_STATE=yes
-MODULE__SSL_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
-MODULE__SSL_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib  -lssl -lcrypto
+MODULE__SSL_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include
+MODULE__SSL_LDFLAGS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib  -lssl -lcrypto
 MODULE__HASHLIB_STATE=yes
-MODULE__HASHLIB_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include
-MODULE__HASHLIB_LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib   -lcrypto
+MODULE__HASHLIB_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include
+MODULE__HASHLIB_LDFLAGS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib   -lcrypto
 MODULE__TESTCAPI_STATE=yes
 MODULE__TESTCAPI_LDFLAGS=
 MODULE__TESTCLINIC_STATE=yes
@@ -382,7 +382,7 @@ EXEMODE=	755
 FILEMODE=	644
 
 # configure script arguments
-CONFIG_ARGS=	 '--enable-framework=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks' '--enable-universalsdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk' '--with-universal-archs=universal2' '--with-pkg-config=no' '--enable-loadable-sqlite-extensions' '--with-openssl=/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps' '--with-openssl-rpath=no' '--enable-optimizations' '--with-lto=full' '--with-computed-gotos' '--without-ensurepip' 'CC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang' 'LDFLAGS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -Wl,-headerpad_max_install_names' 'CPPFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBSQLITE3_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBSQLITE3_LIBS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -lsqlite3' 'LIBLZMA_CFLAGS=-I/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/include' 'LIBLZMA_LIBS=-L/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/deps/lib -llzma'
+CONFIG_ARGS=	 '--enable-framework=/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks' '--enable-universalsdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk' '--with-universal-archs=universal2' '--with-pkg-config=no' '--enable-loadable-sqlite-extensions' '--with-openssl=/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps' '--with-openssl-rpath=no' '--enable-optimizations' '--with-lto=full' '--with-computed-gotos' '--without-ensurepip' 'CC=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang' 'LDFLAGS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -Wl,-headerpad_max_install_names' 'CPPFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include' 'LIBSQLITE3_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include' 'LIBSQLITE3_LIBS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -lsqlite3' 'LIBLZMA_CFLAGS=-I/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/include' 'LIBLZMA_LIBS=-L/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/deps/lib -llzma'
 
 
 # Subdirectories with code
@@ -3289,7 +3289,7 @@ MODULE__SHA1_DEPS=$(srcdir)/Modules/hashlib.h $(LIBHACL_HEADERS) Modules/_hacl/H
 MODULE__SHA2_DEPS=$(srcdir)/Modules/hashlib.h $(LIBHACL_SHA2_HEADERS) $(LIBHACL_SHA2_A)
 MODULE__SHA3_DEPS=$(srcdir)/Modules/hashlib.h $(LIBHACL_HEADERS) Modules/_hacl/Hacl_Hash_SHA3.h Modules/_hacl/Hacl_Hash_SHA3.c
 MODULE__SOCKET_DEPS=$(srcdir)/Modules/socketmodule.h $(srcdir)/Modules/addrinfo.h $(srcdir)/Modules/getaddrinfo.c $(srcdir)/Modules/getnameinfo.c
-MODULE__SSL_DEPS=$(srcdir)/Modules/_ssl.h $(srcdir)/Modules/_ssl/cert.c $(srcdir)/Modules/_ssl/debughelpers.c $(srcdir)/Modules/_ssl/misc.c $(srcdir)/Modules/_ssl_data_111.h $(srcdir)/Modules/_ssl_data_300.h $(srcdir)/Modules/socketmodule.h
+MODULE__SSL_DEPS=$(srcdir)/Modules/_ssl.h $(srcdir)/Modules/_ssl/cert.c $(srcdir)/Modules/_ssl/debughelpers.c $(srcdir)/Modules/_ssl/misc.c $(srcdir)/Modules/_ssl/distrusted_spki.h $(srcdir)/Modules/_ssl_data_111.h $(srcdir)/Modules/_ssl_data_300.h $(srcdir)/Modules/socketmodule.h
 MODULE__TESTCAPI_DEPS=$(srcdir)/Modules/_testcapi/parts.h $(srcdir)/Modules/_testcapi/util.h
 MODULE__TESTLIMITEDCAPI_DEPS=$(srcdir)/Modules/_testlimitedcapi/testcapi_long.h $(srcdir)/Modules/_testlimitedcapi/parts.h $(srcdir)/Modules/_testlimitedcapi/util.h
 MODULE__TESTINTERNALCAPI_DEPS=$(srcdir)/Modules/_testinternalcapi/parts.h

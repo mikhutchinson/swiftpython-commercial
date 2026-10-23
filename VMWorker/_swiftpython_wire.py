@@ -124,6 +124,7 @@ WORKER_CAPABILITY_NAMES = frozenset({
     "duplex.transferred-socket.v1",
     "eval.result.v1",
     "side.execution.v1",
+    "stream.atomic-ring.v1",
     "stream.credit.v1",
     "worker.memory-admission.v1",
 })

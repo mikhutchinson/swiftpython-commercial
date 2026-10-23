@@ -1,4 +1,4 @@
-#!/private/tmp/swiftpython-runtime-repair-20261008/input-3.13.16-ipc2/Frameworks/Python.framework/Versions/3.13/bin/python3.13
+#!/Users/mikhutchinson/CascadeProjects/SwiftPython/Artifacts/security-0.7.0/cpython-input-final/Frameworks/Python.framework/Versions/3.13/bin/python3.13
 # -*- python -*-
 
 # Keep this script in sync with python-config.sh.in

@@ -220,8 +220,8 @@
       "Consumer/release_manifest.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "fae993307c4b965e0133106ac9dc5dce64d3428bda1fb13e16f33b4db110240d",
-        "size": 15089
+        "sha256": "8036718c3227672d4390ac2352f58a2bb74982972688588c8efbfac596ff9041",
+        "size": 15549
       },
       "Consumer/sealed_stdlib.py": {
         "kind": "file",
@@ -340,8 +340,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Python": {
         "kind": "file",
         "mode": 493,
-        "sha256": "4c9d7980d8906f4615ded17b6df2eb1290b289489e12fee6604d00aa93956fe7",
-        "size": 13767488
+        "sha256": "f527d13ab01b69e23a89253a25948a919633483226a166aed0883db1620bd2fa",
+        "size": 13767552
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Resources": {
         "kind": "directory",
@@ -350,7 +350,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Resources/Info.plist": {
         "kind": "file",
         "mode": 420,
-        "sha256": "ed503cffdfa961193b0455d22a32e74646e61c32e08f1ed22bd4d1cfe1042e4d",
+        "sha256": "2b0bd49a1a888a47d7a4325ec186990899fee00deb97399ac55592a93b8c8ef5",
         "size": 975
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Resources/ThirdPartyLicenses": {
@@ -390,8 +390,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/Resources/swiftpython-runtime-build.json": {
         "kind": "file",
         "mode": 420,
-        "sha256": "88a3dd0269dc4d68baad693af15f4241bdb5b3d03a7f01135bb3af3d46e431f3",
-        "size": 253264
+        "sha256": "e0eae9e6ad49b2c94b9efe29efdd53a3ae1137839698e581be86aaa88c14917f",
+        "size": 254501
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/_CodeSignature": {
         "kind": "directory",
@@ -400,7 +400,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/_CodeSignature/CodeResources": {
         "kind": "file",
         "mode": 420,
-        "sha256": "be376f8fd478be3f052f4aaedb8693f0ec2dea7de80688ba9e73e51ac20bb1bb",
+        "sha256": "c58a603cc947d25502b98339736908a8386e4736e7fad89b6d8b075609f8f505",
         "size": 244553
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/bin": {
@@ -410,7 +410,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/bin/python3.13": {
         "kind": "file",
         "mode": 493,
-        "sha256": "a475a8c151c5612f446bef668f489209eca2540c4f737720fb3ee90918abd9e8",
+        "sha256": "36cb91283171acbd7ed314e00f3540814d92ad2c934d810e0a8abe32db56436b",
         "size": 119376
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/etc": {
@@ -424,8 +424,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/etc/ssl/cert.pem": {
         "kind": "file",
         "mode": 420,
-        "sha256": "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505",
-        "size": 188900
+        "sha256": "796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe",
+        "size": 200116
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/etc/ssl/certs": {
         "kind": "directory",
@@ -1826,7 +1826,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/include/python3.13/patchlevel.h": {
         "kind": "file",
         "mode": 420,
-        "sha256": "fe193cc6d1c016cf6baaf60c4e7d26a4fdb8eb85d5d4e9c883de5b2808cea4ca",
+        "sha256": "5e7d2a64e92f9dd677331f5de0759a0b7c6708afbbe03377947702a9818cc965",
         "size": 1301
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/include/python3.13/py_curses.h": {
@@ -2046,13 +2046,13 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/libcrypto.3.dylib": {
         "kind": "file",
         "mode": 493,
-        "sha256": "61799f07a57ad5ec9b514b6b05162ea8abfaf3646aa87d37579f0762d0f24aae",
+        "sha256": "7a57e2436a4e97ded0350d4def5abd82df2388a718f6038ff9e83578554a1db1",
         "size": 10347088
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/liblzma.5.dylib": {
         "kind": "file",
         "mode": 493,
-        "sha256": "70015e733015cb140ff1cd92d1e6e26a0f5a66a894e5f72a902d0dcb044bc83b",
+        "sha256": "ca30f80d4ab0abd78c38e207115cb82877881aae15a2b9b1a1cfdbebdc7bc34f",
         "size": 429888
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/libpython3.13.dylib": {
@@ -2062,13 +2062,13 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/libsqlite3.0.dylib": {
         "kind": "file",
         "mode": 493,
-        "sha256": "944495addcf36a2e36593bc045d812c4549b1809e5ca38b7b98a915402304e01",
+        "sha256": "356b55f27ba10261335f27d84ee20c741d34579f84f5b0e924eeaab22c13be3f",
         "size": 3282832
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/libssl.3.dylib": {
         "kind": "file",
         "mode": 493,
-        "sha256": "f1b1bd74e0a52155f8a49b22fc50297a7a0bc66945a0a1c6d1380872bf74d443",
+        "sha256": "839b21389903234e525b47851a9acd4afea455f55e57201fdda3ae34efb15d8b",
         "size": 1980480
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/pkgconfig": {
@@ -2078,14 +2078,14 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/pkgconfig/python-3.13-embed.pc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "0b233b431440342d3d1b5187e383ce6a113852f7f3ca1312b5c37cd34b9e133f",
-        "size": 412
+        "sha256": "b55ed78ecd2d87a8f4b2305c61e95ce7d0beb4fea0ca1135163a38a2d6b470a2",
+        "size": 438
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/pkgconfig/python-3.13.pc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "45e3fcf4ae5c5fab2aa3186fc8b47cb747740d6a3f780b3f6a23ce4ca4403857",
-        "size": 398
+        "sha256": "9412f6ad5fcc460353a68a2cb88b2b9248e93987b46b2142d6ea10df89b9aefd",
+        "size": 424
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13": {
         "kind": "directory",
@@ -2268,8 +2268,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/__pycache__/_sysconfigdata__darwin_darwin.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "87bb7b627fdac29cc4a1c491f4966df32b1d9dd564adae64d28af282133ae9bb",
-        "size": 80713
+        "sha256": "d5d399cedfa515b7cfedd301efd681b7d29481908af66687813c4c1148bccbeb",
+        "size": 85997
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/__pycache__/_threading_local.cpython-313.pyc": {
         "kind": "file",
@@ -2934,8 +2934,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/__pycache__/tarfile.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "64fdc9829d13a1831ef924928c18743ef13363d6af1fd4557b4e28da65d08c34",
-        "size": 128561
+        "sha256": "9c47905d6ef92cd9b2abad05f2a5a26d06a21dabe5825865a2aa4e1edee8c557",
+        "size": 128780
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/__pycache__/tempfile.cpython-313.pyc": {
         "kind": "file",
@@ -3488,8 +3488,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/_sysconfigdata__darwin_darwin.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "50c94aa769b50a2f0540280942218c8d5071c35fb9ada3d1e12dd499e1891757",
-        "size": 70028
+        "sha256": "356bddbae6ab5e7128b47d18f6270b53975dce4e9cbb1154295ee746914a4608",
+        "size": 75951
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/_threading_local.py": {
         "kind": "file",
@@ -4106,8 +4106,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/Makefile": {
         "kind": "file",
         "mode": 420,
-        "sha256": "87e720e992e779a1ba465a6aa7017913937912b87b26e45bc83ff6be0c43d6ca",
-        "size": 211212
+        "sha256": "1f431eee3bd4e97afe6d97085967bd0e72e7db82f8f276f88341d6c1f940f2d1",
+        "size": 211981
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/Setup": {
         "kind": "file",
@@ -4140,14 +4140,14 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/__pycache__/python-config.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "b7b3e33ef148b42ca6723b9c780b65c9e3430571e2301282ed880fd5f596acff",
+        "sha256": "7b2afbfbfa56bebd5625a1fd933d0a82f12755df3d18544dfb7843459e84532e",
         "size": 3303
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/config.c": {
         "kind": "file",
         "mode": 420,
-        "sha256": "8a8942e3998cafa65181f5a3113dc015b88005ce30ab0a595ca564582c97604f",
-        "size": 3671
+        "sha256": "06d1261ab7dde57d536d53c9e59cc119160afea4a8f19569df7941f0be75ad2e",
+        "size": 3697
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/config.c.in": {
         "kind": "file",
@@ -4174,8 +4174,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/config-3.13-darwin/python-config.py": {
         "kind": "file",
         "mode": 493,
-        "sha256": "94736e57c9cf687616ec0b96e398ba8ed5d772fe7738d87c71b65324ac842580",
-        "size": 2170
+        "sha256": "cb7d1c4f78561a01869a19a038ab8941d513935ac59d1d79d409a286950c626f",
+        "size": 2196
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/configparser.py": {
         "kind": "file",
@@ -6376,7 +6376,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/__init__.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "ae1246b1800cd6483a1e9c298bd9d2154e3f60203189fb46877719417514e768",
+        "sha256": "7a059d9be176d8ecdc21a76a05c873d7dd07606adc647096a727a7c597dbe088",
         "size": 8256
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/__main__.py": {
@@ -6392,7 +6392,7 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/__pycache__/__init__.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "dfb3ef7a2c697e0d45a0aea38ac1073bd7f0d9871e1be22e7ae31577b8d581ca",
+        "sha256": "8922463d9c2b60fe19af3a3d99dfe2c52f5cd11eb4e019d55d39645ec4e7110f",
         "size": 8341
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/__pycache__/__main__.cpython-313.pyc": {
@@ -6411,11 +6411,11 @@
         "kind": "directory",
         "mode": 493
       },
-      "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/_bundled/pip-26.2.1-py3-none-any.whl": {
+      "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/_bundled/pip-26.2.2-py3-none-any.whl": {
         "kind": "file",
         "mode": 420,
-        "sha256": "71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e",
-        "size": 1816632
+        "sha256": "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
+        "size": 1819850
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/ensurepip/_uninstall.py": {
         "kind": "file",
@@ -7066,404 +7066,404 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_asyncio.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "112e8081f693cefb08ab4d3c70d341a9634a29190f56336124d2db0b8e31feba",
-        "size": 259296
+        "sha256": "8cfffaf434ddb077fc1debf44462ddc4c5ab168651196cec80ff87c9758669ce",
+        "size": 259344
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_bisect.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "184b1cdd726d975c2a7d341e92500ca953b1a893e83d1ec90aee735e6c8d222f",
-        "size": 137744
+        "sha256": "d460ca61b0b02b80eb8a80f423f6a534ef1021c4f010995f11d42542e8b5a881",
+        "size": 137792
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_blake2.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "4b5bf3054ff98c932b44ef1396112a16a929faa5cb6675b0ef1fb0e3b949274c",
-        "size": 190208
+        "sha256": "bfad3dbfe2cbe85b5e9d3f2264ad247764d611af4467f333e275026527b7d808",
+        "size": 190256
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_bz2.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "a0cbac8ac815ef43151e11e662f3100d4d947e5eae48e6ff5a590a347b1a6c4b",
-        "size": 140432
+        "sha256": "4cebe36332773c421c8755e23da02dd258ba0618260ce93430b287b02dc1ba01",
+        "size": 140496
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_cn.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "5d5a191a802d9a6864685411f2b53a47d547531d7b480a8201e1df43186dae13",
-        "size": 384016
+        "sha256": "c89248b6f696d5efb32425c2f7cd808b55ad8bc3c7c4cf2bf4af32b0198135bb",
+        "size": 384064
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_hk.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "e241a69b5ca0b17dc5529a4b40be508f8cb775c89c3cb2ac8b25ac8ef58bbcfd",
-        "size": 400000
+        "sha256": "9cffd00018d12d16fcdd72588173f979154b82176a7aa93f2fde8cf2f935f0b5",
+        "size": 400048
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_iso2022.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "40fc085eb40d0338db4cf86ea58bb16dc5d47d88b352038d4d1a914dc62e9025",
-        "size": 158016
+        "sha256": "b46100991a68bfd2e206779c4b7fc8347459c42f8f31385f65ce227f4eddc8ce",
+        "size": 158064
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_jp.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "e94496bab1adc61054a3aa283a0388620b3971a6ddd36e83d95fd4b19f0ceb1e",
-        "size": 598336
+        "sha256": "c1fe5440991a7825b034b2707682866abf861a1d13277a3a0ea12410785958ba",
+        "size": 598384
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_kr.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "8c33c05801f254c1042fb7a466886a2abc23723b6fafe59d3906e9a6ce7f2f19",
-        "size": 351088
+        "sha256": "4201558b7eaec0062b5f38017a255561d56b343882f804ff07ef3b40e879b6d9",
+        "size": 351136
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_codecs_tw.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "850c36e70064afefcb24c070dfba3bf1422bd6a45f80201bba0d4a3316296f24",
-        "size": 333872
+        "sha256": "bdb300c3b0f30f20193511be0634a6a84abe6041841ada5061a617c894f30ea4",
+        "size": 333920
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_contextvars.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "85d92d5179abc8721ff0d4f43e10a530221de5dba54c7a736fe776db8715b204",
-        "size": 118368
+        "sha256": "4a6632ba26cb659ad46c3b578a19d1b9c51b72ea345a0e6f503d58ccf0db2b7c",
+        "size": 118416
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_csv.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "067517c23908a9055917478cc37cd4b3620f3728ee9c926d08e86554c0d25f26",
-        "size": 176400
+        "sha256": "720e7f11b9782b978ac9402e988e00676361730e5d6dcd06974fb3325696aa2f",
+        "size": 176448
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_ctypes.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "c4499082db19b5cd1abd6ba4c9e25db13c47231614c1d166737e8256cbbc80b0",
-        "size": 394896
+        "sha256": "19fa3d7964b5aa58b40385b3e62d6d9ce8dedc9fd39fe26498d72594423ad8f0",
+        "size": 394944
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_ctypes_test.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d138718318106006f0fad139c0f9ebf39e8417942fa95fb8f4fe9bd9618317b4",
-        "size": 163184
+        "sha256": "4ad956490e3249a58c6e312885eee9bc6e0fc3de0655fcec539c6c6e465d8aca",
+        "size": 163232
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_curses.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "ffb9656a8b36b3be366b9154dae6ff1721b32646ef44561281e8589d7d8de45b",
-        "size": 398112
+        "sha256": "50180835ca891070ebded3a624929811afb3037ed6d6c3a67ff331faa11004b7",
+        "size": 398176
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_curses_panel.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "a1a9e35e88356bac32f53fbf15c6b77bfb3b8d98a4c142899aaf91308cc9c6fa",
-        "size": 141248
+        "sha256": "c3e3535213b3828a7f962557a3087b31b7632a81064eec0417a9159f58cc813a",
+        "size": 141296
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_datetime.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "ff0d8d1f6996a16e8e2941c6238bf1acc01a0f20d2a632a3101f4ea05cffc65e",
-        "size": 329248
+        "sha256": "37c695ebd13aa7c13b292c4cea8f03a32b562723d37d3a0fcdfdd4ea25b90849",
+        "size": 329312
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_dbm.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "104a5586b04a52cca1825f028e22976e52f985c8132ee887ae99543314afd0c6",
-        "size": 139840
+        "sha256": "7ee5c5ad5c2efd985279bd3455e59758e2ceb2dfa33eefa5c1583233d1ef388b",
+        "size": 139888
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_decimal.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "92993749f023dbd051173bcc9d1d4f667e638c5936c9d8785b10c2b70305de96",
-        "size": 764896
+        "sha256": "5a578f7dc7425e9f040c2986fa746380ec8e8d4a41dad6fedcb0412e400190ce",
+        "size": 765056
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_elementtree.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "44ce21aa337b2fb9fcd27c8fa027565115ed33f12eb99f08a27eadb6e0cd5271",
-        "size": 274640
+        "sha256": "3130cc4ccff0b7d47e488680bcba8783192e536c3b61d01ac46b3187e8efeeff",
+        "size": 274688
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_hashlib.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "0e2c5c436808c4c7d1e7f26a8e2e94aecde3c3b71c9befa07f2ec3a7345d3088",
-        "size": 219168
+        "sha256": "ce3bbb901d24aaacf706591cfc6c0c6311b6a53b52cd58870ba3bbf5e882fa55",
+        "size": 219216
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_heapq.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "4d3652137117233582311895fdd09d817155cc382d943e9b670d1087f25d3945",
-        "size": 136784
+        "sha256": "35a08b2025a2252dee0ecc9675cd12d86c29be016e34f347ecfa20799e32bf06",
+        "size": 136832
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_interpchannels.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "7e7515fcd530bd15aaa975cfd76090947c1e2cac7e267352a9792fd89e6b1b66",
-        "size": 178704
+        "sha256": "5cd62e8307ca9fb39d0637c2925fe5e8746149866cce5fe6b657e075d5c66079",
+        "size": 178752
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_interpqueues.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "e32c08b1510fe553daa628c54d79a77e0916c1f27f0c7f8075425f5f10035888",
-        "size": 158512
+        "sha256": "4c3b8fea065557b4fe0cc1c1daff5abb26c9bab1e818e44a181d74deffee364e",
+        "size": 158576
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_interpreters.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "eabdaad267ae82d15c6f68e0a56d965b6cf115cd5dbffa5c99e33a299f4d3b25",
-        "size": 179344
+        "sha256": "15c72ee17d73203bb6dfc534d3fc542038d824c22e744a68ede7d017d6d319e8",
+        "size": 179392
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_json.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "1a95712c6199445225efdbc85170ca794a714688560e9184dcaac3813abe4cd4",
-        "size": 191184
+        "sha256": "5a154353485efb3f7d7c8fbae9a5dcf8d8db0f6d06f0561d6738097e7bd4d59a",
+        "size": 191232
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_lsprof.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "a1300020d9ef662c559e3ef1650141ec7adef16f8cbaa026c73f36a808a9c299",
-        "size": 156992
+        "sha256": "6db705930ab36be6e87cd94c03cd22126a472c749c07af5f0674723e3a963613",
+        "size": 157040
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_lzma.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "e1185dc113338b2afcc52da6ca606fc3e3d628778f08cc498d4fa4a3b9153003",
-        "size": 177360
+        "sha256": "eda10e7797304ab84dba170ab39664c7816f96dd60a12948a6699ac5e67a1f46",
+        "size": 177408
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_md5.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "0c5de7c1219015cbe3dbd4ca38926f3c0bf521b81ee08138d13649cc37e6f181",
-        "size": 139120
+        "sha256": "097c52880aadc8a811eee034f83dbc560bb3879b5b1be335fc7d575d925fcaef",
+        "size": 139168
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_multibytecodec.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "2d439905642bccb18fbf4efa7f70bbc43169c5a3d1f24b2c41db21b0117e3655",
-        "size": 200176
+        "sha256": "1b850cc0f3459ec34e89646af1f85c83549ccf69f113a92cc8e9c95d43b8d2e3",
+        "size": 200224
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_multiprocessing.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d2d3055c3e20dc2a80d69e1bf8f37256c2750da2c76ccff18258f595ca951c18",
-        "size": 161184
+        "sha256": "b135f8d0c47100e8246411420ff1ad3a1cf1c4c1275daa41777300dcbaabe91e",
+        "size": 161232
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_opcode.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "20267a7d8735709a2b39ca01dfd14e1acb0879c5abe067fc35f84d20778888e7",
-        "size": 141232
+        "sha256": "a4f4a72efb3ce570c16c9c542706b73ba4ebb13e28fb41b9f79a33907d962aae",
+        "size": 141280
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_pickle.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "28331bd9e82b3705bc0b7d2b05c88c44c9920dff30256c0d93f633b26e6b4f63",
-        "size": 357040
+        "sha256": "4894015ad09ebeaf8ab56b6d5f3b8558dd8ebe5ccb795c4b28547d9c98a5d6c6",
+        "size": 357088
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_posixshmem.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "7d1bf83924f6080d745a8eddeea0ee139c4b2e7a0d65ae038310ff57274dbfb3",
-        "size": 139120
+        "sha256": "f49f0dabf57fb50ea8fd81506d9a9628e0a5454f26a26a3f47db0d8ff3ff8e79",
+        "size": 139168
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_posixsubprocess.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "77d0d3466204b4d15229c8ef197ebee50639f33ffea18d10c210e728ab117938",
-        "size": 139008
+        "sha256": "b03e75e4125a8f2db7736be7d4f3d8164e9b052b3e82ea3811e14731b9e403cf",
+        "size": 139072
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_queue.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "84d6f5accd395ad408803751bd18864ab1a1b1fa7135b84df3aec49f402120c7",
-        "size": 139888
+        "sha256": "c0e762cc8ef30b1cfde86304c32bdc6fdad5c330b4d4f5b105e0d03891456bab",
+        "size": 139936
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_random.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "cca8a928a93afa92d40a05cce4860df498b6831224fc40bb1d80c59263e2ff2a",
-        "size": 138992
+        "sha256": "e028a9a83a99bad4d333dc4084f4bf335c708d47741501aec111cdde3f541d07",
+        "size": 139040
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_scproxy.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "844cd7cb58b93cade55c472561f50e72ff6388ffb09c294359e4d506fa3c0344",
-        "size": 137488
+        "sha256": "38df66996d1ef50ec0cbf5702f0ee6a995f8a64c13499beade55c269ce535676",
+        "size": 137536
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_sha1.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "1de5d8979d6550441073de441d91f6c6627e05041a47aefd4b28120d355a5017",
-        "size": 138928
+        "sha256": "edd8e216e22e01cc1be87943499b3d6159167e6e9c222417b8cd9b410229ced9",
+        "size": 138976
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_sha2.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "27b92c02cba0294c10f1e4c7f6fed7707d5333a3228a85912ef0cc41849a0287",
-        "size": 191024
+        "sha256": "7d6ad7efbb0dfad25618788437bee3d3a2723074dce7ee6403dab786f6c9b6b4",
+        "size": 191088
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_sha3.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "ff6bfd5b8962a201c6f114e572eda95c15ad1ec59e8ffaa9c72be541c3b6107c",
-        "size": 157824
+        "sha256": "712d5eb0950f6f2a0659985981f382bf1818be1a6fbaf6e1520bdfae5fc2869b",
+        "size": 157888
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_socket.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "1d12cbbbb2fdde4a5dc36b2ea84e8744b960979256f9e94c0a7806179114dec9",
-        "size": 272688
+        "sha256": "bc7bba67f9145695cee331d49760a688cb83698e4f03f644df6748a9c628c340",
+        "size": 272736
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_sqlite3.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "34506f620550b6cde4ec4a11c9571ec40eb23a22dfeae00756c8826b504aeddf",
-        "size": 357456
+        "sha256": "effe1a13c8fe9ba7e7c1ab32abeaf9042f5da72049f0adae9bc6585ddfa7cb07",
+        "size": 357520
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_ssl.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "fc9e583daafb7a2f60d97823e25f1432847c84c4776324e8063749ce8b485646",
-        "size": 483200
+        "sha256": "f89fb689b7d7c7237fb2111b5588db39a1ebf61d3d50d37fbc53596d13cce055",
+        "size": 483968
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_statistics.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "556fa5e140d95fbc11629fc8a9b932522a8086c67925842027074982fbb7e605",
-        "size": 134832
+        "sha256": "b595569a75f2ec4e26f210961e3118771486c511bb661063b7fabd1532a93550",
+        "size": 134880
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_struct.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d1451a4e4ea4292c87cf77cf007e9f6bb99737984c6a2141fd1b9bb09f4d99c1",
-        "size": 201024
+        "sha256": "d40a66f323a84bb2bd4df5ea5236a3b3dbd7f480d394de2c5a6e29848ac6fa5a",
+        "size": 201072
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_uuid.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "ad5bdf0fc6b22430aa0875b7c790a73d6b4c9175669c15a508134faba7a4ea45",
-        "size": 118256
+        "sha256": "ab79367fad80b1a7dea12063c7d6046265c6aedf79b895da6707600357894e4e",
+        "size": 118304
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_xxtestfuzz.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "24c46dd9b08b1fc519851b41c17783b4f59581fcfc5cb77407274ddadeac3629",
-        "size": 138224
+        "sha256": "8655680d0085dccd35cd0f242b15174099ea537010ee3ccc7caba57cdd3641bf",
+        "size": 138272
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/_zoneinfo.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "6cba45132f17137d0a9d3878282c96a0ee6274900bc8f63844404a25cb3ee240",
-        "size": 176400
+        "sha256": "81c23711182b203dcd71bf5536a7e2392b77848468d55ada4913e4dc602fc73c",
+        "size": 176448
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/array.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "266fe0089a5b83230894da2f2a1cafa2918d66aee10757064b5eadb01b384e8f",
-        "size": 236800
+        "sha256": "b133fb3e6c730a1c7d73a3647978426a830db76b911beaae3d6854774713ea91",
+        "size": 236848
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/binascii.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "df811033ed84340e1978d5a2988db0d6d179bb4c45ca3620754bd10a7604ad92",
-        "size": 172752
+        "sha256": "01e4ceebce3bc90d6341deaa1a8efb81dd866185d9df01041807ce8cbdcd70d0",
+        "size": 172800
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/cmath.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "be71138d1dfbc3f4c0d576bae4d3d2e97e7ef6796e90e131e7551d1984e326d8",
-        "size": 173856
+        "sha256": "f4d721c6933a0875c306127a36fd50871c29a492a29394ab4f42a3fcb3e97998",
+        "size": 173904
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/fcntl.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d0aba683a1591976653062a5240e9134c666007aa6f7b2410762e7bdbee9f709",
-        "size": 137200
+        "sha256": "1975ee5459c8bbb3fbc7d666838e34aee279cbfcd166e09f4d49ca0ef24aeeeb",
+        "size": 137264
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/grp.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "030324a208243b8c31106f84001e37c949cd84c5a42b456a999a49e47998ad5e",
-        "size": 137904
+        "sha256": "9fe882b2399511273b19c964d2fb0c589f5ca50269754a1c99162550e15a4773",
+        "size": 137952
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/math.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "28e8d0aeed6870e4dce05752c7694e52656846f46b365fd2eb44a373144be7d8",
-        "size": 232592
+        "sha256": "6dd56d2880769171066a7201e7e5b6794f28459420767de95649b4697f2b1735",
+        "size": 232640
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/mmap.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "592881a1c9caca9453ac9dfcf05c040a8932d2d50b4fd198997642400b0b9553",
-        "size": 157936
+        "sha256": "129e2e6fcb99bb407b5f1319a0af35781201bda6400287e107524e3cfcd8d4b6",
+        "size": 157984
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/pyexpat.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "5f140bb03b79bb7b8e98c88d3c2104345857c843253d0486ac795c55a3c1ad01",
-        "size": 547984
+        "sha256": "e29d16dbef6d096de96a5695ab419915f94fbf7a5e5adc0bad5415695d5cc728",
+        "size": 548032
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/readline.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "e2d28c30ef83bcaa528e9e38243252475bcfc84a90f749d1c432e792904dad55",
-        "size": 181088
+        "sha256": "ce5a28a9c4857c3041ecdba98db1dafd1e45238632b92b119a75e233b6d66e1f",
+        "size": 181136
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/resource.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d3477120480a8f9787b19d22fe8636bcef5b4b223bb5327d6278bb66ef3d79dc",
-        "size": 138208
+        "sha256": "22cf8c2dd201d204ce172332ed79c26f8faf8667749342add0e2e86a28f50c13",
+        "size": 138256
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/select.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "bc819e8e3154cb2ba8d5dd58b9a32b66f0d9717c73b85d95eaf1d35233f34cd6",
-        "size": 177952
+        "sha256": "7ec7c1bd33ec66d676751b224590bb5f72950aa77d3dccb47db11aef59e2e888",
+        "size": 178000
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/syslog.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "1668f810fd1c9c763167ec7b7adbd5895acc7f3e672f1011dab50f71c5e83cf6",
-        "size": 137216
+        "sha256": "d6bf685347c44d6d9f377495f68968182d3559b8924bf67b7bae205e8745576a",
+        "size": 137264
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/termios.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d10d16cb755e868f539062d1b501d879d0a197198204a39f184fc8b26c2c7d3c",
-        "size": 155856
+        "sha256": "9f29bcbc8e6cfb0efd9d8fd8f4a7b8b9241d7c26d25780821c15f349c6605497",
+        "size": 155904
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/unicodedata.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "69393a8ab761d6891ca325422d672bde1077df7d7b7da5cc6a817bb01a8bd2c4",
-        "size": 1505328
+        "sha256": "57cfe779de6519b08a0954051b74114eae4f8fcd0c8df596abf8a5f2b2c3e056",
+        "size": 1505376
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/xxlimited.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "a1122f8c7e5d128ca9d4e21413f818007ff7a75a2210721298e9ebec6a85c5e2",
-        "size": 137888
+        "sha256": "78bd8d721c82547da7ed04153e9560c3dc09415af959996fc75789759aac5cad",
+        "size": 137952
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/xxlimited_35.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "63c4e3165e43fc66121094a9fe77365204f94ce42183fb81f2cf006da82b1388",
-        "size": 137120
+        "sha256": "9536c3d002b39696527ee74d49e7e85c3b6f0f0687051beb9abf8a2bee0c8394",
+        "size": 137168
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/xxsubtype.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "531f0ce12cf442ecdcc193e6a74092cd40c27c73392c1cc6ed43e2430c6d9354",
-        "size": 136144
+        "sha256": "1ed581a2c1d1eb2a774c6b9757334cd85bb91f4fcf42e0cc1168c6ad49f4f757",
+        "size": 136208
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/lib-dynload/zlib.cpython-313-darwin.so": {
         "kind": "file",
         "mode": 493,
-        "sha256": "97dde049d917e58f5b6d542149e6d28debb868f63f98e49882c566c29a4d5701",
-        "size": 197312
+        "sha256": "f2f56c0fee71e73a9320d1a0a9c5a69b17eae75ab3c6fe3c92d3755406980214",
+        "size": 197360
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/linecache.py": {
         "kind": "file",
@@ -8042,13 +8042,13 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/pydoc_data/__pycache__/module_docs.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "e4f05c47a3371732925abd49d1e34b7ab8aa37e6cfdc39f752fc0af4a673f1f2",
+        "sha256": "aeb5090380cb2e342d35082ba782b8ac6ef6af5ef68c5d2ef53ddde975c8e0b4",
         "size": 19884
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/pydoc_data/__pycache__/topics.cpython-313.pyc": {
         "kind": "file",
         "mode": 420,
-        "sha256": "c7514ec4d9722b138d0c555fde2c4e07b4312d509b5d0be803146d69235410d9",
+        "sha256": "d0df38b3b52fe5189fbf0aef8ebf1822fd8b794090716756b6e6e33391104b01",
         "size": 564102
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/pydoc_data/_pydoc.css": {
@@ -8060,13 +8060,13 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/pydoc_data/module_docs.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "74a3f835746703d17f9ab43b89b285697af00269b406249bc87bc4d8d45b5c0f",
+        "sha256": "7132f3d150798ad40b6bf0f171b976aba0bb870b00fa393d2faeb26918d4b99d",
         "size": 14805
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/pydoc_data/topics.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "cd2e7395d5991767f74fd99b1e4d7c59dbca9a04e945d1fb794026adf81ee0cd",
+        "sha256": "e457509f70d53ec9d2e7fe8816e85c0f74c1c9a94b06bd0006f252b0054179e4",
         "size": 563555
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/queue.py": {
@@ -8406,8 +8406,8 @@
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/tarfile.py": {
         "kind": "file",
         "mode": 493,
-        "sha256": "0fd87b49826f745c16e3ee68b2390a206b2dfcfe9a0b1118bd7fcd7c06deaff1",
-        "size": 118060
+        "sha256": "9fa4b7849a0c2ed4ff4d73b9f3213e2d051a0ffd347c1ad28556933b87e767a9",
+        "size": 118079
       },
       "Python.xcframework/macos-arm64_x86_64/Python.framework/Versions/3.13/lib/python3.13/tempfile.py": {
         "kind": "file",
@@ -9604,14 +9604,14 @@
       "SwiftPythonAudioInterop.xcframework/macos-arm64_x86_64/libSwiftPythonAudioInterop-universal.a": {
         "kind": "file",
         "mode": 420,
-        "sha256": "ba58462899dad9440362652befb5781cb2bc678fb295e0cdc131eabe6341ad95",
+        "sha256": "496410c9fc40f9099cf6a81299be2a09ffd7c752b50ea7b805e443c234d7867d",
         "size": 6821560
       },
       "SwiftPythonAudioProbe": {
         "kind": "file",
         "mode": 493,
-        "sha256": "d1400596f6e7849fa5397d7cd446f95613ca666b87d6187927750c183d8dce26",
-        "size": 20176784
+        "sha256": "c584aa2ffa74db2460dcc8ce08341883e2fde70442038948846664681aa21329",
+        "size": 20227504
       },
       "SwiftPythonEngine.xcframework": {
         "kind": "directory",
@@ -9688,8 +9688,8 @@
       "SwiftPythonEngine.xcframework/macos-arm64_x86_64/SwiftPythonEngine.framework/Versions/A/SwiftPythonEngine": {
         "kind": "file",
         "mode": 493,
-        "sha256": "be6e53df8755d082db7425d7d2ee1b1a49aaa11dcba502f667efcd89c5957dc1",
-        "size": 4155696
+        "sha256": "07e58377071e850b14433e313456de5a736003ffeb019290aac63f350aac22f1",
+        "size": 4223856
       },
       "SwiftPythonEngine.xcframework/macos-arm64_x86_64/SwiftPythonEngine.framework/Versions/A/_CodeSignature": {
         "kind": "directory",
@@ -9836,7 +9836,7 @@
       "SwiftPythonMetalInterop.xcframework/macos-arm64_x86_64/libSwiftPythonMetalInterop-universal.a": {
         "kind": "file",
         "mode": 420,
-        "sha256": "4aee89b5593ed06ad33d238ea6aa10fc602e8b566626a496b53bdbac3926bc7a",
+        "sha256": "5c60a2ce8b3be355dac05de1bc9d5feeaf4d1492d7ccd433657db85efa38ffcb",
         "size": 474152
       },
       "SwiftPythonRuntime.xcframework": {
@@ -9888,8 +9888,8 @@
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/Headers/SwiftPythonRuntime.swiftmodule/arm64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "b93945946e22e70c8be25d11283fa2a12305893b1628a2449f0534e7801a44e5",
-        "size": 2657164
+        "sha256": "7123a2d86c39b40e7cb0dab8f487dcd540e9f49b4fd356bc6fd41cdeb828fba7",
+        "size": 2657384
       },
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/Headers/SwiftPythonRuntime.swiftmodule/x86_64-apple-macos.private.swiftinterface": {
         "kind": "file",
@@ -9912,8 +9912,8 @@
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/Headers/SwiftPythonRuntime.swiftmodule/x86_64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "2e67845106a9c3ee9a407ab4fa00dd937861464f001b1133a76d54a4cc7159e7",
-        "size": 2657164
+        "sha256": "5876ad232f37fa172cdf114a028b993fc7958d737d179fce3e5b7f6dd6418c8a",
+        "size": 2657384
       },
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/SwiftPythonRuntime.swiftmodule": {
         "kind": "directory",
@@ -9940,8 +9940,8 @@
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/SwiftPythonRuntime.swiftmodule/arm64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "b93945946e22e70c8be25d11283fa2a12305893b1628a2449f0534e7801a44e5",
-        "size": 2657164
+        "sha256": "7123a2d86c39b40e7cb0dab8f487dcd540e9f49b4fd356bc6fd41cdeb828fba7",
+        "size": 2657384
       },
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/SwiftPythonRuntime.swiftmodule/x86_64-apple-macos.private.swiftinterface": {
         "kind": "file",
@@ -9964,20 +9964,20 @@
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/SwiftPythonRuntime.swiftmodule/x86_64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "2e67845106a9c3ee9a407ab4fa00dd937861464f001b1133a76d54a4cc7159e7",
-        "size": 2657164
+        "sha256": "5876ad232f37fa172cdf114a028b993fc7958d737d179fce3e5b7f6dd6418c8a",
+        "size": 2657384
       },
       "SwiftPythonRuntime.xcframework/macos-arm64_x86_64/libRuntime-universal.a": {
         "kind": "file",
         "mode": 420,
-        "sha256": "2737f5353fde8649d50a8e6fd2a3505bb1570735436c93c750b8d9ebd58e3c3f",
-        "size": 37389840
+        "sha256": "da85bcd0e69aaa6abd8990cf862a969893bab7dbe32e850ddcc7d063ff835fe6",
+        "size": 37394736
       },
       "SwiftPythonWorker": {
         "kind": "file",
         "mode": 493,
-        "sha256": "93976cfbdb350d59b2daae8e401dc649b85023973232a14a0e2b92efddeb9b99",
-        "size": 18857152
+        "sha256": "73b671e17f0ce374d19ad598d97561c5334408eb966ef5aa2d860792bbec62b1",
+        "size": 18924512
       },
       "SwiftPythonWorkerService.xcframework": {
         "kind": "directory",
@@ -10028,8 +10028,8 @@
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/Headers/SwiftPythonWorkerService.swiftmodule/arm64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "6ebbf0bd998e82b4ff19d3374084ab3a42dd86fd4c93858ef3dbf9de0a90111f",
-        "size": 319072
+        "sha256": "fcf0e72e729d3331f9b01d300074244b8483b5b80327ad1424b6b0a70b095415",
+        "size": 319380
       },
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/Headers/SwiftPythonWorkerService.swiftmodule/x86_64-apple-macos.private.swiftinterface": {
         "kind": "file",
@@ -10052,8 +10052,8 @@
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/Headers/SwiftPythonWorkerService.swiftmodule/x86_64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "ecea896a130a4e7ab902097a7b4253654bf94f6bad692381ffae1a218f7df351",
-        "size": 319072
+        "sha256": "c4903698e8409c85371ab7141a7f54fc0569ee3163fd7d3962526cd50b85a835",
+        "size": 319380
       },
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/SwiftPythonWorkerService.swiftmodule": {
         "kind": "directory",
@@ -10080,8 +10080,8 @@
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/SwiftPythonWorkerService.swiftmodule/arm64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "6ebbf0bd998e82b4ff19d3374084ab3a42dd86fd4c93858ef3dbf9de0a90111f",
-        "size": 319072
+        "sha256": "fcf0e72e729d3331f9b01d300074244b8483b5b80327ad1424b6b0a70b095415",
+        "size": 319380
       },
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/SwiftPythonWorkerService.swiftmodule/x86_64-apple-macos.private.swiftinterface": {
         "kind": "file",
@@ -10104,14 +10104,14 @@
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/SwiftPythonWorkerService.swiftmodule/x86_64-apple-macos.swiftmodule": {
         "kind": "file",
         "mode": 420,
-        "sha256": "ecea896a130a4e7ab902097a7b4253654bf94f6bad692381ffae1a218f7df351",
-        "size": 319072
+        "sha256": "c4903698e8409c85371ab7141a7f54fc0569ee3163fd7d3962526cd50b85a835",
+        "size": 319380
       },
       "SwiftPythonWorkerService.xcframework/macos-arm64_x86_64/libSwiftPythonWorkerService-universal.a": {
         "kind": "file",
         "mode": 420,
-        "sha256": "4216e19b4da1d598ee5ef441e2feaf023f122b1e8c6ba58175593f4325239c61",
-        "size": 4531496
+        "sha256": "c3875a922b38208211678aee13252664823f718a4a58e1f407eef88669b14ba3",
+        "size": 4532872
       },
       "VMWorker": {
         "kind": "directory",
@@ -10126,8 +10126,66 @@
       "VMWorker/_swiftpython_wire.py": {
         "kind": "file",
         "mode": 420,
-        "sha256": "02e365621774bbe6d94ea7900d5cd5058e3e871cebc486e07e098a611c307160",
-        "size": 7492
+        "sha256": "a7f2ab3c092a5c62c07f51bbadf3d2dec2313804de511bf04518ce9d30f2b2d0",
+        "size": 7521
+      },
+      "VMWorker/security": {
+        "kind": "directory",
+        "mode": 493
+      },
+      "VMWorker/security/README.md": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "5214c1ed74c348362743ed08bd9dfa584a42cbe6d0dd5d7c814b7efa9c914f1d",
+        "size": 1360
+      },
+      "VMWorker/security/distrusted-spki-3.12.patch": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "1c0e9fc5bde84723c09e46654e23775dd116ca8cf4ea0d0b2792d0354f60df95",
+        "size": 7679
+      },
+      "VMWorker/security/distrusted-spki.patch": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "2dd26016b18213573b24ac20e030f4dd8a57a8ce2588f99e66ff5d42f2fc6faf",
+        "size": 7273
+      },
+      "VMWorker/security/distrusted_keycert.pem": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "318b63f5d596ac4f1cb0129e63f9ede04f02b9c4d2cd73b227007bd4ecc2fd55",
+        "size": 2877
+      },
+      "VMWorker/security/distrusted_root.pem": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "a7f5f86a153884ee266931e5ecb888db90af22109497afe843f788926715f2ae",
+        "size": 810
+      },
+      "VMWorker/security/install_runtime.py": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "211fe8f401cfdc2eaafbfbffb7419279cc92d58ef0ceb1d222e57be8b6b3a155",
+        "size": 7320
+      },
+      "VMWorker/security/tar-3.12.patch": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "7a3c621a090c53e62890b6e4ff57d1617ad83a41302324eb627b2383fea89101",
+        "size": 2067
+      },
+      "VMWorker/security/tar-3.13.patch": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "d9226e58a99227230e37b231218f11c90f07a2f838821392b92d2876dc5ec354",
+        "size": 2067
+      },
+      "VMWorker/security/verify_runtime.py": {
+        "kind": "file",
+        "mode": 420,
+        "sha256": "e6c80d419a246becf67240a3b873c01494436fe8f9cf99e05cd296ed57a9a4e1",
+        "size": 6448
       },
       "VMWorker/swiftpython_frames.py": {
         "kind": "file",
@@ -10175,6 +10233,6 @@
     ]
   },
   "schemaVersion": 1,
-  "sourceRevision": "a9e678a3924c689876f28b07a55e315ab6ec95b6",
+  "sourceRevision": "b08465e9d155fed2e251c76f5b9ffd70c2f2a506",
   "sourceTreeState": "clean"
 }

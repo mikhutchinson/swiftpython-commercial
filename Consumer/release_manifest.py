@@ -165,7 +165,14 @@ def create_payload(root, revision, tree_state, architectures):
     return payload
 
 
-def host_records(payload):
+def version_is_prerelease(version):
+    require(type(version) is str and
+            re.fullmatch(r"\d+\.\d+\.\d+(?:-[a-zA-Z0-9._-]+)?(?:\+[a-zA-Z0-9._-]+)?", version),
+            "Invalid release version")
+    return "-" in version.split("+", 1)[0]
+
+
+def host_records(payload, version=None):
     validate_payload(payload)
     result = []
     for kind in HOST_KINDS:
@@ -179,7 +186,7 @@ def host_records(payload):
         result.append({
             "kind": kind, "artifacts": artifacts,
             "recipe": {"path": recipe, "schemaVersion": 1, "inventory": PAYLOAD_NAME},
-            "maturity": "preview" if apple else "supported",
+            "maturity": "preview" if apple and (version is None or version_is_prerelease(version)) else "supported",
             "sourceAvailability": {"platform": "macos", "minimumOS": "26.0" if kind == "extension-foundation" else "15.0"},
             "buildTargets": {module: payload["buildTargets"][module] for module in
                              modules + (() if apple else ("SwiftPythonWorker",))},
@@ -200,7 +207,7 @@ def validate_host_manifest(manifest, payload=None, requested_host=None):
     validate_payload(payload)
     require(manifest.get("sourceRevision") == payload["sourceRevision"] and
             manifest.get("sourceTreeState") == payload["sourceTreeState"], "Manifest/payload source mismatch")
-    expected = host_records(payload)
+    expected = host_records(payload, manifest.get("version"))
     require(exact_value(manifest.get("hosts"), expected),
             "Invalid host contract or unsupported execution qualification; build metadata is not execution evidence")
     if requested_host is not None:
@@ -260,6 +267,7 @@ def main():
     create.add_argument("--architectures", nargs="+", required=True)
     hosts = commands.add_parser("hosts")
     hosts.add_argument("--payload", type=Path, required=True)
+    hosts.add_argument("--version", help="Release version; omitted for development host records")
     verify = commands.add_parser("verify-staged")
     verify.add_argument("--root", type=Path, required=True)
     verify.add_argument("--expected-payload", type=Path, required=True)
@@ -273,7 +281,7 @@ def main():
         create_payload(args.root, args.source_revision, args.source_tree_state, args.architectures)
         print(json.dumps({"payload": str(args.root / PAYLOAD_NAME), "sha256": sha256(args.root / PAYLOAD_NAME)}))
     elif args.command == "hosts":
-        print(json.dumps(host_records(load_json(args.payload)), sort_keys=True))
+        print(json.dumps(host_records(load_json(args.payload), args.version), sort_keys=True))
     elif args.command == "verify-staged":
         verify_staged_payload(args.root, expected_payload=args.expected_payload,
                               source_revision=args.source_revision, require_clean=args.require_clean)

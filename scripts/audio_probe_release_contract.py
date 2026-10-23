@@ -1180,8 +1180,10 @@ def validate_vm_image_attestation(
     *,
     expected_version: str,
     helper_records: Mapping[str, Mapping[str, Any]],
+    runtime_recipe_hashes: Mapping[str, str] | None = None,
 ) -> None:
     if value is None:
+        require(runtime_recipe_hashes is None, "owned runtime recipe requires a VM image attestation")
         return
     require(type(value) is dict, "release VM image attestation must be one object")
     expected_keys = {
@@ -1197,6 +1199,8 @@ def validate_vm_image_attestation(
         "builtAt",
         "guestArtifactSHA256",
     }
+    if runtime_recipe_hashes is not None:
+        expected_keys.add("runtimeRecipeSHA256")
     require(
         set(value) == expected_keys,
         "release VM image attestation has missing or extra fields",
@@ -1252,6 +1256,12 @@ def validate_vm_image_attestation(
         require(
             hashes.get(helper) == expected,
             f"release VM image helper digest mismatch for {helper}",
+        )
+    if runtime_recipe_hashes is not None:
+        require(bool(runtime_recipe_hashes), "owned runtime recipe inventory is empty")
+        require(
+            exact_typed_value(value.get("runtimeRecipeSHA256"), runtime_recipe_hashes),
+            "release VM image owned runtime recipe digest inventory mismatch",
         )
 
 
@@ -1455,10 +1465,26 @@ def validate_manifest(
             f"manifest VM helper hash mismatch for {helper}",
         )
 
+    recipe_directory = repo / "VMWorker" / "security"
+    recipe_hashes = None
+    if recipe_directory.exists():
+        names = {
+            "install_runtime.py", "verify_runtime.py", "tar-3.12.patch", "tar-3.13.patch",
+            "distrusted-spki-3.12.patch", "distrusted-spki.patch",
+            "distrusted_root.pem", "distrusted_keycert.pem", "README.md",
+        }
+        require(recipe_directory.is_dir() and not recipe_directory.is_symlink(),
+                "owned runtime recipe directory is invalid")
+        require({path.name for path in recipe_directory.iterdir()} == names,
+                "owned runtime recipe file inventory mismatch")
+        require(all((recipe_directory / name).is_file() and not (recipe_directory / name).is_symlink()
+                    for name in names), "owned runtime recipe contains a nonregular file")
+        recipe_hashes = {name: sha256(recipe_directory / name) for name in sorted(names)}
     validate_vm_image_attestation(
         manifest.get("vmImage"),
         expected_version=expected_version,
         helper_records=helper_records,
+        runtime_recipe_hashes=recipe_hashes,
     )
 
     complete = records[
